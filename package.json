@@ -20,7 +20,7 @@
     "python/requirements.txt",
     "docs/**/*.md",
     "README.md",
-    "README.zh.md",
+    "README.en.md",
     "LICENSE",
     "THIRD_PARTY_NOTICES.md"
   ],

@@ -1,0 +1,219 @@
+# 🧬 dsh-bio-genie
+
+<div align="center">
+
+[中文](README.md) | **English**
+
+</div>
+
+**Wish-style bioinformatics analysis plugin for DeepSeek Harness (dsh)**
+
+> Speak plainly, get results. Users describe their bioinformatics needs in natural language, and the dsh agent performs the analysis automatically.
+
+**Install and go** — no Python or Biopython installation required. The plugin bootstraps a fully isolated Python environment on first run.
+
+---
+
+## ✨ Features
+
+| Feature | Description |
+|---------|-------------|
+| 🪄 **Wish-style Analysis (Wish Coding)** | Plain language in, results out: *"What's the GC content and EcoRI cut sites of this sequence?"* |
+| 🧩 **Full Biopython Coverage** | `bio_python` executor runs arbitrary Biopython code (alignment, PDB, Phylo, motif, BLAST…) plus 14 domain skill recipes |
+| ⚡ **High-Frequency Semantic Tools** | 11 fixed-parameter tools (GC content, translation, restriction enzymes, k-mer, file IO, Entrez…) — token-efficient, stable output, validated arguments |
+| 📦 **Zero Installation** | Automatically downloads an isolated Python environment (uv + venv + Biopython) to `$DSH_HOME/dsh-bio-genie/`, no system pollution |
+| 🇨🇳 **China-Network Friendly** | `DSH_BIO_UV_BASE` mirror switch accelerates uv downloads (measured: GitHub direct 12+ min stalled → mirror 1-2 min) |
+| 🛡️ **Environment Isolation** | Python subprocesses run in `-I` (isolated) mode, immune to host PYTHONPATH pollution |
+
+---
+
+## 📦 Installation
+
+```bash
+# Option 1: Install from a local path (recommended, no npm publish needed)
+dsh plugin --profile web add "link:/path/to/dsh-bio-genie"
+
+# Option 2: After publishing to npm
+dsh plugin --profile web add @dsh-bio/dsh-bio-genie
+```
+
+Restart the dsh web service to activate. On first startup the plugin bootstraps the Python environment in the background (download uv → Python 3.12 → venv → biopython, ~1-2 min); subsequent starts are ready in seconds.
+
+### Manual Mount (when the profile already contains local packages that break pnpm validation)
+
+```bash
+mkdir -p ~/.dsh/profiles/web/node_modules/@dsh-bio/dsh-bio-genie
+cd /path/to/dsh-bio-genie
+cp -r src index.js cordis.patch.yml package.json skills prompts python docs \
+  README.md README.en.md LICENSE THIRD_PARTY_NOTICES.md \
+  ~/.dsh/profiles/web/node_modules/@dsh-bio/dsh-bio-genie/
+```
+
+Then in `~/.dsh/profiles/web/package.json`:
+- Add to `dependencies`: `"@dsh-bio/dsh-bio-genie": "file:.../dsh-bio-genie"`
+- Add to `dsh.profile.bundles`: `"@dsh-bio/dsh-bio-genie"`
+
+Finally restart the dsh web service.
+
+> ⚠️ Avoid the `dsh plugin add <npm-package>` pnpm full-resolution path: if the profile already contains non-registry local packages (e.g. skin plugins), pnpm fails with 404. The manual copy method is verified to work.
+
+---
+
+## 🛠 Tool Overview
+
+### Executor (covers 100% of Biopython)
+
+| Tool | Function |
+|------|----------|
+| `bio_python` | Run any Biopython Python program (alignment / PDB / Phylo / motif / complex pipelines / custom analysis) |
+| `bio_env` | Environment diagnostics / rebuild |
+
+### Semantic Tools (high-frequency stable operations)
+
+| Tool | Function | Typical Triggers |
+|------|----------|------------------|
+| `bio_seq_analyze` | Length / GC% / reverse complement / **six-frame translation** (both strands) / molecular weight / protein AA composition | GC content, sequence features, translate |
+| `bio_seq_translate` | DNA→protein translation (customizable genetic code table) | translate, protein sequence |
+| `bio_seq_gc_skew` | GC skew (origin-of-replication detection) | skew, replication origin |
+| `bio_seq_find_orf` | Longest open reading frame | ORF, coding region |
+| `bio_seq_kmer` | k-mer frequency statistics | k-mer |
+| `bio_seq_io_read` | Read FASTA/GenBank (UTF-8/GBK adaptive) | read fasta, parse file |
+| `bio_seq_io_write` | Write sequence files | write fasta, save sequence |
+| `bio_seq_restriction` | Restriction enzyme cut sites (CommOnly default / all optional) | restriction enzyme, cut site |
+| `bio_entrez_search` | NCBI search (esearch+esummary) | NCBI, search gene |
+| `bio_entrez_fetch` | NCBI sequence retrieval | download sequence |
+
+### Automatic Sequence-Type Detection
+
+`bio_seq_analyze` defaults `seq_type` to `auto`, auto-detecting three types:
+- Contains U but no T → **RNA**
+- Contains IUPAC ambiguity codes (R/Y/S/W/K/M/B/D/H/V) → **DNA** (primer/probe/SNP safe)
+- Contains non-nucleic letters → **Protein**
+
+---
+
+## 📚 Skill System (15 total)
+
+### Master skill: `dsh-bio-genie`
+Tool-layering decision tree: **check the semantic tool table first → use it if matched; otherwise write code via `bio_python`**.
+
+### 14 Domain Recipes
+
+| Skill | Biopython modules covered |
+|-------|---------------------------|
+| `bio-core` | Core workflow (load first for any analysis) |
+| `bio-io` | Bio.SeqIO (FASTA/FASTQ/GenBank/EMBL…) |
+| `bio-seq` | Bio.Seq / Bio.SeqUtils (GC, Tm, molecular weight) |
+| `bio-align` | Bio.Align.PairwiseAligner / Bio.AlignIO |
+| `bio-blast` | Bio.Blast (NCBIWWW / NCBIXML) |
+| `bio-searchio` | Bio.SearchIO (BLAST/HMMER/Exonerate parsing) |
+| `bio-entrez` | Bio.Entrez (esearch/efetch/esummary/elink) |
+| `bio-phylo` | Bio.Phylo (Newick/Nexus, phylogenetics) |
+| `bio-structure` | Bio.PDB (structure parsing, distances, superposition) |
+| `bio-motif` | Bio.motifs (PWM, JASPAR/MEME) |
+| `bio-restriction` | Bio.Restriction (cut sites, fragments) |
+| `bio-utils` | Bio.Data.CodonTable (genetic codes, codon usage) |
+| `bio-graphics` | Bio.Graphics.GenomeDiagram (map drawing) |
+| `bio-popgen` | Bio.PopGen (population genetics) |
+
+---
+
+## 🚀 Usage Examples
+
+**Scenario 1: Semantic tool path (high-frequency operations)**
+
+> User: *"Analyze the GC content and EcoRI sites of the sequences in this file: D:/data/genes.fasta"*
+
+```
+Agent automatically:
+1. bio_seq_io_read        → read FASTA
+2. bio_seq_analyze        → GC content per sequence
+3. bio_seq_restriction    → check EcoRI
+4. Summary report + biological interpretation
+```
+
+**Scenario 2: Executor path (features not covered by semantic tools)**
+
+> User: *"Draw a protein structure alignment of these two genes"*
+
+```
+Agent automatically:
+1. Load bio-align / bio-structure skills
+2. bio_python writes and runs a Biopython program
+3. Produce files + report
+```
+
+**Scenario 3: Combined path (verified in practice)**
+
+> User: *"Read the FASTA and analyze each sequence's GC, longest ORF and EcoRI sites"*
+
+```
+Agent automatically (measured behavior):
+1. Load dsh-bio-genie master skill (decision guidance)
+2. bio_seq_io_read reads the file
+3. bio_python completes GC + ORF + restriction analysis in one pass
+4. Output summary table (GC 48.28%, ORF 7 aa, EcoRI nt 3-8) + biological interpretation
+```
+
+---
+
+## 🔧 Environment Bootstrap (Zero-Dependency Self-Provisioning)
+
+On first tool call (or background warm-up at dsh startup) the plugin automatically:
+
+```
+1. Download uv            → $DSH_HOME/dsh-bio-genie/bin/uv
+   (GitHub release; DSH_BIO_UV_BASE for mirror acceleration)
+2. uv python install      → $DSH_HOME/dsh-bio-genie/python/ (private CPython 3.12)
+3. uv venv                → $DSH_HOME/dsh-bio-genie/python-env/
+4. uv pip install         → biopython + numpy
+```
+
+- **Everything** lives under `$DSH_HOME/dsh-bio-genie/` (default `~/.dsh/dsh-bio-genie/`); delete it to fully uninstall
+- **Assumes no system Python/uv** (self-provisioning); falls back to system python (if present) on bootstrap failure
+- **Plugin upgrades don't lose the environment**: it lives in the DSH_HOME private directory, separate from the plugin itself (node_modules)
+- **Idempotent**: ready environments reuse in seconds; failed bootstraps auto-retry
+- First bootstrap needs network; semantic tools work offline afterwards
+
+---
+
+## 🔄 Compatibility
+
+| Dimension | Requirement |
+|-----------|-------------|
+| **Node** | `^22.19 \|\| >=24` (same as dsh) |
+| **dsh** | Peer deps `@deepseek-ai/dsh-tools` etc. at `^0.1.0-rc.6`, matching the current dsh source-tree build. If your host dsh is the older npm `latest` (`0.0.1-rc.1`), two copies of `dsh-tools` may resolve and cause type mismatches — use a dsh built from the source repository |
+| **Platform** | Windows / macOS / Linux (x86_64 / arm64); platform-appropriate uv/Python is downloaded automatically |
+
+---
+
+## 🧩 Development
+
+Pure ESM JavaScript, **no build step**, edit-and-run:
+
+```bash
+git clone https://github.com/dsh-bio/dsh-bio-genie
+# Invoke the bootstrapper directly (first run downloads the environment, ~1-2 min):
+node --input-type=module -e "import('./src/runtime.js').then(m => m.ensureEnvironment({}))"
+```
+
+- Architecture: see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- Add a semantic tool: add an op in `python/bio_ops.py` + a `bioTool` entry in `src/tools.js`
+- Add a domain skill: `skills/bio-xxx.md` + a SKILL_MANIFEST entry in `src/skills.js`
+
+---
+
+## 📄 License
+
+- **dsh-bio-genie itself**: MIT License
+- **Biopython**: Biopython License Agreement / BSD 3-Clause (permissive, see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md))
+- **numpy**: BSD License
+- **BioSQL intentionally excluded** (LGPL)
+
+---
+
+## 🙏 Acknowledgements
+
+All of this project's biological computing power stands on **Biopython** — our thanks to the [biopython/biopython](https://github.com/biopython/biopython) project and all its contributors for 25 years of outstanding work. The high-quality implementations they maintain — sequence analysis, alignment, structural biology, phylogenetics and more — make "wish-style bioinformatics" possible. Biopython is released under the permissive [Biopython License Agreement](https://github.com/biopython/biopython/blob/master/LICENSE.rst) (BSD 3-Clause compatible), which allows free copying, modification and redistribution, so this plugin can rely on and promote it with confidence.
+
+We also thank [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) for its plugin-based agent framework, and the numpy community for its foundational contributions.

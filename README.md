@@ -1,5 +1,11 @@
 # 🧬 dsh-bio-genie
 
+<div align="center">
+
+**中文** | [English](README.en.md)
+
+</div>
+
 **面向 DeepSeek Harness (dsh) 的生物信息学「许愿式分析」插件**
 
 > 说人话，出结果。用户用自然语言描述生物学分析需求，dsh 的 agent 自动完成分析。
