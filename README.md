@@ -31,24 +31,38 @@
 
 ## 📦 安装
 
-```bash
-# 方式一：本地路径安装（推荐，无需发布 npm）
-dsh plugin --profile web add "link:/path/to/dsh-bio-genie"
+本插件已发布为 npm 包 `@dsh-bio/dsh-bio-genie`，使用 dsh 官方标准的 `dsh plugin` 命令安装：
 
-# 方式二：发布到 npm 后
+```sh
+# 方式一：从 npm 安装（推荐，安装预构建代码）
 dsh plugin --profile web add @dsh-bio/dsh-bio-genie
+
+# 方式二：从 GitHub 安装（拉取源码；本插件为纯 ESM 无构建步骤，可直接加载）
+dsh plugin --profile web add github:moonbowterfly/dsh-bio-genie
+
+# 方式三：从本地目录安装（开发调试）
+dsh plugin --profile web add ./dsh-bio-genie
 ```
 
-重启 dsh web 服务后生效。首次启动时插件会在后台自动引导 Python 环境
-（下载 uv → Python 3.12 → venv → biopython，约 1-2 分钟），之后秒级就绪。
+安装后重启 dsh web 服务，插件即被加载。首次启动时插件会在后台自动引导 Python
+环境（下载 uv → Python 3.12 → venv → biopython，约 1-2 分钟），之后秒级就绪。
 
-### 手动挂载（当 profile 已含本地包导致 pnpm 校验失败时）
+验证插件层是否生效（无需启动）：
+
+```sh
+dsh --profile web --dump-config   # 输出中应包含 "# == dsh-bio-genie" 层
+```
+
+### 故障排除：profile 已有本地包导致 pnpm 校验失败
+
+若你的 profile 里已装过**不在 npm registry 的本地包**（如皮肤插件），`dsh plugin add`
+触发的 pnpm 全量校验可能报 `ERR_PNPM_FETCH_404`。此时可手动挂载（已验证可行）：
 
 ```bash
 mkdir -p ~/.dsh/profiles/web/node_modules/@dsh-bio/dsh-bio-genie
 cd /path/to/dsh-bio-genie
 cp -r src index.js cordis.patch.yml package.json skills prompts python docs \
-  README.md README.zh.md LICENSE THIRD_PARTY_NOTICES.md \
+  README.md README.en.md LICENSE THIRD_PARTY_NOTICES.md \
   ~/.dsh/profiles/web/node_modules/@dsh-bio/dsh-bio-genie/
 ```
 
@@ -57,8 +71,6 @@ cp -r src index.js cordis.patch.yml package.json skills prompts python docs \
 - `dsh.profile.bundles` 数组添加：`"@dsh-bio/dsh-bio-genie"`
 
 最后重启 dsh web 服务。
-
-> ⚠️ 不要用 `dsh plugin add <npm 包>` 的 pnpm 全量校验路径：若 profile 已含非 registry 的本地包（如皮肤插件），pnpm 会因 404 失败。手动复制方式已验证可行。
 
 ---
 

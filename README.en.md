@@ -31,17 +31,30 @@
 
 ## 📦 Installation
 
-```bash
-# Option 1: Install from a local path (recommended, no npm publish needed)
-dsh plugin --profile web add "link:/path/to/dsh-bio-genie"
+This plugin is published as the npm package `@dsh-bio/dsh-bio-genie`. Install it with the standard dsh `dsh plugin` command:
 
-# Option 2: After publishing to npm
+```sh
+# Option 1: Install from npm (recommended, prebuilt code)
 dsh plugin --profile web add @dsh-bio/dsh-bio-genie
+
+# Option 2: Install from GitHub (fetches source; this plugin is pure ESM with no build step, loads directly)
+dsh plugin --profile web add github:moonbowterfly/dsh-bio-genie
+
+# Option 3: Install from a local directory (development)
+dsh plugin --profile web add ./dsh-bio-genie
 ```
 
 Restart the dsh web service to activate. On first startup the plugin bootstraps the Python environment in the background (download uv → Python 3.12 → venv → biopython, ~1-2 min); subsequent starts are ready in seconds.
 
-### Manual Mount (when the profile already contains local packages that break pnpm validation)
+Verify the plugin layer is active (no boot needed):
+
+```sh
+dsh --profile web --dump-config   # output should contain a "# == dsh-bio-genie" layer
+```
+
+### Troubleshooting: profile already contains local packages that break pnpm validation
+
+If your profile already has locally installed packages **not on the npm registry** (e.g. skin plugins), `dsh plugin add` may fail with `ERR_PNPM_FETCH_404` during the full pnpm resolution. In that case, mount manually (verified to work):
 
 ```bash
 mkdir -p ~/.dsh/profiles/web/node_modules/@dsh-bio/dsh-bio-genie
@@ -56,8 +69,6 @@ Then in `~/.dsh/profiles/web/package.json`:
 - Add to `dsh.profile.bundles`: `"@dsh-bio/dsh-bio-genie"`
 
 Finally restart the dsh web service.
-
-> ⚠️ Avoid the `dsh plugin add <npm-package>` pnpm full-resolution path: if the profile already contains non-registry local packages (e.g. skin plugins), pnpm fails with 404. The manual copy method is verified to work.
 
 ---
 
