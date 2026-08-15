@@ -25,13 +25,18 @@
     "THIRD_PARTY_NOTICES.md"
   ],
   "keywords": [
-    "dsh-plugin",
+    "dsh",
     "deepseek-harness",
-    "biopython",
+    "dsh-plugin",
     "bioinformatics",
+    "biology",
+    "bio-analysis",
+    "biology-analysis",
+    "biopython",
     "genomics",
-    "sequencing",
-    "wish-coding"
+    "sequence-analysis",
+    "wish-coding",
+    "python"
   ],
   "license": "MIT",
   "engines": {

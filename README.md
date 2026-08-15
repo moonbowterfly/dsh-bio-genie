@@ -8,6 +8,8 @@
 
 **面向 DeepSeek Harness (dsh) 的生物信息学「许愿式分析」插件**
 
+> **dsh bio analysis** · **dsh biology analysis** · **deepseek harness bioinformatics** · Biopython · sequence analysis · genomics
+>
 > 说人话，出结果。用户用自然语言描述生物学分析需求，dsh 的 agent 自动完成分析。
 
 **下载安装即用** —— 无需用户安装 Python 或 Biopython，插件首次运行自动引导完全隔离的 Python 环境。

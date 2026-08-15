@@ -8,6 +8,8 @@
 
 **Wish-style bioinformatics analysis plugin for DeepSeek Harness (dsh)**
 
+> **dsh bio analysis** · **dsh biology analysis** · **deepseek harness bioinformatics** · Biopython · sequence analysis · genomics
+>
 > Speak plainly, get results. Users describe their bioinformatics needs in natural language, and the dsh agent performs the analysis automatically.
 
 **Install and go** — no Python or Biopython installation required. The plugin bootstraps a fully isolated Python environment on first run.
