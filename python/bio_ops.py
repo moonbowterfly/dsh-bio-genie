@@ -9,6 +9,12 @@ import json
 import sys
 import traceback
 
+# Windows 下 sys.stdin/stdout 默认按 GBK（locale）编解码，而 Node 侧
+# 以 UTF-8 写入/读取。不显式重配置会导致中文参数/结果损坏。强制 UTF-8。
+sys.stdin.reconfigure(encoding='utf-8')
+sys.stdout.reconfigure(encoding='utf-8')
+sys.stderr.reconfigure(encoding='utf-8')
+
 # ---- 序列分析 ----
 
 def op_seq_analyze(args):

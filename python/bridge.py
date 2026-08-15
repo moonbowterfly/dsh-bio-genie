@@ -27,6 +27,13 @@ import os
 import sys
 import traceback
 
+# Windows 下 sys.stdin/stdout 默认按 GBK（locale）编解码，而 Node 侧
+# 以 UTF-8 写入/读取。不显式重配置会导致中文代码注释/输出损坏
+# （compile 时 UnicodeEncodeError / surrogate 字符）。强制 UTF-8。
+sys.stdin.reconfigure(encoding='utf-8')
+sys.stdout.reconfigure(encoding='utf-8')
+sys.stderr.reconfigure(encoding='utf-8')
+
 # Hard cap on captured stdout/stderr so a runaway program cannot balloon the
 # plugin's memory; the harness spill policy already handles model-facing size.
 MAX_CAPTURE_CHARS = 1_000_000
