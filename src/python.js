@@ -55,8 +55,13 @@ function spawnPython(exe, script, payload, { cwd, timeoutMs, signal } = {}) {
         settle({ ok: false, stdout, stderr, error: `python returned no valid JSON (exit ${code})`, exitCode: code, timedOut: false })
       }
     })
-    child.stdin.write(JSON.stringify(payload))
-    child.stdin.end()
+    try {
+      child.stdin.write(JSON.stringify(payload))
+      child.stdin.end()
+    } catch (err) {
+      // python 未启动（如路径不存在）时 stdin 可能已关闭；error 事件会兜底上报
+      settle({ ok: false, stdout, stderr, error: `stdin write failed: ${err.message}`, exitCode: null, timedOut: false })
+    }
   })
 }
 

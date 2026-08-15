@@ -24,36 +24,45 @@ def op_seq_analyze(args):
         'sequence': sequence.upper(),
     }
 
-    if seq_type in ('auto', 'dna', 'rna'):
-        # 自动判断：含 U 视为 RNA，含 T 视为 DNA
+    # 自动判断序列类型（含蛋白启发式：出现非核酸字母判为蛋白）
+    if seq_type == 'auto':
         upper = sequence.upper()
-        if seq_type == 'auto':
-            if 'U' in upper and 'T' not in upper:
-                seq_type = 'rna'
-            else:
-                seq_type = 'dna'
+        dna_letters = set('ACGTN')
+        if 'U' in upper and 'T' not in upper:
+            seq_type = 'rna'
+        elif set(upper) - dna_letters - {'U'}:
+            seq_type = 'protein'
+        else:
+            seq_type = 'dna'
+
+    if seq_type in ('dna', 'rna'):
         result['seq_type'] = seq_type
+        result['gc_fraction'] = gc_fraction(s)
+        result['gc_percent'] = round(gc_fraction(s) * 100, 2)
+        result['reverse_complement'] = str(s.reverse_complement())
 
         if seq_type == 'dna':
-            result['gc_fraction'] = gc_fraction(s)
-            result['gc_percent'] = round(gc_fraction(s) * 100, 2)
-            result['reverse_complement'] = str(s.reverse_complement())
             result['complement'] = str(s.complement())
-            # 六框翻译（前 3 个正链，后 3 个是负链的互补）
+            # 六框翻译：正链 3 框 + 负链（反向互补）3 框
+            rc = s.reverse_complement()
             frames = {}
             for frame in range(3):
-                translated = s[frame:].translate(to_stop=False)
-                frames[f'+{frame + 1}'] = str(translated)
+                frames[f'+{frame + 1}'] = str(s[frame:].translate(to_stop=False))
+                frames[f'-{frame + 1}'] = str(rc[frame:].translate(to_stop=False))
             result['translations'] = frames
         elif seq_type == 'rna':
-            result['gc_fraction'] = gc_fraction(s)
-            result['gc_percent'] = round(gc_fraction(s) * 100, 2)
-            result['reverse_complement'] = str(s.reverse_complement())
-            result['translations'] = {f'+{frame + 1}': str(s[frame:].translate()) for frame in range(3)}
+            result['complement'] = str(s.complement())
+            frames = {}
+            for frame in range(3):
+                frames[f'+{frame + 1}'] = str(s[frame:].translate())
+            result['translations'] = frames
 
     if seq_type == 'protein':
         result['seq_type'] = 'protein'
-        result['molecular_weight'] = round(molecular_weight(s), 2)
+        result['molecular_weight'] = round(molecular_weight(s, seq_type='protein'), 2)
+        # 氨基酸组成
+        from collections import Counter
+        result['aa_composition'] = dict(Counter(sequence.upper()))
 
     return result
 
@@ -112,7 +121,7 @@ def op_seq_find_orf(args):
 
 def op_seq_restriction(args):
     """限制酶位点分析。"""
-    from Bio.Restriction import RestrictionBatch
+    from Bio.Restriction import RestrictionBatch, AllEnzymes
     from Bio.Seq import Seq
 
     sequence = args['sequence']
@@ -129,7 +138,8 @@ def op_seq_restriction(args):
             except Exception:
                 missing.append(e)
     else:
-        batch = RestrictionBatch()
+        # 不指定 → 分析全部已知酶（AllEnzymes 含商业化与虚构酶全集）
+        batch = RestrictionBatch(first=AllEnzymes)
 
     sites = {}
     for enz in batch:
@@ -166,23 +176,26 @@ def op_seq_io_read(args):
             fmt = 'fasta'
     records = []
     count = 0
-    # 编码容错：优先 UTF-8，失败回退 GBK（中文 Windows 常见）
+    # 编码容错：先读原始字节，再尝试 UTF-8 解码，失败回退 GBK（中文 Windows 常见）。
+    # 注意：open(encoding=...) 是惰性的，UnicodeDecodeError 在迭代时才抛，所以必须显式 decode。
+    import io
+    raw = open(path, 'rb').read()
     try:
-        handle = open(path, 'r', encoding='utf-8')
+        text = raw.decode('utf-8')
     except UnicodeDecodeError:
-        handle = open(path, 'r', encoding='gbk')
-    with handle:
-        for rec in SeqIO.parse(handle, fmt):
-            if count >= limit:
-                break
-            records.append({
-                'id': rec.id,
-                'name': rec.name,
-                'description': rec.description,
-                'length': len(rec.seq),
-                'seq_preview': str(rec.seq[:100]),
-            })
-            count += 1
+        text = raw.decode('gbk', errors='replace')
+    handle = io.StringIO(text)
+    for rec in SeqIO.parse(handle, fmt):
+        if count >= limit:
+            break
+        records.append({
+            'id': rec.id,
+            'name': rec.name,
+            'description': rec.description,
+            'length': len(rec.seq),
+            'seq_preview': str(rec.seq[:100]),
+        })
+        count += 1
     return {'format': fmt, 'count': count, 'records': records}
 
 

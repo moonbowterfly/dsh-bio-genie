@@ -46,8 +46,5 @@
     "@deepseek-ai/dsh-tools": "^0.1.0-rc.6",
     "@deepseek-ai/dsh-skill": "^0.1.0-rc.6",
     "@deepseek-ai/dsh-system-prompt": "^0.1.0-rc.6"
-  },
-  "dependencies": {
-    "@deepseek-ai/schemastery": "^3.18.1"
   }
 }
