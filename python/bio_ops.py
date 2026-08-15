@@ -27,10 +27,11 @@ def op_seq_analyze(args):
     # 自动判断序列类型（含蛋白启发式：出现非核酸字母判为蛋白）
     if seq_type == 'auto':
         upper = sequence.upper()
-        dna_letters = set('ACGTN')
+        # 完整 IUPAC DNA 字母表：ACGTN + 模糊碱基 RYSWKMBDHV（引物/探针/SNP 常用）
+        dna_iupac = set('ACGTRYSWKMBDHVN')
         if 'U' in upper and 'T' not in upper:
             seq_type = 'rna'
-        elif set(upper) - dna_letters - {'U'}:
+        elif set(upper) - dna_iupac - {'U'}:
             seq_type = 'protein'
         else:
             seq_type = 'dna'
@@ -121,11 +122,12 @@ def op_seq_find_orf(args):
 
 def op_seq_restriction(args):
     """限制酶位点分析。"""
-    from Bio.Restriction import RestrictionBatch, AllEnzymes
+    from Bio.Restriction import RestrictionBatch, AllEnzymes, CommOnly
     from Bio.Seq import Seq
 
     sequence = args['sequence']
     enzymes = args.get('enzymes', None)  # 如 ["EcoRI", "BamHI"]，None = 全部
+    enzyme_set = args.get('enzyme_set', 'commonly')  # commonly(商业常用) | all(含虚构)
     linear = args.get('linear', True)  # 线性/环状影响位点计数
     s = Seq(sequence)
 
@@ -138,8 +140,8 @@ def op_seq_restriction(args):
             except Exception:
                 missing.append(e)
     else:
-        # 不指定 → 分析全部已知酶（AllEnzymes 含商业化与虚构酶全集）
-        batch = RestrictionBatch(first=AllEnzymes)
+        # 不指定 → 默认分析商业常用酶（CommOnly ~700 种）；enzyme_set=all 时用全量 AllEnzymes
+        batch = RestrictionBatch(first=CommOnly if enzyme_set == 'commonly' else AllEnzymes)
 
     sites = {}
     for enz in batch:

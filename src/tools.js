@@ -240,11 +240,13 @@ function semanticTools(config) {
     bioTool(config, {
       name: 'bio_seq_restriction',
       description:
-        '分析 DNA 序列的限制酶切位点。enzymes 指定酶名列表（如 ["EcoRI","BamHI"]），不指定则分析全部。' +
+        '分析 DNA 序列的限制酶切位点。enzymes 指定酶名列表（如 ["EcoRI","BamHI"]），不指定则分析全部酶。' +
+        'enzyme_set 控制酶库范围：commonly（默认，商业常用酶）或 all（全量含虚构酶）。' +
         'linear 表示线性还是环状（默认线性）。触发词：限制酶、酶切位点、restriction。',
       parameters: {
         sequence: { type: 'string', required: true, description: 'DNA 序列' },
         enzymes: { type: 'array', description: '酶名列表，如 ["EcoRI"]，默认全部', items: { type: 'string' } },
+        enzyme_set: { type: 'string', enum: ['commonly', 'all'], description: '酶库范围，默认 commonly（商业常用）' },
         linear: { type: 'boolean', description: '是否线性分子，默认 true' },
       },
       op: 'seq_restriction',

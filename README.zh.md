@@ -73,6 +73,12 @@ agent 自动：加载 `bio-align` / `bio-structure` skill → `bio_python` 写 B
 产物在 `$DSH_HOME/dsh-bio-genie/`（默认 `~/.dsh/dsh-bio-genie/`）。删目录即卸载。
 系统无任何 Python/uv 也能工作（自举）；引导失败自动回退系统 python（若有）。
 
+## 🔄 兼容性
+
+- **Node**：`^22.19 || >=24`（与 dsh 一致）
+- **dsh**：插件 peer 依赖声明 `@deepseek-ai/dsh-tools` 等为 `^0.1.0-rc.6`，与 dsh 源码仓库当前构建版本匹配。若宿主 dsh 为 npm `latest` 旧版本（`0.0.1-rc.1`），可能解析出两份 `dsh-tools` 导致不匹配——建议使用与源码仓库同步构建的 dsh
+- **平台**：Windows / macOS / Linux（x86_64 / arm64），按平台自动下载对应 uv/Python
+
 ## 📄 许可证
 
 - **dsh-bio-genie 本体**：MIT License
