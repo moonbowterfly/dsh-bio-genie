@@ -49,7 +49,9 @@ def _json_safe(value):
 
 
 def main() -> int:
-    raw = sys.stdin.read()
+    # 用 binary 读取 + 容错解码：任何输入字节都不会让桥接崩溃，
+    # 非法 UTF-8 会被替换为 U+FFFD（之后 JSON 解析失败会返回友好错误）。
+    raw = sys.stdin.buffer.read().decode('utf-8', errors='replace')
     try:
         payload = json.loads(raw) if raw.strip() else {}
     except json.JSONDecodeError as exc:

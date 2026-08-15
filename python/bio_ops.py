@@ -320,7 +320,8 @@ OPS = {
 
 def main():
     try:
-        raw = sys.stdin.read()
+        # binary 读取 + 容错解码：任何输入字节都不会崩溃（与 bridge.py 一致）
+        raw = sys.stdin.buffer.read().decode('utf-8', errors='replace')
         if not raw.strip():
             print(json.dumps({'ok': False, 'error': 'empty request'}))
             return
