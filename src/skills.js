@@ -91,6 +91,9 @@ export function registerSkills(ctx, skillsDir) {
   disposers.push(ctx.skills.register({
     name: 'dsh-bio-genie',
     description: '生物信息学「许愿式分析」主指引：工具分层选择（语义化 bio_* 工具 vs bio_python 执行器）、工作流、常见坑。任何生物分析先加载本 skill。',
+    whenToUse: '用户提出生物学/序列分析/FASTA/GC含量/限制酶/翻译/ORF/k-mer 等需求时。',
+    source: 'custom',
+    provider: 'dsh-bio-genie',
     content: GENIE_SKILL_CONTENT,
   }))
 
@@ -104,6 +107,8 @@ export function registerSkills(ctx, skillsDir) {
     disposers.push(ctx.skills.register({
       name: skill.name,
       description: skill.description,
+      source: 'custom',
+      provider: 'dsh-bio-genie',
       content,
     }))
   }
