@@ -1,0 +1,18 @@
+# dsh-bio-genie bundle patch: inserts the plugin row over whatever profile it
+# is stacked on. Applied AFTER @deepseek-ai/dsh-base (which supplies the
+# `tools`, `skills`, and `systemPrompt` services this plugin injects).
+#
+# The plugin's own Schemastery schema supplies every default; users can
+# override any field from their profile cordis.patch.yml or a --patch overlay
+# by id `dsh-bio-genie`.
+#
+# Example override (pin the bundled environment to an explicit directory):
+#   - id: dsh-bio-genie
+#     name: '@dsh-bio/dsh-bio-genie'
+#     config:
+#       pythonEnvDir: 'D:/data/dsh-bio-env'
+#       uvBase: 'https://gh-proxy.com/https://github.com/astral-sh/uv/releases/download/0.7.5'
+
+- insert:
+    - id: dsh-bio-genie
+      name: '@dsh-bio/dsh-bio-genie'

@@ -1,0 +1,8 @@
+# dsh-bio bundled Python environment dependencies.
+#
+# biopython is the core; numpy is its one hard runtime dependency. Keep this
+# list intentionally small so the lazily-bootstrapped environment stays fast
+# and reproducible. Add optional extras only when a bundled skill genuinely
+# requires them (and mirror the change in the matching SKILL body).
+biopython>=1.83
+numpy>=1.26

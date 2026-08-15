@@ -1,0 +1,22 @@
+# Bundled Python environment (lazily bootstrapped — do not commit)
+python-env/
+python-env-*/
+
+# Node / package manager
+node_modules/
+.pnpm-store/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
