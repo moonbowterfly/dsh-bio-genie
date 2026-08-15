@@ -66,7 +66,9 @@ model ──bio_seq_analyze(seq)──▶ tools.js
 
 ## 5. 环境引导（零依赖自举）
 
-环境目录解析：`config.pythonEnvDir` → `<插件>/python-env` → `$DSH_HOME/dsh-bio-genie/python-env`。
+环境目录解析：`config.pythonEnvDir` → `$DSH_HOME/dsh-bio-genie/python-env`（默认）。
+刻意**不用** `<插件目录>/python-env`：npm 升级/重装插件会覆盖 node_modules 内的环境，
+导致用户已引导的环境丢失；放在 DSH_HOME 私有目录则与插件本体分离、升级不丢。
 
 引导策略（不假设系统有任何 Python/uv）：
 1. **下载 uv** 到 `$DSH_HOME/dsh-bio-genie/bin/`（GitHub release，按平台/架构；

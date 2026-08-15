@@ -65,13 +65,16 @@ function isWritable(dir) {
 }
 
 /**
- * 解析环境目录：config.pythonEnvDir → 插件内 python-env → $DSH_HOME/dsh-bio-genie/python-env。
+ * 解析环境目录（优先级）：
+ *   1. config.pythonEnvDir（用户显式指定）
+ *   2. $DSH_HOME/dsh-bio-genie/python-env（默认：插件私有目录，与插件本体分离，
+ *      升级/重装插件不会丢失环境）
+ * 刻意不用 <插件目录>/python-env —— npm 升级会覆盖 node_modules 里的环境。
  */
 export function resolveEnvDir(configured) {
   if (configured) return resolve(configured)
-  const bundled = join(PLUGIN_ROOT, 'python-env')
-  if (isWritable(bundled)) return bundled
-  return join(bioRoot(), 'python-env')
+  const dshHome = process.env.DSH_HOME ?? join(os.homedir(), '.dsh')
+  return join(dshHome, 'dsh-bio-genie', 'python-env')
 }
 
 /** uv 下载 URL（支持 DSH_BIO_UV_BASE 镜像前缀替换）。 */
