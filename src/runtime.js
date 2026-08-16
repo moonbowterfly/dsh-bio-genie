@@ -45,6 +45,12 @@ const MIRROR_PYPI = 'https://pypi.tuna.tsinghua.edu.cn/simple'
 const MIRROR_PYTHON = 'https://registry.npmmirror.com/-/binary/python-build-standalone'
 const DOWNLOAD_TIMEOUT_MS = 60_000
 const WHEEL_TIMEOUT_MS = 120_000
+/**
+ * GitHub 官方通道单请求超时（仅自动 fallback 模式）：中国网络下 GitHub 直连
+ * 多为「挂起」而非快速失败，10s 即切镜像，避免首次引导白等 60s。
+ * 用户显式设置 DSH_BIO_UV_BASE 时不受此限（用户镜像不自动 fallback，沿用 60s）。
+ */
+const GITHUB_OFFICIAL_TIMEOUT_MS = 10_000
 
 /** dsh-bio-genie 私有根目录（默认 $DSH_HOME/dsh-bio-genie）。 */
 export function bioRoot() {
@@ -114,35 +120,53 @@ export async function verifySha256(file, expectedHex) {
 }
 
 /**
- * 从 sha256sums.txt 文本中查找指定文件名的哈希。
- * 兼容 `hash  file`（GNU 双空格）与 `hash *file`（binary 标记星号）两种格式。
+ * 从 sha256sums 文本中查找指定文件名的哈希。
+ * 兼容 `hash  file`（GNU 双空格）、`hash *file`（binary 标记星号，uv 官方
+ * per-asset .sha256 文件即此格式）与纯哈希单行（部分 per-asset 文件只含哈希）。
  */
 function findChecksum(sumsText, filename) {
   for (const line of sumsText.split('\n')) {
     const parts = line.trim().split(/\s+/)
-    if (parts.length >= 2 && parts[1] === filename) return parts[0]
+    if (parts.length >= 2 && (parts[1] === filename || parts[1] === `*${filename}`)) return parts[0]
+    if (parts.length === 1 && /^[0-9a-f]{64}$/i.test(parts[0])) return parts[0]
   }
   throw new Error(`checksum entry not found for ${filename}`)
 }
 
 /**
- * 按下载 URL 对应的 release 目录获取 sha256sums.txt 并校验已下载文件。
- * 用于官方 GitHub release 与用户自定义镜像（DSH_BIO_UV_BASE）两个通道。
+ * 按下载 URL 获取校验值并校验已下载文件。两条来源按序尝试：
+ *   1. `<url>.sha256` —— uv 官方 per-asset 格式（GitHub release 无 sha256sums.txt）
+ *   2. `<base>/sha256sums.txt` —— 自定义镜像常用的 GNU 汇总格式
  * 校验文件缺失/获取失败一律拒绝执行——uv 是信任根，宁可不引导也不跑未校验二进制。
  */
 async function verifyFromReleaseChecksums(url, file) {
   const base = url.slice(0, url.lastIndexOf('/'))
   const filename = url.slice(url.lastIndexOf('/') + 1)
-  let sumsText
-  try {
-    sumsText = await fetchText(`${base}/sha256sums.txt`, 30_000)
-  } catch (err) {
-    throw new Error(
-      `checksum file unavailable (${base}/sha256sums.txt): ${err.message}. ` +
-      'Refusing to run unverified uv binary; provide sha256sums.txt on your mirror or use the official source.')
+  const sources = [
+    { name: `${filename}.sha256`, fetchUrl: `${url}.sha256` },
+    { name: 'sha256sums.txt', fetchUrl: `${base}/sha256sums.txt` },
+  ]
+  let lastErr
+  for (const src of sources) {
+    let sumsText
+    try {
+      // 二进制下载已成功（GitHub 响应正常），校验文件 15s 足够；挂起则快速放弃
+      sumsText = await fetchText(src.fetchUrl, 15_000)
+    } catch (err) {
+      lastErr = err
+      continue
+    }
+    try {
+      const expected = findChecksum(sumsText, filename)
+      await verifySha256(file, expected)
+      return
+    } catch (err) {
+      lastErr = err
+    }
   }
-  const expected = findChecksum(sumsText, filename)
-  await verifySha256(file, expected)
+  throw new Error(
+    `checksum file unavailable (${url}.sha256 / ${base}/sha256sums.txt): ${lastErr?.message ?? 'unknown'}. ` +
+    'Refusing to run unverified uv binary; provide a checksum on your mirror or use the official source.')
 }
 
 /** PyPI uv wheel 的平台 tag（uv 发布 all-platform wheels）。 */
@@ -192,7 +216,8 @@ export async function downloadUvBinary(root, logs) {
     extractArchive(officialTmp, extractDir)
   } else {
     try {
-      await download(url, officialTmp)
+      // 官方 GitHub 通道限 10s：挂起即快速失败切镜像（见 GITHUB_OFFICIAL_TIMEOUT_MS）
+      await download(url, officialTmp, GITHUB_OFFICIAL_TIMEOUT_MS)
       logs.push('[bootstrap] uv: 官方 GitHub 下载成功')
       await verifyFromReleaseChecksums(url, officialTmp)
       extractArchive(officialTmp, extractDir)
