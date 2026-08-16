@@ -25,6 +25,9 @@ to install anything or write code themselves.
   that the tool hands back to you directly — use it for small computed results.
 - For larger outputs, write files (e.g. `.fa`, `.tsv`, `.png`) and report their
   paths rather than dumping megabytes into stdout.
+- On failure the tool returns `ok: false` with `needs_repair: true` and the
+  stderr explains what went wrong. Repair the code and re-call — see
+  "Automatic code repair" below.
 
 ## Biopython module map (import what you need)
 
@@ -59,6 +62,37 @@ to install anything or write code themselves.
   no alphabet; use `Seq.translate()`/transcription helpers directly.
 - Check `bio_env` if an import fails: it reports the interpreter and package
   versions, and can re-bootstrap the environment.
+
+## Automatic code repair (ACR)
+
+When `bio_python` fails, it returns `needs_repair: true`; the stderr tells you
+why. Repair the code and re-call — do not give up on the first error:
+
+- `ImportError` / `ModuleNotFoundError` → check the module name; if a package
+  is missing, run `bio_env` with `reinstall=true`.
+- HTTP 429 / rate limit → add `time.sleep()` between requests.
+- `FileNotFoundError` → check the path; relative paths resolve against the
+  workspace — use absolute paths when unsure.
+- `KeyError` / `AttributeError` → read the stderr line number, inspect the
+  data structure.
+
+Retry up to 2 repairs (3 attempts total). If it still fails, stop and report
+the error honestly — do not retry indefinitely.
+
+## Scientific rigor constraints
+
+Every biological conclusion must be traceable to tool output, never to LLM
+inference alone:
+
+- ✅ "This sequence has 48% GC" — from `bio_seq_analyze` output.
+- ✅ "There is an EcoRI site" — from `bio_seq_restriction` output.
+- ✅ "The gene maps to 17p13.1" — from `bio_entrez_search` (db=gene) output.
+- ❌ "This is likely a tumour suppressor" — inference, unless backed by
+  BLAST/Entrez evidence.
+- ❌ "This sequence is from human" — inference, unless backed by a BLAST hit.
+
+Mark LLM-inferred statements with "[inferred — unverified]" and state which
+tool call would verify them.
 
 Load the `bio-core` and domain skills (via the `skill` tool) for detailed
 recipes before writing non-trivial code.

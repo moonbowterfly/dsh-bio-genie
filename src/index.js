@@ -28,6 +28,8 @@ export const inject = ['tools', 'skills', 'systemPrompt']
 const DEFAULT_CONFIG = {
   defaultTimeoutMs: 60000,
   warmUp: true,
+  enableLog: true,
+  enableMemory: true,
   pythonEnvDir: undefined,
 }
 

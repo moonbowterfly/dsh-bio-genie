@@ -22,10 +22,15 @@
 |---------|-------------|
 | 🪄 **Wish-style Analysis (Wish Coding)** | Plain language in, results out: *"What's the GC content and EcoRI cut sites of this sequence?"* |
 | 🧩 **Full Biopython Coverage** | `bio_python` executor runs arbitrary Biopython code (alignment, PDB, Phylo, motif, BLAST…) plus 14 domain skill recipes |
-| ⚡ **High-Frequency Semantic Tools** | 11 fixed-parameter tools (GC content, translation, restriction enzymes, k-mer, file IO, Entrez…) — token-efficient, stable output, validated arguments |
+| ⚡ **High-Frequency Semantic Tools** | 15 fixed-parameter tools (GC content, translation, restriction enzymes, k-mer, file IO, Entrez, pathway enrichment, PubMed literature, reference genome…) — token-efficient, stable output, validated arguments |
 | 📦 **Zero Installation** | Automatically downloads an isolated Python environment (uv + venv + Biopython) to `$DSH_HOME/dsh-bio-genie/`, no system pollution |
 | 🇨🇳 **China-Network Ready** | Auto network adaptation: official sources by default, automatic switch to domestic mirrors on any failure (uv→Tsinghua PyPI, CPython→npmmirror, PyPI packages→Tsinghua), zero configuration required |
 | 🛡️ **Environment Isolation** | Python subprocesses run in `-I` (isolated) mode, immune to host PYTHONPATH pollution |
+| 🔁 **Self-Repairing Execution (ACR)** | bio_python failures return a `needs_repair` signal + stderr; the agent auto-repairs and retries (max 3 attempts), reporting honestly if it still fails |
+| 📜 **Transparency Log** | Every code execution / tool call appends an async JSONL log (hash/preview/duration); `bio_log` traces back any analysis |
+| 🧬 **Scientific Rigor Guardrails** | Persona enforces "biological conclusions must trace to tool output"; pure inference is marked [inferred — unverified] |
+| 🧠 **Session Memory** | Successful code patterns + error→fix lessons accumulate automatically (local JSON); query via `bio_memory`, gets smarter over time |
+| 📚 **Protocol Knowledge Base** | 14 high-frequency task protocols (QC/alignment/BLAST/cloning/trees/structure/enrichment…), each with runnable code templates + pitfalls, bundled with the plugin |
 
 ---
 
@@ -78,8 +83,10 @@ Finally restart the dsh web service.
 
 | Tool | Function |
 |------|----------|
-| `bio_python` | Run any Biopython Python program (alignment / PDB / Phylo / motif / complex pipelines / custom analysis) |
+| `bio_python` | Run arbitrary Biopython Python programs (alignment/PDB/Phylo/motif/complex pipelines/custom analysis) |
 | `bio_env` | Environment diagnostics / rebuild |
+| `bio_log` | Execution log traceback (bio_python code hash/preview/duration + tool call records) |
+| `bio_memory` | Session memory query (successful code patterns / error-fix lessons, gets smarter over time) |
 
 ### Semantic Tools (high-frequency stable operations)
 
@@ -93,8 +100,12 @@ Finally restart the dsh web service.
 | `bio_seq_io_read` | Read FASTA/GenBank (UTF-8/GBK adaptive) | read fasta, parse file |
 | `bio_seq_io_write` | Write sequence files | write fasta, save sequence |
 | `bio_seq_restriction` | Restriction enzyme cut sites (CommOnly default / all optional) | restriction enzyme, cut site |
-| `bio_entrez_search` | NCBI search (esearch+esummary) | NCBI, search gene |
+| `bio_entrez_search` | NCBI search (esearch+esummary; db=gene returns gene metadata: full name/chromosome/aliases) | NCBI, search gene, gene info |
 | `bio_entrez_fetch` | NCBI sequence retrieval | download sequence |
+| `bio_enrichr` | Pathway/GO enrichment (gene symbol list → p-value ranked terms; GO/KEGG/Reactome/MSigDB libraries) | enrichment, pathway, GO, KEGG |
+| `bio_pubmed_search` | PubMed literature search (PMID/title/journal/authors/DOI) | literature, PubMed |
+| `bio_pubmed_abstract` | Structured abstracts by PMID (title/full abstract/authors/date/DOI) | read abstract, PMID |
+| `bio_ref_genome` | Reference genome assembly info (Ensembl: assembly name/chromosomes/download dirs) | reference genome, assembly |
 
 ### Automatic Sequence-Type Detection
 

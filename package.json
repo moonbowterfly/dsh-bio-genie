@@ -39,6 +39,9 @@
     "python"
   ],
   "license": "MIT",
+  "scripts": {
+    "bench": "node scripts/test-throttle.mjs && node scripts/test-log.mjs && node scripts/test-memory.mjs && node scripts/test-skills.mjs && node scripts/test-ops.mjs"
+  },
   "engines": {
     "node": "^22.19 || >=24"
   },

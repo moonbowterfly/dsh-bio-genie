@@ -12,9 +12,18 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import { ensureEnvironment, venvPython, resolveEnvDir } from './runtime.js'
 import { runBridge, callBio } from './python.js'
 import { resolveWorkdir, fallbackWorkspace } from './workdir.js'
+import { cacheGet, cacheSet, throttle } from './throttle.js'
+import { appendLog, codeHash, readLogs } from './log.js'
+import {
+  codeSignature, errorSignature, rememberSuccess, rememberLesson,
+  readPatterns, readLessons, searchMemory,
+} from './memory.js'
 
 /** 引导可能耗时数分钟；工具执行期间等待引导完成。 */
 const BOOT_WAIT_MS = 600_000
+
+/** 「失败挂起」队列：signature → 失败信息，等待同意图的成功来配对成经验（上限 20 防膨胀）。 */
+const pendingFixes = new Map()
 
 /** 确保环境就绪并返回 python 路径；失败抛错。 */
 async function requireEnv(config) {
@@ -39,10 +48,36 @@ function bioTool(config, opts) {
     },
     async execute(args, exec) {
       if (exec.signal.aborted) throw new Error('aborted')
+      // 缓存：查询类 op 相同参数命中缓存直接返回，不发网络请求（命中也要记日志，保可复现）
+      const cacheKey = opts.cache ? `${opts.op}:${JSON.stringify(args)}` : null
+      if (cacheKey) {
+        const hit = cacheGet(cacheKey)
+        if (hit !== undefined) {
+          if (config.enableLog !== false) {
+            appendLog({ kind: 'op', op: opts.op, ok: true, duration_ms: 0, cache_hit: true })
+          }
+          return hit
+        }
+      }
+      // 限流：不足最小间隔先等待（spawn 之前，省进程启动）
+      await throttle(opts.op)
       const py = await requireEnv(config)
       const cwd = resolveWorkdir(exec)
+      const t0 = Date.now()
       const res = await callBio(py, opts.op, args, { cwd, timeoutMs: callTimeout, signal: exec.signal })
+      const duration = Date.now() - t0
+      // 透明性日志：语义化工具调用（成功与失败都记）
+      if (config.enableLog !== false) {
+        appendLog({
+          kind: 'op',
+          op: opts.op,
+          ok: res.ok === true,
+          duration_ms: duration,
+          error: res.ok ? undefined : (res.error ?? '').slice(0, 300),
+        })
+      }
       if (!res.ok) throw new Error(res.error ?? 'bio op failed')
+      if (cacheKey) cacheSet(cacheKey, res.result)
       return res.result
     },
   })
@@ -78,6 +113,7 @@ export function registerTools(ctx, config) {
           exitCode: { type: 'integer' },
           timedOut: { type: 'boolean', required: true },
           truncated: { type: 'boolean' },
+          needs_repair: { type: 'boolean' },
         },
       },
       render: renderBioPython,
@@ -86,9 +122,50 @@ export function registerTools(ctx, config) {
       const env = await requireEnv(config)
       const timeoutMs = args.timeoutMs ?? config.defaultTimeoutMs ?? 60_000
       const cwd = resolveWorkdir(exec, args.workdir)
+      const t0 = Date.now()
       const out = await runBridge(env, args.code, { cwd, timeoutMs, signal: exec.signal })
       const canonical = { ...out }
       if (canonical.result === null || canonical.result === undefined) delete canonical.result
+      // bridge 捕获所有代码异常后恒返回 ok:true（traceback 写入 stderr），
+      // 因此代码级失败要靠 stderr 里的 traceback 头判定，而不是 out.ok。
+      const hasTraceback = /\bTraceback\s*\(most recent call last\)/.test(out.stderr ?? '')
+      if (hasTraceback) canonical.needs_repair = true
+      // 透明性日志：异步写，不阻塞返回（可 config.enableLog=false 关闭）
+      const preview = (args.code ?? '').replace(/\s+/g, ' ').trim().slice(0, 200)
+      if (config.enableLog !== false) {
+        appendLog({
+          kind: 'bio_python',
+          ok: out.ok === true && !hasTraceback,
+          code_hash: codeHash(args.code ?? ''),
+          code_preview: preview,
+          workdir: cwd,
+          stdout_len: (out.stdout ?? '').length,
+          stderr_len: (out.stderr ?? '').length,
+          result_type: typeof out.result,
+          duration_ms: Date.now() - t0,
+          timed_out: out.timedOut === true,
+          needs_repair: hasTraceback,
+        })
+      }
+      // 会话记忆：失败挂起等待配对；成功后沉淀经验 + 记成功模式
+      if (config.enableMemory !== false) {
+        const sig = codeSignature(args.code ?? '')
+        if (hasTraceback) {
+          pendingFixes.set(sig, { error_signature: errorSignature(out.stderr), failed_preview: preview })
+          if (pendingFixes.size > 20) pendingFixes.delete(pendingFixes.keys().next().value)
+        } else {
+          const pending = pendingFixes.get(sig)
+          if (pending) {
+            rememberLesson({
+              error_signature: pending.error_signature,
+              fix_hint: preview,
+              example: `${pending.failed_preview}  →  ${preview}`,
+            })
+            pendingFixes.delete(sig)
+          }
+          rememberSuccess({ signature: sig, template: preview, tool: 'bio_python' })
+        }
+      }
       return canonical
     },
   })))
@@ -134,6 +211,79 @@ export function registerTools(ctx, config) {
         envDir: env.envDir,
         bootstrapped: env.bootstrapped === true,
       }
+    },
+  })))
+
+  // ============ 执行日志查询 ============
+  disposers.push(ctx.tools.register(defineTool({
+    name: 'bio_log',
+    description:
+      '查询 dsh-bio-genie 执行日志：回溯之前 bio_python 跑过什么代码（哈希/预览/耗时/结果类型）' +
+      '和语义化工具的调用记录（op/成功/耗时/错误）。' +
+      'action=recent 返回最近 N 条；action=search 按关键词检索（如错误信息、op 名、代码片段）。' +
+      '触发词：执行日志、回溯、之前跑过什么、查错误记录。',
+    parameters: {
+      action: { type: 'string', enum: ['recent', 'search'], description: 'recent=最近日志（默认）；search=按 query 检索' },
+      query: { type: 'string', description: '检索关键词（action=search 时）' },
+      limit: { type: 'number', description: '返回条数，默认 20' },
+    },
+    output: {
+      schema: { type: 'object', additionalProperties: true },
+      render: (_args, value) => [{
+        type: 'text',
+        text: value.entries && value.entries.length
+          ? value.entries.map((e) => `[${e.ts}] ${e.kind}${e.op ? '/' + e.op : ''} ${e.ok ? 'ok' : 'FAIL'} ${e.duration_ms ?? ''}ms${e.cache_hit ? ' (cache)' : ''} ${e.error ?? ''} ${e.code_preview ?? ''}`.trim()).join('\n')
+          : '(日志为空)',
+      }],
+    },
+    async execute(args) {
+      const entries = readLogs({
+        action: args.action ?? 'recent',
+        query: args.query ?? '',
+        limit: args.limit ?? 20,
+      })
+      return { count: entries.length, entries }
+    },
+  })))
+
+  // ============ 会话记忆查询 ============
+  disposers.push(ctx.tools.register(defineTool({
+    name: 'bio_memory',
+    description:
+      '查询插件的会话记忆：成功代码模式（patterns）与错误修复经验（lessons），越用越聪明。' +
+      'action=patterns 列出成功模式；action=lessons 列出错误→修复经验；action=search 按关键词检索两者。' +
+      '写非平凡代码前先查 patterns 是否有同类任务现成模板；bio_python 失败时查 lessons 是否命中错误签名，直接套用 fix_hint。' +
+      '触发词：成功模式、修复经验、之前怎么修的、记忆。',
+    parameters: {
+      action: { type: 'string', enum: ['patterns', 'lessons', 'search'], description: 'patterns=成功模式（默认）；lessons=错误修复经验；search=关键词检索' },
+      query: { type: 'string', description: '检索关键词（action=search 时）' },
+      limit: { type: 'number', description: '返回条数，默认 10' },
+    },
+    output: {
+      schema: { type: 'object', additionalProperties: true },
+      render: (_args, value) => {
+        const items = value.items ?? []
+        if (!items.length) return [{ type: 'text', text: '(记忆为空——执行过 bio_python 任务后自动累积)' }]
+        const lines = items.map((e) => {
+          if (e.fix_hint !== undefined) return `[lesson] ${e.error_signature} → ${e.fix_hint}`
+          return `[pattern] ${e.signature || '(通用)'} :: ${e.template}`
+        })
+        return [{ type: 'text', text: lines.join('\n') }]
+      },
+    },
+    async execute(args) {
+      const limit = args.limit ?? 10
+      const action = args.action ?? 'patterns'
+      if (action === 'patterns') {
+        const items = readPatterns().slice(0, limit)
+        return { action, count: items.length, items }
+      }
+      if (action === 'lessons') {
+        const items = readLessons().slice(0, limit)
+        return { action, count: items.length, items }
+      }
+      const res = searchMemory(args.query ?? '')
+      return { action, query: args.query ?? '', count: res.patterns.length + res.lessons.length, items: [...res.lessons, ...res.patterns].slice(0, limit) }
     },
   })))
 
@@ -243,7 +393,8 @@ function semanticTools(config) {
       description:
         '分析 DNA 序列的限制酶切位点。enzymes 指定酶名列表（如 ["EcoRI","BamHI"]），不指定则分析全部酶。' +
         'enzyme_set 控制酶库范围：commonly（默认，商业常用酶）或 all（全量含虚构酶）。' +
-        'linear 表示线性还是环状（默认线性）。触发词：限制酶、酶切位点、restriction。',
+        'linear 表示线性还是环状（默认线性）。cut_positions 是 1-based 切割坐标（切点后第一个碱基）。' +
+        '触发词：限制酶、酶切位点、restriction。',
       parameters: {
         sequence: { type: 'string', required: true, description: 'DNA 序列' },
         enzymes: { type: 'array', description: '酶名列表，如 ["EcoRI"]，默认全部', items: { type: 'string' } },
@@ -255,15 +406,18 @@ function semanticTools(config) {
     }),
     bioTool(config, {
       name: 'bio_entrez_search',
-      description: 'NCBI Entrez 检索：esearch + esummary 摘要。触发词：NCBI、检索基因、搜索序列。',
+      description:
+        'NCBI Entrez 检索：esearch + esummary 摘要。db=gene 返回基因元数据（全名/染色体位置/别名/摘要），' +
+        'db=nucleotide/protein 返回序列摘要。触发词：NCBI、检索基因、查基因信息、搜索序列。',
       parameters: {
-        term: { type: 'string', required: true, description: '检索式，如 "BRCA1[Gene] AND Homo sapiens[Organism]"' },
-        db: { type: 'string', description: '数据库，默认 nucleotide（gene/protein/pubmed 等）' },
+        term: { type: 'string', required: true, description: '检索式，如 "TP53[Gene Name] AND human[Organism]"' },
+        db: { type: 'string', description: '数据库，默认 nucleotide（gene/protein 等；gene 有结构化摘要）' },
         retmax: { type: 'number', description: '最大返回数，默认 5' },
         email: { type: 'string', description: 'NCBI 要求的邮箱（建议提供）' },
       },
       op: 'entrez_search',
       timeoutMs: 120_000,
+      cache: true,
     }),
     bioTool(config, {
       name: 'bio_entrez_fetch',
@@ -277,15 +431,82 @@ function semanticTools(config) {
       op: 'entrez_fetch',
       timeoutMs: 120_000,
     }),
+    bioTool(config, {
+      name: 'bio_enrichr',
+      description:
+        '通路/功能富集分析（Enrichr REST）：输入基因符号列表，返回显著富集的通路/GO term 及 p 值。' +
+        'library 默认 GO_Biological_Process_2023，可选 GO_Molecular_Function_2023、' +
+        'GO_Cellular_Component_2023、KEGG_2021_Human、Reactome_2022、MSigDB_Hallmark_2020、WikiPathway_2023_Human。' +
+        '触发词：富集分析、通路富集、GO 分析、KEGG、Enrichr。',
+      parameters: {
+        genes: {
+          type: 'array',
+          required: true,
+          description: '基因符号列表，如 ["TP53","BRCA1","EGFR"]（建议 5-500 个）',
+          items: { type: 'string' },
+        },
+        library: { type: 'string', description: '富集库名，默认 GO_Biological_Process_2023' },
+        top: { type: 'number', description: '返回前 N 条显著条目，默认 10' },
+      },
+      op: 'enrichr',
+      timeoutMs: 120_000,
+      cache: true,
+    }),
+    bioTool(config, {
+      name: 'bio_pubmed_search',
+      description:
+        'PubMed 文献检索：返回 PMID、标题、年份、期刊、作者、DOI。' +
+        'term 支持 PubMed 检索语法（如 "CRISPR gene editing"、TP53[Title]）。触发词：查文献、PubMed、论文检索。',
+      parameters: {
+        term: { type: 'string', required: true, description: '检索式，如 "CRISPR gene editing"' },
+        retmax: { type: 'number', description: '最大返回数，默认 10' },
+        email: { type: 'string', description: 'NCBI 要求的邮箱（建议提供）' },
+      },
+      op: 'pubmed_search',
+      timeoutMs: 120_000,
+      cache: true,
+    }),
+    bioTool(config, {
+      name: 'bio_pubmed_abstract',
+      description:
+        '按 PMID 取文献结构化摘要：标题、摘要全文、作者、期刊、日期、DOI。' +
+        'ids 是 PMID 列表。触发词：读摘要、文献摘要、PMID。',
+      parameters: {
+        ids: { type: 'array', required: true, description: 'PMID 列表，如 ["42603971"]', items: { type: 'string' } },
+        email: { type: 'string', description: 'NCBI 要求的邮箱（建议提供）' },
+      },
+      op: 'pubmed_abstract',
+      timeoutMs: 120_000,
+      cache: true,
+    }),
+    bioTool(config, {
+      name: 'bio_ref_genome',
+      description:
+        '查询参考基因组 assembly 信息（Ensembl）：assembly 名、accession、染色体列表与长度、下载目录。' +
+        'species 可用常用名（human/mouse/rat/zebrafish/fly/yeast/arabidopsis）或 Ensembl 目录名（homo_sapiens）。' +
+        '触发词：参考基因组、基因组版本、assembly、下载基因组。',
+      parameters: {
+        species: { type: 'string', required: true, description: '物种：human、mouse、homo_sapiens、mus_musculus 等' },
+      },
+      op: 'ref_genome',
+      timeoutMs: 120_000,
+      cache: true,
+    }),
   ]
 }
 
 function renderBioPython(_args, value) {
   if (value.ok === false) {
     const detail = value.error || value.stderr || 'unknown error'
-    return [{ type: 'text', text: `bio_python failed: ${detail}` }]
+    const hint = value.needs_repair
+      ? '\n(needs_repair: 根据 stderr 修复代码后重新调用 bio_python，最多修复 2 次)'
+      : ''
+    return [{ type: 'text', text: `bio_python failed: ${detail}${hint}` }]
   }
   const parts = []
+  if (value.needs_repair) {
+    parts.push('[needs_repair] 代码抛异常（见下方 stderr）——根据 stderr 修复后重新调用 bio_python，最多修复 2 次')
+  }
   if (value.stdout) parts.push(value.stdout)
   if (value.stderr) parts.push(`[stderr]\n${value.stderr}`)
   if (value.result !== undefined && value.result !== null) {

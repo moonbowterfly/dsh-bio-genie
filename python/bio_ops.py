@@ -255,18 +255,40 @@ def op_entrez_search(args):
     handle.close()
     ids = search.get('IdList', [])
     summaries = []
-    if ids and db in ('nucleotide', 'protein'):
+    if ids and db in ('nucleotide', 'protein', 'gene'):
         try:
             shandle = Entrez.esummary(db=db, id=','.join(ids))
             records = Entrez.read(shandle)
             shandle.close()
-            for r in records:
-                summaries.append({
-                    'id': r.get('Id', r.get('uid', '')),
-                    'title': r.get('Title', ''),
-                    'length': r.get('Length', ''),
-                    'accession': r.get('Caption', r.get('Accession', '')),
-                })
+            if db == 'gene':
+                # gene esummary 解析结果包了 DocumentSummarySet → DocumentSummary 两层
+                # （与 nucleotide/protein 直接返回 ListElement 不同）
+                ds = records.get('DocumentSummarySet', {}) if isinstance(records, dict) else {}
+                items = ds.get('DocumentSummary', []) if isinstance(ds, dict) else []
+                if isinstance(items, dict):
+                    items = [items]
+                # gene docsum 不含 UID 字段，用 esearch 的 IdList 按序回填
+                for uid, r in zip(ids, items):
+                    ginfo = (r.get('GenomicInfo') or [{}])[0] if r.get('GenomicInfo') else {}
+                    summaries.append({
+                        'id': uid,
+                        'name': r.get('Name', ''),
+                        'description': r.get('Description', ''),
+                        'chromosome': r.get('Chromosome', ''),
+                        'map_location': r.get('MapLocation', ''),
+                        'chr_start': ginfo.get('ChrStart', ''),
+                        'chr_stop': ginfo.get('ChrStop', ''),
+                        'aliases': r.get('OtherAliases', ''),
+                        'summary': (r.get('Summary', '') or '')[:300],
+                    })
+            else:
+                for r in records:
+                    summaries.append({
+                        'id': r.get('Id', r.get('uid', '')),
+                        'title': r.get('Title', ''),
+                        'length': r.get('Length', ''),
+                        'accession': r.get('Caption', r.get('Accession', '')),
+                    })
         except Exception as e:
             summaries = [{'id': i, 'note': f'summary fetch failed: {e}'} for i in ids]
     return {'db': db, 'count': int(search.get('Count', 0)), 'ids': ids, 'summaries': summaries}
@@ -285,6 +307,254 @@ def op_entrez_fetch(args):
     text = handle.read()
     handle.close()
     return {'db': db, 'rettype': rettype, 'data': text[:50000]}
+
+
+def op_enrichr(args):
+    """Enrichr 通路/功能富集分析（maayanlab REST，两步：addList → enrich）。
+
+    零新增依赖：urllib 标准库即可。生物背景：给定基因符号列表，
+    返回其在 GO/KEGG/Reactome 等库中的显著富集条目（p 值、基因重叠）。
+    """
+    import json
+    import urllib.parse
+    import urllib.request
+
+    genes = args['genes']
+    if not isinstance(genes, list) or not genes:
+        raise ValueError('genes must be a non-empty list of gene symbols')
+    library = args.get('library', 'GO_Biological_Process_2023')
+    top = int(args.get('top', 10))
+
+    def _multipart_post(url, fields, timeout):
+        # Enrichr addList 官方 API 用 multipart/form-data（requests files= 参数），
+        # JSON POST 会被 400 拒绝。stdlib 手工构造 multipart 体。
+        from uuid import uuid4
+        boundary = '----dshbio' + uuid4().hex
+        body = b''
+        for name, value in fields.items():
+            body += (f'--{boundary}\r\n'
+                     f'Content-Disposition: form-data; name="{name}"\r\n\r\n'
+                     f'{value}\r\n').encode('utf-8')
+        body += f'--{boundary}--\r\n'.encode('utf-8')
+        req = urllib.request.Request(
+            url, data=body, method='POST',
+            headers={'Content-Type': f'multipart/form-data; boundary={boundary}'})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return json.loads(resp.read().decode('utf-8'))
+
+    # 1) 提交基因列表，换 userListId
+    res = _multipart_post('https://maayanlab.cloud/Enrichr/addList',
+                          {'list': '\n'.join(str(g).strip() for g in genes if str(g).strip()),
+                           'description': 'dsh-bio-genie enrichment'},
+                          timeout=30)
+    user_list_id = res.get('userListId')
+    if not user_list_id:
+        raise ValueError(f'Enrichr addList 失败: {res}')
+
+    # 2) 拉取富集结果。响应形如 {<library>: [[rank, term, p, z, combined, genes, adj_p], ...]}
+    url = ('https://maayanlab.cloud/Enrichr/enrich'
+           f'?userListId={user_list_id}&backgroundType={urllib.parse.quote(library)}')
+    with urllib.request.urlopen(url, timeout=60) as resp:
+        data = json.loads(resp.read().decode('utf-8'))
+    terms = data.get(library, [])
+
+    results = []
+    for t in terms[:top]:
+        if not isinstance(t, (list, tuple)) or len(t) < 7:
+            continue
+        results.append({
+            'rank': t[0],
+            'term': t[1],
+            'p_value': t[2],
+            'odds_ratio': t[3],
+            'combined_score': t[4],
+            'overlap_genes': t[5],
+            'overlap_count': len(t[5]) if isinstance(t[5], list) else None,
+            'adjusted_p_value': t[6],
+        })
+    return {
+        'library': library,
+        'gene_count': len(genes),
+        'total_terms': len(terms),
+        'top': top,
+        'results': results,
+    }
+
+
+def op_pubmed_search(args):
+    """PubMed 检索：esearch + esummary，返回 PMID/标题/年份/期刊/作者/DOI。"""
+    from Bio import Entrez
+    term = args['term']
+    retmax = args.get('retmax', 10)
+    email = args.get('email', None)
+    if email:
+        Entrez.email = email
+    handle = Entrez.esearch(db='pubmed', term=term, retmax=retmax)
+    search = Entrez.read(handle)
+    handle.close()
+    ids = search.get('IdList', [])
+    results = []
+    if ids:
+        try:
+            shandle = Entrez.esummary(db='pubmed', id=','.join(ids))
+            records = Entrez.read(shandle)
+            shandle.close()
+            for r in records:
+                article_ids = r.get('ArticleIds') or {}
+                results.append({
+                    'pmid': r.get('Id', ''),
+                    'title': r.get('Title', ''),
+                    'journal': r.get('FullJournalName', ''),
+                    'date': r.get('PubDate', ''),
+                    'authors': r.get('AuthorList', [])[:10],
+                    'doi': article_ids.get('doi', ''),
+                    'has_abstract': r.get('HasAbstract', 0),
+                })
+        except Exception as e:
+            results = [{'pmid': i, 'note': f'summary fetch failed: {e}'} for i in ids]
+    return {'db': 'pubmed', 'count': int(search.get('Count', 0)), 'pmids': ids, 'results': results}
+
+
+def _pubmed_abstract_text(ab):
+    """AbstractText 可能是 str / str 列表 / 分节 dict 列表（Label + #text）。"""
+    if not isinstance(ab, dict):
+        return str(ab or '')
+    t = ab.get('AbstractText', '')
+    if isinstance(t, str):
+        return t
+    if isinstance(t, list):
+        parts = []
+        for seg in t:
+            if isinstance(seg, str):
+                parts.append(seg)
+            elif isinstance(seg, dict):
+                label = seg.get('Label', '')
+                txt = seg.get('#text', '')
+                parts.append(f'[{label}] {txt}' if label else str(txt))
+        return '\n'.join(p for p in parts if p)
+    return str(t)
+
+
+def op_pubmed_abstract(args):
+    """按 PMID 取结构化摘要：标题/摘要/作者/期刊/日期/DOI。
+
+    rettype=medline retmode=xml（text 模式是纯文本无法解析；Entrez.read 解析
+    PubmedArticleSet）。走 Entrez.parse 会因根节点不是列表报错，故用 read。
+    """
+    import io
+    from Bio import Entrez
+    ids = args['ids']
+    if not isinstance(ids, list) or not ids:
+        raise ValueError('ids must be a non-empty list of PMIDs')
+    email = args.get('email', None)
+    if email:
+        Entrez.email = email
+    handle = Entrez.efetch(db='pubmed', id=','.join(str(i) for i in ids),
+                           rettype='medline', retmode='xml')
+    data = handle.read()
+    handle.close()
+    parsed = Entrez.read(io.BytesIO(data))
+    articles = parsed.get('PubmedArticle', [])
+    if isinstance(articles, dict):
+        articles = [articles]
+
+    results = []
+    for a in articles:
+        med = a.get('MedlineCitation', {})
+        art = med.get('Article', {})
+        journal = art.get('Journal', {})
+        pubdate = (journal.get('JournalIssue') or {}).get('PubDate', {})
+        date = pubdate.get('Year', '')
+        if pubdate.get('Month'):
+            date = f"{date} {pubdate['Month']}"
+        authors = []
+        for au in art.get('AuthorList', []) or []:
+            if isinstance(au, dict) and au.get('CollectiveName'):
+                authors.append(au['CollectiveName'])
+            elif isinstance(au, dict):
+                authors.append(f"{au.get('LastName', '')} {au.get('ForeName', '')}".strip())
+        # DOI：medline XML 的 ELocationID 是裸值（属性 EIdType='doi'），
+        # 与 esummary 的 'doi: xxxx' 字符串形式不同，需按属性判断
+        doi = ''
+        eloc = art.get('ELocationID', '')
+        if isinstance(eloc, list):
+            for x in eloc:
+                attrs = getattr(x, 'attributes', {}) or {}
+                if attrs.get('EIdType') == 'doi' or str(x).startswith('doi'):
+                    doi = str(x).replace('doi:', '').strip()
+                    break
+        elif eloc:
+            doi = str(eloc).replace('doi:', '').strip()
+        results.append({
+            'pmid': med.get('PMID', ''),
+            'title': art.get('ArticleTitle', ''),
+            'abstract': _pubmed_abstract_text(art.get('Abstract')),
+            'authors': authors,
+            'journal': journal.get('Title', ''),
+            'date': date,
+            'doi': doi,
+        })
+    return {'db': 'pubmed', 'count': len(results), 'results': results}
+
+
+def op_ref_genome(args):
+    """参考基因组 assembly 信息（Ensembl REST）。
+
+    Ensembl 要求显式 User-Agent 头（默认 urllib UA 会被 429 拒绝）。
+    主站失败自动切 asia.ensembl.org 镜像。
+    """
+    import json
+    import urllib.request
+
+    SPECIES_ALIAS = {
+        'human': 'homo_sapiens',
+        'mouse': 'mus_musculus',
+        'rat': 'rattus_norvegicus',
+        'zebrafish': 'danio_rerio',
+        'fly': 'drosophila_melanogaster',
+        'drosophila': 'drosophila_melanogaster',
+        'worm': 'caenorhabditis_elegans',
+        'c.elegans': 'caenorhabditis_elegans',
+        'arabidopsis': 'arabidopsis_thaliana',
+        'rice': 'oryza_sativa',
+        'yeast': 'saccharomyces_cerevisiae',
+        'ecoli': 'escherichia_coli',
+    }
+    species = args['species'].strip().lower()
+    species = SPECIES_ALIAS.get(species, species)
+
+    headers = {'User-Agent': 'dsh-bio-genie/0.1.4'}
+    last_err = None
+    for host in ('https://rest.ensembl.org', 'https://asia.ensembl.org'):
+        url = f'{host}/info/assembly/{species}?content-type=application/json'
+        req = urllib.request.Request(url, headers=headers)
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                d = json.loads(resp.read().decode('utf-8'))
+            # 目录名首字母大写（Homo_sapiens）
+            sdir = species[0].upper() + species[1:]
+            # top_level_region 含数百条 scaffold，压缩为染色体列表 + scaffold 计数
+            regions = d.get('top_level_region', [])
+            chromosomes = [r for r in regions if r.get('coord_system') == 'chromosome']
+            chromosomes.sort(key=lambda r: (int(r['name']), 0) if str(r.get('name', '')).isdigit() else (99, str(r.get('name', ''))))
+            return {
+                'species': species,
+                'assembly_name': d.get('assembly_name', ''),
+                'assembly_accession': d.get('assembly_accession', ''),
+                'assembly_date': d.get('assembly_date', ''),
+                'karyotype': d.get('karyotype', ''),
+                'chromosomes': [
+                    {'name': c.get('name'), 'length': c.get('length')} for c in chromosomes
+                ],
+                'scaffold_count': len(regions) - len(chromosomes),
+                'download_urls': {
+                    'fasta_dir': f'https://ftp.ensembl.org/pub/current_fasta/{sdir}/dna/',
+                    'gtf_dir': f'https://ftp.ensembl.org/pub/current_gtf/{sdir}/',
+                },
+            }
+        except Exception as e:
+            last_err = e
+    raise RuntimeError(f'Ensembl assembly 查询失败（{species}）: {last_err}')
 
 
 def op_env_status(args):
@@ -314,6 +584,10 @@ OPS = {
     'seq_kmer': op_seq_kmer,
     'entrez_search': op_entrez_search,
     'entrez_fetch': op_entrez_fetch,
+    'enrichr': op_enrichr,
+    'pubmed_search': op_pubmed_search,
+    'pubmed_abstract': op_pubmed_abstract,
+    'ref_genome': op_ref_genome,
     'env_status': op_env_status,
 }
 

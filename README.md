@@ -22,10 +22,15 @@
 |------|------|
 | 🪄 **许愿式分析（Wish Coding）** | 说人话就能分析：*"这条序列的 GC 含量和 EcoRI 酶切位点？"* |
 | 🧩 **全功能覆盖** | `bio_python` 执行器可运行任意 Biopython 代码（比对、PDB、Phylo、motif、BLAST…），配合 14 个领域 skill 配方 |
-| ⚡ **高频语义化工具** | 11 个固定参数工具（GC 含量、翻译、限制酶、k-mer、文件 IO、Entrez…）——省 token、输出稳定、参数有校验 |
+| ⚡ **高频语义化工具** | 15 个固定参数工具（GC 含量、翻译、限制酶、k-mer、文件 IO、Entrez 检索、通路富集、PubMed 文献、参考基因组…）——省 token、输出稳定、参数有校验 |
 | 📦 **零安装** | 自动下载隔离的 Python 环境（uv + venv + Biopython）到 `$DSH_HOME/dsh-bio-genie/`，不污染系统 |
 | 🇨🇳 **网络自动适配** | 默认直连官方源，任一环节失败自动切换国内镜像（uv→清华 PyPI、CPython→npmmirror、PyPI 包→清华镜像），无需任何配置 |
 | 🛡️ **环境隔离** | Python 子进程以 `-I`（isolated）模式运行，不受宿主 PYTHONPATH 污染 |
+| 🔁 **自愈执行（ACR）** | bio_python 失败返回 `needs_repair` 信号 + stderr，模型自动修复重试（最多 3 次），失败即如实报告 |
+| 📜 **透明性日志** | 每次代码执行/工具调用异步记 JSONL 日志（哈希/预览/耗时），`bio_log` 可回溯任何一次分析 |
+| 🧬 **科学严谨性约束** | persona 强制「生物学结论必须可溯源到工具输出」，纯推断标注 [推断-未验证] |
+| 🧠 **会话记忆** | 成功代码模式 + 错误→修复经验自动沉淀（本地 JSON），`bio_memory` 查询，越用越聪明 |
+| 📚 **协议知识库** | 14 个高频任务协议（质控/比对/BLAST/克隆/建树/结构/富集…），每个含可执行代码模板 + 常见坑，随插件打包 |
 
 ---
 
@@ -82,6 +87,8 @@ cp -r src index.js cordis.patch.yml package.json skills prompts python docs \
 |------|------|
 | `bio_python` | 运行任意 Biopython Python 程序（比对/PDB/Phylo/motif/复杂流程/自定义分析） |
 | `bio_env` | 环境诊断 / 重建 |
+| `bio_log` | 执行日志回溯（bio_python 代码哈希/预览/耗时 + 工具调用记录） |
+| `bio_memory` | 会话记忆查询（成功代码模式 / 错误修复经验，越用越聪明） |
 
 ### 语义化工具（高频稳定操作）
 
@@ -95,8 +102,12 @@ cp -r src index.js cordis.patch.yml package.json skills prompts python docs \
 | `bio_seq_io_read` | 读 FASTA/GenBank（UTF-8/GBK 自适应） | 读取fasta、解析文件 |
 | `bio_seq_io_write` | 写序列文件 | 写fasta、保存序列 |
 | `bio_seq_restriction` | 限制酶切位点（CommOnly 默认 / all 可选） | 限制酶、酶切位点 |
-| `bio_entrez_search` | NCBI 检索（esearch+esummary） | NCBI、检索基因 |
+| `bio_entrez_search` | NCBI 检索（esearch+esummary；db=gene 返回基因元数据摘要：全名/染色体位置/别名） | NCBI、检索基因、查基因信息 |
 | `bio_entrez_fetch` | NCBI 取序列 | 下载序列 |
+| `bio_enrichr` | 通路/GO 富集分析（基因符号列表 → p 值排序条目；GO/KEGG/Reactome/MSigDB 等库） | 富集分析、通路、GO、KEGG |
+| `bio_pubmed_search` | PubMed 文献检索（PMID/标题/期刊/作者/DOI） | 查文献、PubMed |
+| `bio_pubmed_abstract` | 按 PMID 取结构化摘要（标题/摘要全文/作者/日期/DOI） | 读摘要、PMID |
+| `bio_ref_genome` | 参考基因组 assembly 信息（Ensembl：assembly 名/染色体/下载目录） | 参考基因组、基因组版本 |
 
 ### 序列类型自动判断
 
