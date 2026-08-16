@@ -24,7 +24,7 @@
 | 🧩 **全功能覆盖** | `bio_python` 执行器可运行任意 Biopython 代码（比对、PDB、Phylo、motif、BLAST…），配合 14 个领域 skill 配方 |
 | ⚡ **高频语义化工具** | 11 个固定参数工具（GC 含量、翻译、限制酶、k-mer、文件 IO、Entrez…）——省 token、输出稳定、参数有校验 |
 | 📦 **零安装** | 自动下载隔离的 Python 环境（uv + venv + Biopython）到 `$DSH_HOME/dsh-bio-genie/`，不污染系统 |
-| 🇨🇳 **国内网络友好** | `DSH_BIO_UV_BASE` 镜像开关加速 uv 下载（实测 GitHub 直连 12 分钟未完成 → 镜像 1-2 分钟） |
+| 🇨🇳 **网络自动适配** | 默认直连官方源，任一环节失败自动切换国内镜像（uv→清华 PyPI、CPython→npmmirror、PyPI 包→清华镜像），无需任何配置 |
 | 🛡️ **环境隔离** | Python 子进程以 `-I`（isolated）模式运行，不受宿主 PYTHONPATH 污染 |
 
 ---
@@ -178,12 +178,16 @@ agent 自动（实测行为）：
 
 ```
 1. 下载 uv            → $DSH_HOME/dsh-bio-genie/bin/uv
-   （GitHub release；DSH_BIO_UV_BASE 可换镜像加速）
+   （官方 GitHub 直连失败自动切换清华 PyPI 的 uv wheel，实测 18MB/约 2 秒）
 2. uv python install  → $DSH_HOME/dsh-bio-genie/python/（私有 CPython 3.12）
+   （官方源失败自动切换 npmmirror 的 python-build-standalone 镜像）
 3. uv venv            → $DSH_HOME/dsh-bio-genie/python-env/
-4. uv pip install     → biopython + numpy
+4. uv pip install     → biopython + numpy（官方 PyPI 失败自动切换清华镜像）
 ```
 
+- **网络自动适配**：每个环节默认直连官方源，失败自动切换国内镜像，全程无需用户配置；
+  高级用户可用环境变量覆盖镜像地址（`DSH_BIO_UV_BASE` / `DSH_BIO_PYTHON_MIRROR` / `DSH_BIO_PYPI_INDEX`，
+  也尊重 uv 官方变量 `UV_PYTHON_INSTALL_MIRROR` / `UV_DEFAULT_INDEX` / `UV_INDEX_URL`）
 - **全部产物**在 `$DSH_HOME/dsh-bio-genie/`（默认 `~/.dsh/dsh-bio-genie/`），删除即完全卸载
 - **不假设系统有任何 Python/uv**（自举）；引导失败自动回退系统 python（若有）
 - **升级插件不丢环境**：环境在 DSH_HOME 私有目录，与插件本体（node_modules）分离

@@ -24,7 +24,7 @@
 | 🧩 **Full Biopython Coverage** | `bio_python` executor runs arbitrary Biopython code (alignment, PDB, Phylo, motif, BLAST…) plus 14 domain skill recipes |
 | ⚡ **High-Frequency Semantic Tools** | 11 fixed-parameter tools (GC content, translation, restriction enzymes, k-mer, file IO, Entrez…) — token-efficient, stable output, validated arguments |
 | 📦 **Zero Installation** | Automatically downloads an isolated Python environment (uv + venv + Biopython) to `$DSH_HOME/dsh-bio-genie/`, no system pollution |
-| 🇨🇳 **China-Network Friendly** | `DSH_BIO_UV_BASE` mirror switch accelerates uv downloads (measured: GitHub direct 12+ min stalled → mirror 1-2 min) |
+| 🇨🇳 **China-Network Ready** | Auto network adaptation: official sources by default, automatic switch to domestic mirrors on any failure (uv→Tsinghua PyPI, CPython→npmmirror, PyPI packages→Tsinghua), zero configuration required |
 | 🛡️ **Environment Isolation** | Python subprocesses run in `-I` (isolated) mode, immune to host PYTHONPATH pollution |
 
 ---
@@ -176,12 +176,17 @@ On first tool call (or background warm-up at dsh startup) the plugin automatical
 
 ```
 1. Download uv            → $DSH_HOME/dsh-bio-genie/bin/uv
-   (GitHub release; DSH_BIO_UV_BASE for mirror acceleration)
+   (official GitHub; auto-fallback to Tsinghua PyPI uv wheel on failure, ~18MB/2s)
 2. uv python install      → $DSH_HOME/dsh-bio-genie/python/ (private CPython 3.12)
+   (auto-fallback to npmmirror python-build-standalone on failure)
 3. uv venv                → $DSH_HOME/dsh-bio-genie/python-env/
-4. uv pip install         → biopython + numpy
+4. uv pip install         → biopython + numpy (auto-fallback to Tsinghua PyPI on failure)
 ```
 
+- **Auto network adaptation**: each step tries official sources first, then automatically
+  switches to domestic mirrors — zero configuration required. Power users can override
+  mirrors via `DSH_BIO_UV_BASE` / `DSH_BIO_PYTHON_MIRROR` / `DSH_BIO_PYPI_INDEX`
+  (uv's official `UV_PYTHON_INSTALL_MIRROR` / `UV_DEFAULT_INDEX` / `UV_INDEX_URL` are respected too)
 - **Everything** lives under `$DSH_HOME/dsh-bio-genie/` (default `~/.dsh/dsh-bio-genie/`); delete it to fully uninstall
 - **Assumes no system Python/uv** (self-provisioning); falls back to system python (if present) on bootstrap failure
 - **Plugin upgrades don't lose the environment**: it lives in the DSH_HOME private directory, separate from the plugin itself (node_modules)
