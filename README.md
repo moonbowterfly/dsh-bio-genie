@@ -187,7 +187,9 @@ agent 自动（实测行为）：
 
 - **网络自动适配**：每个环节默认直连官方源，失败自动切换国内镜像，全程无需用户配置；
   高级用户可用环境变量覆盖镜像地址（`DSH_BIO_UV_BASE` / `DSH_BIO_PYTHON_MIRROR` / `DSH_BIO_PYPI_INDEX`，
-  也尊重 uv 官方变量 `UV_PYTHON_INSTALL_MIRROR` / `UV_DEFAULT_INDEX` / `UV_INDEX_URL`）
+  也尊重 uv 官方变量 `UV_PYTHON_INSTALL_MIRROR` / `UV_DEFAULT_INDEX` / `UV_INDEX_URL`）；
+  ⚠️ uv 二进制下载后一律做 SHA256 校验（官方/镜像通道均校验，校验失败拒绝执行）——
+  自定义 `DSH_BIO_UV_BASE` 镜像需在镜像根目录提供 `sha256sums.txt`（与 uv 官方 release 同格式）
 - **全部产物**在 `$DSH_HOME/dsh-bio-genie/`（默认 `~/.dsh/dsh-bio-genie/`），删除即完全卸载
 - **不假设系统有任何 Python/uv**（自举）；引导失败自动回退系统 python（若有）
 - **升级插件不丢环境**：环境在 DSH_HOME 私有目录，与插件本体（node_modules）分离

@@ -16,8 +16,9 @@
  * @module dsh-bio-genie/runtime
  */
 import { spawn, spawnSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { constants as fsConstants, existsSync, mkdirSync, accessSync, readFileSync, writeFileSync, renameSync, rmSync, readdirSync, statSync } from 'node:fs'
-import { createWriteStream } from 'node:fs'
+import { createReadStream, createWriteStream } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { pipeline } from 'node:stream/promises'
@@ -93,6 +94,57 @@ async function download(url, dest, timeoutMs = DOWNLOAD_TIMEOUT_MS) {
   await pipeline(Readable.fromWeb(res.body), createWriteStream(dest))
 }
 
+/** 流式计算文件 SHA256（不把文件读进内存，兼容 GB 级场景）。 */
+export async function sha256File(file) {
+  const hash = createHash('sha256')
+  for await (const chunk of createReadStream(file)) hash.update(chunk)
+  return hash.digest('hex')
+}
+
+/** 校验文件 SHA256 与期望值一致，不一致抛错（拒绝执行未校验二进制）。 */
+export async function verifySha256(file, expectedHex) {
+  const expected = String(expectedHex).trim().toLowerCase()
+  if (!/^[0-9a-f]{64}$/.test(expected)) {
+    throw new Error(`invalid sha256 value for ${file}: ${expectedHex}`)
+  }
+  const actual = await sha256File(file)
+  if (actual !== expected) {
+    throw new Error(`SHA256 mismatch for ${file}: expected ${expected}, got ${actual}`)
+  }
+}
+
+/**
+ * 从 sha256sums.txt 文本中查找指定文件名的哈希。
+ * 兼容 `hash  file`（GNU 双空格）与 `hash *file`（binary 标记星号）两种格式。
+ */
+function findChecksum(sumsText, filename) {
+  for (const line of sumsText.split('\n')) {
+    const parts = line.trim().split(/\s+/)
+    if (parts.length >= 2 && parts[1] === filename) return parts[0]
+  }
+  throw new Error(`checksum entry not found for ${filename}`)
+}
+
+/**
+ * 按下载 URL 对应的 release 目录获取 sha256sums.txt 并校验已下载文件。
+ * 用于官方 GitHub release 与用户自定义镜像（DSH_BIO_UV_BASE）两个通道。
+ * 校验文件缺失/获取失败一律拒绝执行——uv 是信任根，宁可不引导也不跑未校验二进制。
+ */
+async function verifyFromReleaseChecksums(url, file) {
+  const base = url.slice(0, url.lastIndexOf('/'))
+  const filename = url.slice(url.lastIndexOf('/') + 1)
+  let sumsText
+  try {
+    sumsText = await fetchText(`${base}/sha256sums.txt`, 30_000)
+  } catch (err) {
+    throw new Error(
+      `checksum file unavailable (${base}/sha256sums.txt): ${err.message}. ` +
+      'Refusing to run unverified uv binary; provide sha256sums.txt on your mirror or use the official source.')
+  }
+  const expected = findChecksum(sumsText, filename)
+  await verifySha256(file, expected)
+}
+
 /** PyPI uv wheel 的平台 tag（uv 发布 all-platform wheels）。 */
 function uvWheelTag() {
   switch (process.platform) {
@@ -106,33 +158,46 @@ function uvWheelTag() {
 /**
  * 从清华 PyPI 下载 uv wheel 并提取 uv 可执行文件到 dest。
  * wheel 是 zip/tar 容器，内部布局 <pkg>-<ver>.data/scripts/uv[.exe]，无需 Python。
+ * PEP 503 simple index 的 href 带 #sha256= 碎片，下载后必须校验，缺失则拒绝。
  */
 async function downloadUvViaPypiMirror(dest) {
   const page = await fetchText('https://pypi.tuna.tsinghua.edu.cn/simple/uv/', 30_000)
   const re = new RegExp(`href="([^"]*uv-${UV_VERSION_TAG}-py3-none-${uvWheelTag()}\\.whl[^"]*)"`)
   const m = page.match(re)
   if (!m) throw new Error(`uv ${UV_VERSION_TAG} wheel (${uvWheelTag()}) not found on tsinghua mirror`)
-  const url = 'https://pypi.tuna.tsinghua.edu.cn/' + m[1].split('#')[0].replace(/^\.\.\/\.\.\//, '')
+  const [hrefPath, hashPart] = m[1].split('#')
+  const sha = hashPart && hashPart.startsWith('sha256=') ? hashPart.slice('sha256='.length) : null
+  if (!sha) {
+    throw new Error('tsinghua mirror wheel link missing sha256 fragment (PEP 503) — refusing unverified download')
+  }
+  const url = 'https://pypi.tuna.tsinghua.edu.cn/' + hrefPath.replace(/^\.\.\/\.\.\//, '')
   await download(url, dest, WHEEL_TIMEOUT_MS)
+  await verifySha256(dest, sha)
 }
 
-/** 下载 uv 二进制（官方 GitHub → 失败自动切清华 PyPI；DSH_BIO_UV_BASE 显式设置时只用用户源）。 */
-async function downloadUvBinary(root, logs) {
+/** 下载 uv 二进制（官方 GitHub → 失败自动切清华 PyPI；DSH_BIO_UV_BASE 显式设置时只用用户源）。下载后一律做 SHA256 校验。 */
+export async function downloadUvBinary(root, logs) {
   const uv = uvBinary()
   if (existsSync(uv)) return
   const extractDir = join(root, 'bin', 'uv-extract')
+  // 自建 bin 目录：selfBootstrap 会先 mkdir，但单独调用（测试/复用）也应自洽
+  mkdirSync(join(root, 'bin'), { recursive: true })
   const url = uvDownloadUrl()
   const officialTmp = join(root, 'bin', url.endsWith('.zip') ? 'uv-download.zip' : 'uv-download.tar.gz')
   if (uvUserMirrorSet()) {
     await download(url, officialTmp)
     logs.push(`[bootstrap] uv: 用户镜像 ${url}`)
+    // 用户镜像同样要求 sha256sums.txt（放在镜像 release 根目录），缺失即拒绝
+    await verifyFromReleaseChecksums(url, officialTmp)
     extractArchive(officialTmp, extractDir)
   } else {
     try {
       await download(url, officialTmp)
       logs.push('[bootstrap] uv: 官方 GitHub 下载成功')
+      await verifyFromReleaseChecksums(url, officialTmp)
       extractArchive(officialTmp, extractDir)
     } catch (err) {
+      // 下载或校验失败都视为官方通道不可用，自动切换清华 PyPI 镜像
       logs.push(`[bootstrap] uv: GitHub 直连失败（${err.message}），自动切换清华 PyPI 镜像`)
       const whlTmp = join(root, 'bin', 'uv-download.whl')
       await downloadUvViaPypiMirror(whlTmp)

@@ -77,7 +77,9 @@ model ──bio_seq_analyze(seq)──▶ tools.js
 
 引导策略（不假设系统有任何 Python/uv）：
 1. **下载 uv** 到 `$DSH_HOME/dsh-bio-genie/bin/`（GitHub release，按平台/架构；
-   `DSH_BIO_UV_BASE` 可换镜像加速国内网络）
+   `DSH_BIO_UV_BASE` 可换镜像加速国内网络；下载后校验 SHA256——官方 release 取
+   `sha256sums.txt`、清华 wheel 取 PEP 503 `#sha256=` 碎片，自定义镜像需自备
+   `sha256sums.txt`，校验失败拒绝执行）
 2. `uv python install 3.12 --install-dir <priv>` → 私有 CPython
 3. `uv venv` → 私有虚拟环境
 4. `uv pip install biopython numpy`
