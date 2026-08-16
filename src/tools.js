@@ -9,9 +9,9 @@
  * @module dsh-bio-genie/tools
  */
 import { defineTool } from '@deepseek-ai/dsh-tools'
-import { resolve } from 'node:path'
 import { ensureEnvironment, venvPython, resolveEnvDir } from './runtime.js'
 import { runBridge, callBio } from './python.js'
+import { resolveWorkdir, fallbackWorkspace } from './workdir.js'
 
 /** 引导可能耗时数分钟；工具执行期间等待引导完成。 */
 const BOOT_WAIT_MS = 600_000
@@ -40,7 +40,8 @@ function bioTool(config, opts) {
     async execute(args, exec) {
       if (exec.signal.aborted) throw new Error('aborted')
       const py = await requireEnv(config)
-      const res = await callBio(py, opts.op, args, { timeoutMs: callTimeout, signal: exec.signal })
+      const cwd = resolveWorkdir(exec)
+      const res = await callBio(py, opts.op, args, { cwd, timeoutMs: callTimeout, signal: exec.signal })
       if (!res.ok) throw new Error(res.error ?? 'bio op failed')
       return res.result
     },
@@ -61,7 +62,7 @@ export function registerTools(ctx, config) {
       '触发词：任意代码、写python、复杂分析、Biopython脚本。',
     parameters: {
       code: { type: 'string', required: true, description: '完整 Python 源码，使用 Biopython。' },
-      workdir: { type: 'string', description: '工作目录（绝对路径，或相对工作区）。默认工作区。' },
+      workdir: { type: 'string', description: '工作目录（绝对路径，或相对默认工作区的相对路径）。默认：会话工作区；会话工作区未指定时用 ~/deepseek-harness/bio-genie-workspace。' },
       timeoutMs: { type: 'number', description: '超时毫秒数。默认插件默认值。' },
     },
     output: {
@@ -84,7 +85,7 @@ export function registerTools(ctx, config) {
     async execute(args, exec) {
       const env = await requireEnv(config)
       const timeoutMs = args.timeoutMs ?? config.defaultTimeoutMs ?? 60_000
-      const cwd = resolveWorkdir(args.workdir)
+      const cwd = resolveWorkdir(exec, args.workdir)
       const out = await runBridge(env, args.code, { cwd, timeoutMs, signal: exec.signal })
       const canonical = { ...out }
       if (canonical.result === null || canonical.result === undefined) delete canonical.result
@@ -277,11 +278,6 @@ function semanticTools(config) {
       timeoutMs: 120_000,
     }),
   ]
-}
-
-function resolveWorkdir(workdir) {
-  if (!workdir) return process.cwd()
-  return workdir.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(workdir) ? workdir : resolve(process.cwd(), workdir)
 }
 
 function renderBioPython(_args, value) {

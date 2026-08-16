@@ -19,7 +19,7 @@ DeepSeek Harness 是 Cordis 驱动的「一切皆插件」框架。第三方插�
 
 ## 2. 工具分层哲学（本插件核心设计）
 
-合并自两个前代实现（dsh-bio 语义化工具版 + dsh-bio-workbuddy 执行器版）：
+工具分层结合「语义化快捷工具」与「通用执行器」两条路线：
 
 | 层 | 工具 | 适用场景 | 优点 | 代价 |
 |----|------|---------|------|------|
@@ -43,6 +43,10 @@ model ──bio_python(code)──▶ tools.js
                               │ ensureEnvironment(config)
                               │   ├─ 命中已有 env → 复用
                               │   └─ 未命中 → 自举（下载 uv → python → venv → pip）
+                              │ resolveWorkdir(exec, workdir)
+                              │   ├─ 显式 workdir → 用之（绝对路径原样；相对路径基于默认基准）
+                              │   ├─ 会话工作区 exec.agent.session.header.cwd → 用之
+                              │   └─ 均不可用 → ~/deepseek-harness/bio-genie-workspace（自动创建）
                               ▼
                      spawn <python> -I bridge.py   （cwd=工作区，stdin=JSON envelope）
                               ▼
@@ -52,8 +56,9 @@ model ──bio_python(code)──▶ tools.js
 
 model ──bio_seq_analyze(seq)──▶ tools.js
                               │ ensureEnvironment(config)
+                              │ resolveWorkdir(exec)  （同上，语义化工具也获得工作区 cwd）
                               ▼
-                     spawn <python> -I bio_ops.py  （stdin={op, args}）
+                     spawn <python> -I bio_ops.py  （cwd=工作区，stdin={op, args}）
                               ▼
                      返回 { ok, result | error }
 ```

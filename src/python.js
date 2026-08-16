@@ -80,8 +80,8 @@ export function runBridge(pythonPath, code, { cwd, timeoutMs = 60_000, signal } 
  * @param {string} pythonPath venv python
  * @param {string} op 操作名
  * @param {object} args 参数
- * @param {{timeoutMs?: number, signal?: AbortSignal}} [opts]
+ * @param {{cwd?: string, timeoutMs?: number, signal?: AbortSignal}} [opts]
  */
-export function callBio(pythonPath, op, args = {}, { timeoutMs = 60_000, signal } = {}) {
-  return spawnPython(pythonPath, OPS_PATH, { op, args }, { timeoutMs, signal })
+export function callBio(pythonPath, op, args = {}, { cwd, timeoutMs = 60_000, signal } = {}) {
+  return spawnPython(pythonPath, OPS_PATH, { op, args }, { cwd, timeoutMs, signal })
 }
