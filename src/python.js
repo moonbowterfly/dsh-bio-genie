@@ -27,6 +27,7 @@ function spawnPython(exe, script, payload, { cwd, timeoutMs, signal } = {}) {
     let stdout = ''
     let stderr = ''
     let settled = false
+    let didTimeout = false
 
     const settle = (obj) => {
       if (settled) return
@@ -36,7 +37,7 @@ function spawnPython(exe, script, payload, { cwd, timeoutMs, signal } = {}) {
       resolvePromise(obj)
     }
     const onAbort = () => child.kill()
-    const timer = setTimeout(() => { child.kill() }, timeoutMs)
+    const timer = setTimeout(() => { didTimeout = true; child.kill() }, timeoutMs)
 
     if (signal) {
       if (signal.aborted) child.kill()
@@ -50,9 +51,14 @@ function spawnPython(exe, script, payload, { cwd, timeoutMs, signal } = {}) {
       let parsed = null
       try { parsed = JSON.parse(stdout.trim()) } catch { /* fallthrough */ }
       if (parsed && typeof parsed === 'object' && 'ok' in parsed) {
-        settle({ ...parsed, exitCode: code, timedOut: false })
+        // 超时后 kill 与进程自行退出存在竞态：即便 kill 前恰好输出了合法 JSON，
+        // 只要超时已发生就如实标记，让上层知道执行未完整
+        settle({ ...parsed, exitCode: code, timedOut: didTimeout })
       } else {
-        settle({ ok: false, stdout, stderr, error: `python returned no valid JSON (exit ${code})`, exitCode: code, timedOut: false })
+        const reason = didTimeout
+          ? `python execution timed out after ${timeoutMs} ms (exit ${code})`
+          : `python returned no valid JSON (exit ${code})`
+        settle({ ok: false, stdout, stderr, error: reason, exitCode: code, timedOut: didTimeout })
       }
     })
     try {
