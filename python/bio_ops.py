@@ -15,6 +15,23 @@ sys.stdin.reconfigure(encoding='utf-8')
 sys.stdout.reconfigure(encoding='utf-8')
 sys.stderr.reconfigure(encoding='utf-8')
 
+# 网络 op 统一 20s 单请求上限：慢网络（如中国直连 NCBI）下防无限挂起。
+# 带显式 timeout 参数的请求（enrichr/ref_genome）以各自参数为准。
+import socket
+socket.setdefaulttimeout(20)
+
+
+def _entrez():
+    """配置好的 Bio.Entrez：单请求 20s（socket 级）+ 最多 2 试 + 5s 间隔。
+
+    Bio.Entrez 默认 3 试 × 15s 间隔，最坏 3×30+30=120s 恰好顶满工具层超时；
+    收紧后最坏 2×20+5=45s，保留一次重试应对瞬断。
+    """
+    from Bio import Entrez
+    Entrez.max_tries = 2
+    Entrez.sleep_between_tries = 5
+    return Entrez
+
 # ---- 序列分析 ----
 
 def op_seq_analyze(args):
@@ -243,7 +260,7 @@ def op_seq_kmer(args):
 
 def op_entrez_search(args):
     """NCBI Entrez 检索：esearch + efetch 摘要。"""
-    from Bio import Entrez
+    Entrez = _entrez()
     term = args['term']
     db = args.get('db', 'nucleotide')
     retmax = args.get('retmax', 5)
@@ -296,7 +313,8 @@ def op_entrez_search(args):
 
 def op_entrez_fetch(args):
     """NCBI Entrez fetch：取序列。"""
-    from Bio import Entrez, SeqIO
+    Entrez = _entrez()
+    from Bio import SeqIO
     ids = args['ids']
     db = args.get('db', 'nucleotide')
     rettype = args.get('rettype', 'fasta')
@@ -383,7 +401,7 @@ def op_enrichr(args):
 
 def op_pubmed_search(args):
     """PubMed 检索：esearch + esummary，返回 PMID/标题/年份/期刊/作者/DOI。"""
-    from Bio import Entrez
+    Entrez = _entrez()
     term = args['term']
     retmax = args.get('retmax', 10)
     email = args.get('email', None)
@@ -442,7 +460,7 @@ def op_pubmed_abstract(args):
     PubmedArticleSet）。走 Entrez.parse 会因根节点不是列表报错，故用 read。
     """
     import io
-    from Bio import Entrez
+    Entrez = _entrez()
     ids = args['ids']
     if not isinstance(ids, list) or not ids:
         raise ValueError('ids must be a non-empty list of PMIDs')
