@@ -524,12 +524,20 @@ def op_ref_genome(args):
     species = SPECIES_ALIAS.get(species, species)
 
     headers = {'User-Agent': 'dsh-bio-genie/0.1.4'}
+    url = f'https://rest.ensembl.org/info/assembly/{species}?content-type=application/json'
+    # 网络策略（WB 审查发现）：部分代理环境对 rest.ensembl.org 超时/404，
+    # 直连稳定。因此直连优先，失败回退系统代理。
+    # 注意：只有 rest.ensembl.org 一个 host —— asia.ensembl.org 是网页门户
+    # 而非 REST API，/info/assembly/ 路径必然 404，不可作 fallback。
+    openers = (
+        ('direct', urllib.request.build_opener(urllib.request.ProxyHandler({}))),
+        ('proxy', urllib.request.build_opener()),
+    )
     last_err = None
-    for host in ('https://rest.ensembl.org', 'https://asia.ensembl.org'):
-        url = f'{host}/info/assembly/{species}?content-type=application/json'
-        req = urllib.request.Request(url, headers=headers)
+    for label, opener in openers:
         try:
-            with urllib.request.urlopen(req, timeout=30) as resp:
+            req = urllib.request.Request(url, headers=headers)
+            with opener.open(req, timeout=15 if label == 'direct' else 30) as resp:
                 d = json.loads(resp.read().decode('utf-8'))
             # 目录名首字母大写（Homo_sapiens）
             sdir = species[0].upper() + species[1:]
@@ -554,7 +562,10 @@ def op_ref_genome(args):
             }
         except Exception as e:
             last_err = e
-    raise RuntimeError(f'Ensembl assembly 查询失败（{species}）: {last_err}')
+    raise RuntimeError(
+        f'Ensembl assembly 查询失败（{species}）: {last_err}。'
+        'rest.ensembl.org 直连与系统代理均不可用；'
+        '代理环境可尝试设置 NO_PROXY=rest.ensembl.org 后重试。')
 
 
 def op_env_status(args):
