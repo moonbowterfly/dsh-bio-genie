@@ -60,7 +60,7 @@ print(f"RMSD over {n} CA atoms: {sup.rms:.2f} Å")
 - Superimposer 要求两组原子一一对应且顺序一致，先按 CA 提取
 - 缺电子密度区没有原子，`"CA" in res` 检查防 KeyError
 - 按 PDB ID 下载结构用 `PDBList().retrieve_pdb_file(id, pdir="pdb_data", file_format="pdb")`（返回含 `.ent` 后缀的旧格式文件；新版默认 mmCIF，需传 `file_format="pdb"` 或改用 `MmCIFParser`）
-- ⚠️ **ResidueDepth 依赖外部 `msms` 二进制，DSSP 依赖 `dssp/mkdssp`**：插件环境不预装这些外部程序，`Bio.PDB.ResidueDepth` / `Bio.PDB.DSSP` 会直接抛错。**回退方案**：① 深度估算用 SASA 表面距离法（Shrake-Rupley 可由 `Bio.PDB.FreeSASA` 或简化原子到表面原子距离实现）；② 二级结构从 PDB 文件自带的 HELIX/SHEET 记录读取，或 `cif` 注解（不要假设 DSSP 可用）。
+- ⚠️ **ResidueDepth 依赖外部 `msms` 二进制，DSSP 依赖 `dssp/mkdssp`**：插件环境不预装这些外部程序，`Bio.PDB.ResidueDepth` / `Bio.PDB.DSSP` 会直接抛错。**回退方案**：① 深度估算用 SASA 表面距离法——`Bio.PDB.SASA.ShrakeRupley`（Biopython 自带，无需第三方 freesasa）或简化原子到表面原子距离；② 二级结构从 PDB 文件自带的 HELIX/SHEET 记录读取，或 `cif` 注解（不要假设 DSSP 可用）。
 - 可视化用 matplotlib（已随环境预装）：`matplotlib.use("Agg")` 无显示后端，CA 轨迹 3D 散点/折线即可输出 PNG。
 
 ## 解读要点

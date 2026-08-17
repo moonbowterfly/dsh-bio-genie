@@ -70,6 +70,11 @@ assert(dnaX.result.translations?.['+1'] === 'MX', 'X 密码子按 N 翻译为 X 
 const protX = callOp('seq_analyze', { sequence: 'MKTX', seq_type: 'protein' })
 assert(protX.ok && protX.result.molecular_weight === null, '蛋白含 X 时分子量降级为 null 不崩溃')
 
+const rnaX = callOp('seq_analyze', { sequence: 'AUGXXA' })
+assert(rnaX.ok, `含 X 的 RNA 不崩溃(WB 第二轮 S2: RNA 分支缺 X→N)`)
+assert(rnaX.result.seq_type === 'rna', `含 X 的 RNA 判为 rna(实际=${rnaX.result?.seq_type})`)
+assert(rnaX.result.translations?.['+1'] === 'MX', 'RNA 含 X 翻译按 N 处理为 X 氨基酸')
+
 const degenerate = callOp('seq_analyze', { sequence: 'ATGCNNSATGC' })
 assert(degenerate.ok && degenerate.result.seq_type === 'dna', '简并引物(N/S)判为 DNA')
 

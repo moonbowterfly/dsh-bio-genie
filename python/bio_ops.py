@@ -82,9 +82,12 @@ def op_seq_analyze(args):
             result['translations'] = frames
         elif seq_type == 'rna':
             result['complement'] = str(s.complement())
+            # 与 DNA 分支一致：含 X 的 RNA（探针/引物常见修饰碱基）翻译前 X→N，
+            # 避免 XXA 等模糊密码子抛 TranslationError（WB 第二轮审查 S2 确认）
+            translate_rna = s.replace('X', 'N')
             frames = {}
             for frame in range(3):
-                frames[f'+{frame + 1}'] = str(s[frame:].translate())
+                frames[f'+{frame + 1}'] = str(translate_rna[frame:].translate())
             result['translations'] = frames
 
     if seq_type == 'protein':

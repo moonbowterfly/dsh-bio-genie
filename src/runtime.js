@@ -215,19 +215,33 @@ export async function downloadUvBinary(root, logs) {
     await verifyFromReleaseChecksums(url, officialTmp)
     extractArchive(officialTmp, extractDir)
   } else {
+    let downloaded = false
     try {
       // 官方 GitHub 通道限 10s：挂起即快速失败切镜像（见 GITHUB_OFFICIAL_TIMEOUT_MS）
       await download(url, officialTmp, GITHUB_OFFICIAL_TIMEOUT_MS)
+      downloaded = true
       logs.push('[bootstrap] uv: 官方 GitHub 下载成功')
-      await verifyFromReleaseChecksums(url, officialTmp)
-      extractArchive(officialTmp, extractDir)
     } catch (err) {
-      // 下载或校验失败都视为官方通道不可用，自动切换清华 PyPI 镜像
-      logs.push(`[bootstrap] uv: GitHub 直连失败（${err.message}），自动切换清华 PyPI 镜像`)
+      // 下载阶段失败（网络/超时）——官方通道不可用，自动切换清华 PyPI 镜像
+      logs.push(`[bootstrap] uv: GitHub 直连下载失败（${err.message}），自动切换清华 PyPI 镜像`)
       const whlTmp = join(root, 'bin', 'uv-download.whl')
       await downloadUvViaPypiMirror(whlTmp)
       extractArchive(whlTmp, extractDir)
       rmSync(whlTmp, { force: true })
+    }
+    if (downloaded) {
+      try {
+        // 下载成功后的校验/解压：这一阶段的失败是供应链信号（校验 mismatch / 损坏包），
+        // 与网络失败性质不同——单独记录，不并入「GitHub 直连失败」文案
+        await verifyFromReleaseChecksums(url, officialTmp)
+        extractArchive(officialTmp, extractDir)
+      } catch (err) {
+        logs.push(`[bootstrap] uv: GitHub 文件校验/解压失败（${err.message}），拒绝使用并切换清华 PyPI 镜像`)
+        const whlTmp = join(root, 'bin', 'uv-download.whl')
+        await downloadUvViaPypiMirror(whlTmp)
+        extractArchive(whlTmp, extractDir)
+        rmSync(whlTmp, { force: true })
+      }
     }
   }
   const candidates = [
