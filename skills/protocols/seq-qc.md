@@ -4,6 +4,7 @@ domain: sequence-qc
 inputs: [FASTA/FASTQ 序列文件]
 outputs: [统计表：长度/GC/N比例/碱基组成]
 requires_network: false
+language: python
 ---
 
 # 序列质控协议（读文件 → 统计 → 判断）

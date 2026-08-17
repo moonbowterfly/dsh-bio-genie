@@ -4,6 +4,7 @@ domain: annotation
 inputs: [DNA 序列]
 outputs: [ORF 列表：位置/长度/翻译产物]
 requires_network: false
+language: python
 ---
 
 # ORF 预测与注释协议

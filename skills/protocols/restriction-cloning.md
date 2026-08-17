@@ -4,6 +4,7 @@ domain: cloning
 inputs: [载体序列 + 插入片段序列 + 目标酶]
 outputs: [酶切位点位置、消化片段大小、克隆可行性判断]
 requires_network: false
+language: python
 ---
 
 # 限制酶克隆设计协议

@@ -1,3 +1,7 @@
+---
+language: python
+---
+
 # 工具函数与密码子表（Bio.SeqUtils / Bio.Data）
 
 ## 遗传密码子表

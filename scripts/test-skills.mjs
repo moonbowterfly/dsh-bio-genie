@@ -21,6 +21,31 @@ console.log(`[skills] ${SKILL_MANIFEST.length} 个 skill（${domain.length} 领�
 assert(protocols.length === 17, `协议数 = 17（实际 ${protocols.length}）`)
 assert(GUIDE_MANIFEST.length === 8, `指南数 = 8（实际 ${GUIDE_MANIFEST.length}）`)
 
+// ---- 语言标注约定（用户 2026-08-17）：所有 skill 开头 frontmatter 必须含 language 字段 ----
+const NL = String.fromCharCode(10)
+const VALID_LANGUAGES = ['python', 'r', 'mixed', 'none']
+
+/** 解析 frontmatter 里的 language 字段；无 frontmatter 或无字段返回 null。 */
+function frontmatterLanguage(text) {
+  if (!text.startsWith('---' + NL)) return null
+  const end = text.indexOf(NL + '---', 4)
+  if (end < 0) return null
+  for (const line of text.slice(4, end).split(NL)) {
+    const t = line.trim()
+    if (t.startsWith('language:')) return t.slice('language:'.length).trim()
+  }
+  return null
+}
+
+function assertLanguage(label, text) {
+  const lang = frontmatterLanguage(text)
+  if (!lang) {
+    assert(false, `${label} 缺 language 标注（python/r/mixed/none）`)
+    return
+  }
+  assert(VALID_LANGUAGES.includes(lang), `${label} language 值合法（${lang}）`)
+}
+
 for (const g of GUIDE_MANIFEST) {
   const p = join(guidesDir, g.file)
   assert(existsSync(p), `指南文件存在: docs/agent-guide/${g.file}`)
@@ -28,6 +53,7 @@ for (const g of GUIDE_MANIFEST) {
     const text = readFileSync(p, 'utf8')
     assert(text.length > 500, `指南内容非空且完整: ${g.name}（${text.length} 字符）`)
     assert(!text.includes('[SKILL_PRUNED]'), `指南未被裁剪: ${g.name}`)
+    assertLanguage(`指南 ${g.name}`, text)
   }
 }
 
@@ -36,6 +62,7 @@ for (const s of SKILL_MANIFEST) {
   assert(existsSync(p), `文件存在: ${s.file}`)
   if (!existsSync(p)) continue
   const text = readFileSync(p, 'utf8')
+  assertLanguage(`skill ${s.name}`, text)
   if (s.file.startsWith('protocols/')) {
     for (const field of ['name:', 'domain:', 'inputs:', 'outputs:', 'requires_network:']) {
       assert(text.includes(field), `${s.file} frontmatter 含 ${field}`)

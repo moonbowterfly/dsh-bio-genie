@@ -1,3 +1,7 @@
+---
+language: python
+---
+
 # 限制性内切酶分析（Bio.Restriction）
 
 酶切位点查找与模拟消化。

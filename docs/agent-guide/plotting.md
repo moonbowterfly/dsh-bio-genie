@@ -1,3 +1,7 @@
+---
+language: python
+---
+
 # 出版级绘图专题
 
 > 插件定位：**可视化顾问**（先思考后绘制），不是画图机器人。决策层 skill `bio-figure` + 执行层协议 `bio-proto-pub-figure` + 三个 fig 工具 + `figurelib` 库。

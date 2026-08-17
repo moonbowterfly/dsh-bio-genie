@@ -1,3 +1,7 @@
+---
+language: python
+---
+
 # 序列图形化（Bio.Graphics.GenomeDiagram）
 
 用 GenomeDiagram 绘制带注释的序列图谱（线性/环形）。

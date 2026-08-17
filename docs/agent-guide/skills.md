@@ -1,3 +1,7 @@
+---
+language: none
+---
+
 # Skill 体系导航（33 个）
 
 > skill 是插件内置的可加载知识库（配方/工作流/坑）。加载方式：用 skill 工具按名字加载。**写非平凡代码前先加载对应领域 skill；命中协议场景直接加载协议。**
@@ -68,3 +72,5 @@
 | `dsh-bio-genie-guide-plotting` | 绘图专题 |
 | `dsh-bio-genie-guide-troubleshooting` | 故障排查与边界 |
 | `dsh-bio-genie-guide-rigor` | 严谨性与报告规范 |
+
+> 语言标注：每个 skill 开头 frontmatter 的 `language:` 字段标明其可执行内容运行在哪个解释器（`python` / `r` / `mixed` / `none`=纯知识导航）。加载 skill 前先看该字段，确认与任务匹配。

@@ -4,6 +4,7 @@ domain: codon-usage
 inputs: [蛋白序列 + 目标物种密码子频率表]
 outputs: [密码子使用统计、优化后的 DNA 序列]
 requires_network: false
+language: python
 ---
 
 # 密码子使用与优化协议

@@ -4,6 +4,7 @@ domain: alignment
 inputs: [两条序列（DNA 或蛋白）]
 outputs: [最优比对、打分、相似度/一致度]
 requires_network: false
+language: python
 ---
 
 # 双序列比对协议（PairwiseAligner）

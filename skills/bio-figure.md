@@ -1,3 +1,7 @@
+---
+language: python
+---
+
 # 出版级科研绘图（bio-figure，可视化顾问）
 
 > 吸收自 scipilot-figure-skill（MIT）——定位不是"画图工具"，而是"**可视化顾问**"：先剖析数据、按论证目标选图、主动拦截经典错误、按期刊规范出图、机器自检闭环。执行层配方见协议 `bio-proto-pub-figure`。

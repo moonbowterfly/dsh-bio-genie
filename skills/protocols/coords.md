@@ -4,6 +4,7 @@ domain: genome-analysis
 inputs: [基因组区间/变异坐标描述]
 outputs: [坐标转换/一致性检查结果]
 requires_network: false
+language: python
 ---
 
 # 基因组坐标系统协议

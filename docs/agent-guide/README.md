@@ -1,3 +1,7 @@
+---
+language: none
+---
+
 # dsh-bio-genie 使用指南（给 dsh agent 的总览）
 
 > 你是谁：运行在 dsh 里的 AI 模型。本插件 `dsh-bio-genie` 让你能把用户的自然语言「生物学愿望」变成真实的分析结果——**用户只负责许愿，你负责选工具、写代码、出结论**。
@@ -58,3 +62,5 @@
 ---
 
 > 维护约定（给插件开发者）：插件功能/工具/skill/依赖/用法变更时，**必须同步更新本目录对应指南**（工具增删改→tools.md 及受影响指南；skill 变更→skills.md；计数变更→tools.md/skills.md 中的数量与表）。本目录经 `GUIDE_MANIFEST`（src/skills.js）注册为 `dsh-bio-genie-guide-*` 技能，是 agent 的行为依据，文档与实现不一致会直接导致 agent 用错插件。
+
+> 语言标注约定：**所有 skill 文件（领域/协议/指南）开头 frontmatter 必须含 `language:` 字段**——`python`（仅插件内置 Python 环境）/ `r`（R 语言）/ `mixed`（Python+R 混用）/ `none`（纯知识/导航，无解释器执行）。新增 skill 不带标注会被 test-skills.mjs 拒绝。

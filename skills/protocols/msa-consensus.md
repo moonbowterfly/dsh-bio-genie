@@ -4,6 +4,7 @@ domain: alignment
 inputs: [多序列比对文件（fasta/clustal/stockholm）]
 outputs: [比对概况、保守性、consensus 序列]
 requires_network: false
+language: python
 ---
 
 # 多序列比对解析与保守性协议

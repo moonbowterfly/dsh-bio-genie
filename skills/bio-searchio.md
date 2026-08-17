@@ -1,3 +1,7 @@
+---
+language: python
+---
+
 # 搜索输出统一解析（Bio.SearchIO）
 
 `Bio.SearchIO` 用一套统一对象模型解析 BLAST、HMMER、Exonerate 等搜索结果，避免为每种工具写不同的解析代码。

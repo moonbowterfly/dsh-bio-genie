@@ -4,6 +4,7 @@ domain: phylogenetics
 inputs: [多序列比对文件]
 outputs: [距离矩阵、NJ/UPGMA 树、树文件]
 requires_network: false
+language: python
 ---
 
 # 系统发育树构建协议（距离法）

@@ -1,3 +1,7 @@
+---
+language: python
+---
+
 # dsh-bio 核心工作流（许愿式生信分析）
 
 dsh-bio 把「生物信息学分析」变成「许愿式编程」：你描述想要的结果，我把这个愿望翻译成一段 Biopython Python 程序，通过 `bio_python` 工具执行，再根据输出迭代，直到得到正确结果。

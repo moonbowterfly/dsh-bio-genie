@@ -1,3 +1,7 @@
+---
+language: python
+---
+
 # BLAST 搜索（Bio.Blast）
 
 NCBI BLAST 在线服务与结果解析。**注意：需要网络访问，且受速率限制。**

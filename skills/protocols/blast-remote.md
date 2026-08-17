@@ -4,6 +4,7 @@ domain: homology
 inputs: [查询序列]
 outputs: [BLAST hit 表：描述/长度/E-value/得分]
 requires_network: true
+language: python
 ---
 
 # 远程 BLAST 协议（NCBIWWW + 解析）

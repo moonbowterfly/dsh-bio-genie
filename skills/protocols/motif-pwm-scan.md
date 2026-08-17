@@ -4,6 +4,7 @@ domain: motif
 inputs: [目标序列 + motif/PWM（或 motif 比对）]
 outputs: [扫描命中的位置与打分]
 requires_network: false
+language: python
 ---
 
 # Motif / PWM 扫描协议

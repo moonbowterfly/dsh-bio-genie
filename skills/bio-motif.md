@@ -1,3 +1,7 @@
+---
+language: python
+---
+
 # 序列模体（Bio.motifs）
 
 位置权重矩阵（PWM/PSSM）、motif 创建与扫描。

@@ -4,6 +4,7 @@ domain: sequence-io
 inputs: [序列文件（任意 Biopython 支持格式）]
 outputs: [转换后的文件 + 记录数]
 requires_network: false
+language: python
 ---
 
 # 序列格式批量转换协议（流式，大文件安全）

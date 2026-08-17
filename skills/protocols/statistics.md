@@ -4,6 +4,7 @@ domain: statistics
 inputs: [两组/多组数值数据, 或设计问题描述]
 outputs: [检验选择建议 + 统计结果(p 值/效应量/功效)]
 requires_network: false
+language: python
 ---
 
 # 统计分析协议

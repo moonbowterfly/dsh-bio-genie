@@ -1,3 +1,7 @@
+---
+language: python
+---
+
 # 序列比对（Bio.Align / Bio.AlignIO）
 
 ## 双序列比对（PairwiseAligner）

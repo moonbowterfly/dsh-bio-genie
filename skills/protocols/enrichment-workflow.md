@@ -4,6 +4,7 @@ domain: functional-analysis
 inputs: [基因符号列表]
 outputs: [富集通路/GO term + p 值 + 解读]
 requires_network: true
+language: python
 ---
 
 # 富集分析工作流协议（语义工具版）

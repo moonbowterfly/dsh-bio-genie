@@ -1,3 +1,7 @@
+---
+language: python
+---
+
 # 序列文件读写（Bio.SeqIO）
 
 `Bio.SeqIO` 是读写序列文件（FASTA/FASTQ/GenBank/EMBL/Swiss-Prot 等）的统一入口。

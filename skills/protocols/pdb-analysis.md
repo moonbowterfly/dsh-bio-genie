@@ -4,6 +4,7 @@ domain: structure
 inputs: [PDB 文件（本地或按 ID 下载）]
 outputs: [原子/残基信息、距离计算、结构比对 RMSD]
 requires_network: false
+language: python
 ---
 
 # 蛋白结构分析协议（Bio.PDB）

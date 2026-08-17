@@ -282,7 +282,11 @@ export function registerSkills(ctx, skillsDir, guideDir) {
 }
 
 /** 主 skill 正文（工具分层选择的决策树）。 */
-const GENIE_SKILL_CONTENT = `# dsh-bio-genie 许愿式生物信息学分析
+const GENIE_SKILL_CONTENT = `---
+language: python
+---
+
+# dsh-bio-genie 许愿式生物信息学分析
 
 用户用自然语言描述生物学分析需求时，使用本 skill 决定调用路径。
 

@@ -1,3 +1,7 @@
+---
+language: python
+---
+
 # NCBI E-utilities（Bio.Entrez）
 
 通过 NCBI 检索/下载序列、taxonomy、文献。**必须设置 `email`，且需网络。**

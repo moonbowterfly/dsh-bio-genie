@@ -1,3 +1,7 @@
+---
+language: python
+---
+
 # 蛋白质结构（Bio.PDB）
 
 解析 PDB/mmCIF、遍历原子/残基/链、计算距离、结构叠加。

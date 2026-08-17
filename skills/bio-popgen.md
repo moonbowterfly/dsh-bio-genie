@@ -1,3 +1,7 @@
+---
+language: python
+---
+
 # 群体遗传学（Bio.PopGen）
 
 处理群体遗传数据：GenePop 格式解析、Fst、连锁不平衡。

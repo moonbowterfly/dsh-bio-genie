@@ -4,6 +4,7 @@ domain: literature
 inputs: [研究主题关键词]
 outputs: [文献列表 + 结构化摘要 + 综述要点]
 requires_network: true
+language: python
 ---
 
 # 文献调研工作流协议（语义工具版）

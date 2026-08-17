@@ -1,3 +1,7 @@
+---
+language: python
+---
+
 # 序列操作（Bio.Seq / Bio.SeqUtils）
 
 序列级变换与物化性质计算。

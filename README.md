@@ -236,6 +236,7 @@ node --input-type=module -e "import('./src/runtime.js').then(m => m.ensureEnviro
 - **给 dsh agent 的使用说明书**：[docs/agent-guide/](docs/agent-guide/)——8 份指南（总览/工具参考/skill 导航/bio_python 编程/工作流/绘图专题/故障排查/严谨性），随插件注册为 `dsh-bio-genie-guide-*` 技能，agent 可随时加载
 - 加语义化工具：`python/bio_ops.py` 加 op + `src/tools.js` 加 bioTool 条目
 - 加领域 skill：`skills/bio-xxx.md` + `src/skills.js` 的 SKILL_MANIFEST
+- **skill 语言标注约定**：所有 skill（领域/协议/指南）开头 frontmatter 必须含 `language:` 字段（`python`/`r`/`mixed`/`none`），test-skills.mjs 强制校验
 
 ---
 

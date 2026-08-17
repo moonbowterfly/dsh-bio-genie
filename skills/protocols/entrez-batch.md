@@ -4,6 +4,7 @@ domain: database
 inputs: [关键词或 accession 列表]
 outputs: [序列文件/元数据/FASTA]
 requires_network: true
+language: python
 ---
 
 # Entrez 批量数据获取协议（bio_python 版）

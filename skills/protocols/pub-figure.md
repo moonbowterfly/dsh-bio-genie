@@ -4,6 +4,7 @@ domain: visualization
 inputs: [数据文件(CSV/TSV/Excel)或已有数据]
 outputs: [出版级图文件(PDF/SVG/PNG) + 审计结论]
 requires_network: false
+language: python
 ---
 
 # 出版级出图协议（执行层配方）
