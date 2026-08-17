@@ -16,7 +16,7 @@ const protocols = SKILL_MANIFEST.filter((s) => s.file.startsWith('protocols/'))
 const domain = SKILL_MANIFEST.filter((s) => !s.file.startsWith('protocols/'))
 
 console.log(`[skills] ${SKILL_MANIFEST.length} 个 skill（${domain.length} 领域 + ${protocols.length} 协议）`)
-assert(protocols.length === 14, `协议数 = 14（实际 ${protocols.length}）`)
+assert(protocols.length === 17, `协议数 = 17（实际 ${protocols.length}）`)
 
 for (const s of SKILL_MANIFEST) {
   const p = join(skillsDir, s.file)

@@ -15,3 +15,14 @@ numpy>=1.26
 matplotlib>=3.8
 reportlab>=4.0
 rlPyCairo>=0.3
+# 出版级绘图（2026-08-17 吸收 scipilot-figure-skill / K-Dense scientific-visualization）：
+#  - pandas:   fig_profile 数据剖析（列类型/分布/相关）
+#  - scipy:    profile 偏度/统计协议（检验、效应量）
+#  - seaborn:  高层统计图配方（箱线/小提琴/热图，pub-figure 协议模板使用）
+#  - Pillow:   图文件审计（DPI 读取）+ 灰度预览渲染（fig_export 使用）
+# 四者均纯 wheel 预编译；环境引导时随 requirements 一次性装好（直接进核心，
+# 2026-08-17 决策：先不做 tier 延迟安装）。
+pandas>=2.0
+scipy>=1.10
+seaborn>=0.13
+Pillow>=10.0

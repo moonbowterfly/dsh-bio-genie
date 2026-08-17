@@ -21,8 +21,8 @@
 | Feature | Description |
 |---------|-------------|
 | 🪄 **Wish-style Analysis (Wish Coding)** | Plain language in, results out: *"What's the GC content and EcoRI cut sites of this sequence?"* |
-| 🧩 **Full Biopython Coverage** | `bio_python` executor runs arbitrary Biopython code (alignment, PDB, Phylo, motif, BLAST…) plus 14 domain skill recipes |
-| ⚡ **High-Frequency Semantic Tools** | 14 fixed-parameter tools (GC content, translation, restriction enzymes, k-mer, file IO, Entrez, pathway enrichment, PubMed literature, reference genome…) + 4 executor tools (bio_python / bio_env / bio_log / bio_memory) — token-efficient, stable output, validated arguments |
+| 🧩 **Full Biopython Coverage** | `bio_python` executor runs arbitrary Biopython code (alignment, PDB, Phylo, motif, BLAST…) plus 15 domain skill recipes |
+| ⚡ **High-Frequency Semantic Tools** | 17 fixed-parameter tools (GC content, translation, restriction enzymes, k-mer, file IO, Entrez, pathway enrichment, PubMed literature, reference genome, publication-grade plotting) + 4 executor tools (bio_python / bio_env / bio_log / bio_memory) — token-efficient, stable output, validated arguments |
 | 📦 **Zero Installation** | Automatically downloads an isolated Python environment (uv + venv + Biopython) to `$DSH_HOME/dsh-bio-genie/`, no system pollution |
 | 🇨🇳 **China-Network Ready** | Auto network adaptation: official sources by default, automatic switch to domestic mirrors on any failure (uv→Tsinghua PyPI, CPython→npmmirror, PyPI packages→Tsinghua), zero configuration required |
 | 🛡️ **Environment Isolation** | Python subprocesses run in `-I` (isolated) mode, immune to host PYTHONPATH pollution |
@@ -30,7 +30,7 @@
 | 📜 **Transparency Log** | Every code execution / tool call appends an async JSONL log (hash/preview/duration); `bio_log` traces back any analysis |
 | 🧬 **Scientific Rigor Guardrails** | Persona enforces "biological conclusions must trace to tool output"; pure inference is marked [inferred — unverified] |
 | 🧠 **Session Memory** | Successful code patterns + error→fix lessons accumulate automatically (local JSON); query via `bio_memory`, gets smarter over time |
-| 📚 **Protocol Knowledge Base** | 14 high-frequency task protocols (QC/alignment/BLAST/cloning/trees/structure/enrichment…), each with runnable code templates + pitfalls, bundled with the plugin |
+| 📚 **Protocol Knowledge Base** | 17 high-frequency task protocols (QC/alignment/BLAST/cloning/trees/structure/enrichment/publication figures/coordinate systems/statistics…), each with runnable code templates + pitfalls, bundled with the plugin |
 
 ---
 
@@ -118,12 +118,12 @@ X and gaps are treated as unknown bases during translation (Biopython standard b
 
 ---
 
-## 📚 Skill System (15 total)
+## 📚 Skill System (16 total)
 
 ### Master skill: `dsh-bio-genie`
 Tool-layering decision tree: **check the semantic tool table first → use it if matched; otherwise write code via `bio_python`**.
 
-### 14 Domain Recipes
+### 15 Domain Recipes
 
 | Skill | Biopython modules covered |
 |-------|---------------------------|
@@ -141,6 +141,7 @@ Tool-layering decision tree: **check the semantic tool table first → use it if
 | `bio-utils` | Bio.Data.CodonTable (genetic codes, codon usage) |
 | `bio-graphics` | Bio.Graphics.GenomeDiagram (map drawing) |
 | `bio-popgen` | Bio.PopGen (population genetics) |
+| `bio-figure` | Publication-grade figure consultant (figurelib: chart selection, 18 pitfalls, journal specs, CJK Chinese support) |
 
 ---
 
@@ -239,6 +240,8 @@ node --input-type=module -e "import('./src/runtime.js').then(m => m.ensureEnviro
 - **dsh-bio-genie itself**: MIT License
 - **Biopython**: Biopython License Agreement / BSD 3-Clause (permissive, see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md))
 - **numpy**: BSD License
+- **scipilot-figure-skill** (figurelib plotting scripts): MIT (Copyright Haojae, see THIRD_PARTY_NOTICES.md)
+- **K-Dense scientific-agent-skills** (figurelib style assets + knowledge protocol sources): MIT (Copyright K-Dense Inc., see THIRD_PARTY_NOTICES.md)
 - **BioSQL intentionally excluded** (LGPL)
 
 ---
@@ -248,3 +251,5 @@ node --input-type=module -e "import('./src/runtime.js').then(m => m.ensureEnviro
 All of this project's biological computing power stands on **Biopython** — our thanks to the [biopython/biopython](https://github.com/biopython/biopython) project and all its contributors for 25 years of outstanding work. The high-quality implementations they maintain — sequence analysis, alignment, structural biology, phylogenetics and more — make "wish-style bioinformatics" possible. Biopython is released under the permissive [Biopython License Agreement](https://github.com/biopython/biopython/blob/master/LICENSE.rst) (BSD 3-Clause compatible), which allows free copying, modification and redistribution, so this plugin can rely on and promote it with confidence.
 
 We also thank [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) for its plugin-based agent framework, and the numpy community for its foundational contributions.
+
+The publication-grade plotting stack (figurelib) is inspired by [Haojae/scipilot-figure-skill](https://github.com/Haojae/scipilot-figure-skill) (MIT) — its "visualization consultant" workflow and visual QA design — while style assets and some knowledge protocols reference [K-Dense-AI/scientific-agent-skills](https://github.com/K-Dense-AI/scientific-agent-skills) (MIT). Our thanks to both.

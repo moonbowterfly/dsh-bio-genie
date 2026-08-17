@@ -21,8 +21,8 @@
 | 特性 | 说明 |
 |------|------|
 | 🪄 **许愿式分析（Wish Coding）** | 说人话就能分析：*"这条序列的 GC 含量和 EcoRI 酶切位点？"* |
-| 🧩 **全功能覆盖** | `bio_python` 执行器可运行任意 Biopython 代码（比对、PDB、Phylo、motif、BLAST…），配合 14 个领域 skill 配方 |
-| ⚡ **高频语义化工具** | 14 个固定参数工具（GC 含量、翻译、限制酶、k-mer、文件 IO、Entrez 检索、通路富集、PubMed 文献、参考基因组…）+ 4 个执行器工具（bio_python / bio_env / bio_log / bio_memory）——省 token、输出稳定、参数有校验 |
+| 🧩 **全功能覆盖** | `bio_python` 执行器可运行任意 Biopython 代码（比对、PDB、Phylo、motif、BLAST…），配合 15 个领域 skill 配方 |
+| ⚡ **高频语义化工具** | 17 个固定参数工具（GC 含量、翻译、限制酶、k-mer、文件 IO、Entrez 检索、通路富集、PubMed 文献、参考基因组、出版级绘图）+ 4 个执行器工具（bio_python / bio_env / bio_log / bio_memory）——省 token、输出稳定、参数有校验 |
 | 📦 **零安装** | 自动下载隔离的 Python 环境（uv + venv + Biopython）到 `$DSH_HOME/dsh-bio-genie/`，不污染系统 |
 | 🇨🇳 **网络自动适配** | 默认直连官方源，任一环节失败自动切换国内镜像（uv→清华 PyPI、CPython→npmmirror、PyPI 包→清华镜像），无需任何配置 |
 | 🛡️ **环境隔离** | Python 子进程以 `-I`（isolated）模式运行，不受宿主 PYTHONPATH 污染 |
@@ -30,7 +30,7 @@
 | 📜 **透明性日志** | 每次代码执行/工具调用异步记 JSONL 日志（哈希/预览/耗时），`bio_log` 可回溯任何一次分析 |
 | 🧬 **科学严谨性约束** | persona 强制「生物学结论必须可溯源到工具输出」，纯推断标注 [推断-未验证] |
 | 🧠 **会话记忆** | 成功代码模式 + 错误→修复经验自动沉淀（本地 JSON），`bio_memory` 查询，越用越聪明 |
-| 📚 **协议知识库** | 14 个高频任务协议（质控/比对/BLAST/克隆/建树/结构/富集…），每个含可执行代码模板 + 常见坑，随插件打包 |
+| 📚 **协议知识库** | 17 个高频任务协议（质控/比对/BLAST/克隆/建树/结构/富集/出版级绘图/坐标系统/统计检验…），每个含可执行代码模板 + 常见坑，随插件打包 |
 
 ---
 
@@ -120,12 +120,12 @@ X 与 gap 在翻译时按未知碱基处理（Biopython 标准行为），含 X/
 
 ---
 
-## 📚 Skill 体系（15 个）
+## 📚 Skill 体系（16 个）
 
 ### 主 skill：`dsh-bio-genie`
 工具分层决策树：**先查语义化工具表 → 命中就用；否则用 `bio_python` 写代码执行**。
 
-### 14 个领域配方
+### 15 个领域配方
 
 | Skill | 覆盖的 Biopython 模块 |
 |-------|---------------------|
@@ -143,6 +143,7 @@ X 与 gap 在翻译时按未知碱基处理（Biopython 标准行为），含 X/
 | `bio-utils` | Bio.Data.CodonTable（遗传密码表、密码子用法） |
 | `bio-graphics` | Bio.Graphics.GenomeDiagram（图谱绘制） |
 | `bio-popgen` | Bio.PopGen（群体遗传学） |
+| `bio-figure` | 出版级科研绘图顾问（figurelib：选图决策、18 陷阱、期刊规格、CJK 中文） |
 
 ---
 
@@ -195,7 +196,7 @@ agent 自动（实测行为）：
 2. uv python install  → $DSH_HOME/dsh-bio-genie/python/（私有 CPython 3.12）
    （官方源失败自动切换 npmmirror 的 python-build-standalone 镜像）
 3. uv venv --seed     → $DSH_HOME/dsh-bio-genie/python-env/（预装 pip，方便按需补包）
-4. uv pip install     → biopython + numpy + matplotlib + reportlab（官方 PyPI 失败自动切换清华镜像）
+4. uv pip install     → biopython + numpy + matplotlib + reportlab + pandas/scipy/seaborn/Pillow（出版级绘图栈；官方 PyPI 失败自动切换清华镜像）
 ```
 
 - **网络自动适配**：每个环节默认直连官方源，失败自动切换国内镜像，全程无需用户配置；
@@ -242,6 +243,8 @@ node --input-type=module -e "import('./src/runtime.js').then(m => m.ensureEnviro
 - **dsh-bio-genie 本体**：MIT License
 - **Biopython**：Biopython License Agreement / BSD 3-Clause（宽松，详见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)）
 - **numpy**：BSD License
+- **scipilot-figure-skill**（figurelib 绘图脚本）：MIT（Copyright Haojae，详见 THIRD_PARTY_NOTICES.md）
+- **K-Dense scientific-agent-skills**（figurelib 样式资产 + 知识型协议来源）：MIT（Copyright K-Dense Inc.，详见 THIRD_PARTY_NOTICES.md）
 - **不含 BioSQL**（LGPL，刻意排除）
 
 ---
@@ -249,5 +252,7 @@ node --input-type=module -e "import('./src/runtime.js').then(m => m.ensureEnviro
 ## 🙏 致谢
 
 本项目的一切生物学计算能力都建立在 **Biopython** 之上 —— 感谢 [biopython/biopython](https://github.com/biopython/biopython) 项目及全体贡献者 25 年来的卓越工作：他们维护的序列分析、比对、结构生物学、系统发育等高质量实现，让"许愿式生物信息学"成为可能。Biopython 采用宽松的 [Biopython License Agreement](https://github.com/biopython/biopython/blob/master/LICENSE.rst)（兼容 BSD 3-Clause），允许自由复制、修改与分发，本插件因此得以安心地依赖并推广它。
+
+出版级绘图能力（figurelib）借鉴了 [Haojae/scipilot-figure-skill](https://github.com/Haojae/scipilot-figure-skill)（MIT）的"可视化顾问"工作流与视觉自检设计，样式资产与部分知识型协议参考 [K-Dense-AI/scientific-agent-skills](https://github.com/K-Dense-AI/scientific-agent-skills)（MIT）——一并致谢。
 
 同时感谢 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 提供的插件化 Agent 框架，以及 numpy 社区的基础贡献。

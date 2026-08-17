@@ -34,6 +34,13 @@ sys.stdin.reconfigure(encoding='utf-8')
 sys.stdout.reconfigure(encoding='utf-8')
 sys.stderr.reconfigure(encoding='utf-8')
 
+# -I（isolated）模式下脚本目录不进 sys.path：把 bridge 所在目录（随包分发
+# 的 python payload 根）加回，用户代码才能 import 同目录的 figurelib 绘图库
+# （仅插件自己的目录，不引入宿主 PYTHONPATH）。
+_BRIDGE_DIR = os.path.dirname(os.path.abspath(__file__))
+if _BRIDGE_DIR not in sys.path:
+    sys.path.insert(0, _BRIDGE_DIR)
+
 # Hard cap on captured stdout/stderr so a runaway program cannot balloon the
 # plugin's memory; the harness spill policy already handles model-facing size.
 MAX_CAPTURE_CHARS = 1_000_000

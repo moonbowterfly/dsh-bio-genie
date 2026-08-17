@@ -81,6 +81,11 @@ export const SKILL_MANIFEST = [
     description: 'Population genetics with Bio.PopGen: Fst, linkage disequilibrium, haplotype analysis from population data.',
     file: 'bio-popgen.md',
   },
+  {
+    name: 'bio-figure',
+    description: '出版级科研绘图顾问（吸收 scipilot-figure-skill）：8 步思考-绘制工作流、图型决策速查表、18 条画图陷阱、期刊规格、中文 CJK 支持。任何画图/数据可视化需求先加载本 skill。',
+    file: 'bio-figure.md',
+  },
   // ---- 协议库（高频任务的可执行工作流，含代码模板 + 常见坑）----
   {
     name: 'bio-proto-seq-qc',
@@ -149,8 +154,23 @@ export const SKILL_MANIFEST = [
   },
   {
     name: 'bio-proto-literature-review',
-    description: '文献调研工作流：PubMed 检索式技巧、批量摘要、引用可溯源汇总。',
+    description: '文献调研工作流：PubMed 检索式技巧、批量摘要、OpenAlex 补充检索、引用可溯源汇总。',
     file: 'protocols/literature-review.md',
+  },
+  {
+    name: 'bio-proto-pub-figure',
+    description: '出版级出图执行协议：profile→选图→setup_style→9 类图配方→自检→导出→审计的完整闭环（figurelib 代码模板）。',
+    file: 'protocols/pub-figure.md',
+  },
+  {
+    name: 'bio-proto-coords',
+    description: '基因组坐标系统协议：0/1-based 转换、BED/GFF/VCF 惯例、GRCh37/38、indel 左对齐归一化、区间运算与审计清单。',
+    file: 'protocols/coords.md',
+  },
+  {
+    name: 'bio-proto-statistics',
+    description: '统计分析协议：检验选择决策树、scipy 模板、多重校正（Bonferroni/BH-FDR）、效应量与功效、实验设计要点、APA 报告规范。',
+    file: 'protocols/statistics.md',
   },
 ]
 
@@ -209,6 +229,9 @@ const GENIE_SKILL_CONTENT = `# dsh-bio-genie 许愿式生物信息学分析
 | bio_enrichr | 通路/GO 富集分析（基因符号列表 → p 值排序条目） |
 | bio_pubmed_search / bio_pubmed_abstract | PubMed 文献检索 / 结构化摘要 |
 | bio_ref_genome | 参考基因组 assembly 信息（Ensembl） |
+| bio_fig_profile | 数据剖析 + 图型建议（画统计图前先跑） |
+| bio_fig_export | 图文件合规审计（DPI/格式/尺寸/字体嵌入）+ 可选 PNG 预览 |
+| bio_fig_qa | 绘图环境自检（CJK 中文字体 / 期刊预设） |
 | bio_log | 执行日志回溯（最近/检索） |
 | bio_memory | 会话记忆查询（成功模式/修复经验） |
 | bio_env | 环境诊断 |
@@ -237,6 +260,9 @@ const GENIE_SKILL_CONTENT = `# dsh-bio-genie 许愿式生物信息学分析
 | 密码子优化 | bio-proto-codon-optimization |
 | 富集分析解读 | bio-proto-enrichment-workflow |
 | 文献调研 | bio-proto-literature-review |
+| 论文配图/统计图（选图+出版级出图） | bio-figure + bio-proto-pub-figure |
+| 基因组坐标转换/off-by-one 排查 | bio-proto-coords |
+| 统计检验/多重校正/功效 | bio-proto-statistics |
 
 ## 调用规则
 
@@ -250,6 +276,8 @@ const GENIE_SKILL_CONTENT = `# dsh-bio-genie 许愿式生物信息学分析
 8. 文献检索用 bio_pubmed_search（返回 PMID/标题/期刊），要看全文摘要用 bio_pubmed_abstract 传 PMID 列表。
 9. 参考基因组/基因组版本信息用 bio_ref_genome，species 可传 human/mouse 等常用名。
 10. 语义化工具的 NCBI/Enrichr/Ensembl 限流已由插件内置，无需自己在参数里处理；但 bio_python 代码里直接调 Bio.Entrez 时仍需自己遵守速率限制。
+11. 画统计图/论文图：先 bio_fig_profile 剖析数据再选图型（见 bio-figure skill）；中文图先 bio_fig_qa 查字体；绘制配方见 bio-proto-pub-figure（figurelib 可 import）；投稿前 bio_fig_export 审计。
+12. 统计结论必须跑检验（bio-proto-statistics）：组间比较给 p 值+效应量，多重比较必须校正；误差棒图注写清 SD/SEM/CI + n。
 
 ## 自动代码修复（ACR）
 

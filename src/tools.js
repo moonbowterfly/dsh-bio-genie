@@ -492,6 +492,51 @@ function semanticTools(config) {
       timeoutMs: 120_000,
       cache: true,
     }),
+    // ---- 出版级绘图（figurelib，2026-08-17 吸收 scipilot/K-Dense）----
+    bioTool(config, {
+      name: 'bio_fig_profile',
+      description:
+        '科研数据剖析 + 图型建议（画图前的"顾问"步骤）：读 CSV/TSV/Excel，' +
+        '返回每列类型/样本量/缺失率/分布（均值、偏度、IQR 异常值）/相关性/分组结构，' +
+        '并基于数据形态给出图型建议与风险警告（小样本均值柱、偏态、跨量级等）。' +
+        '画统计图前必须先跑本工具再选图型。触发词：画图、数据可视化、用什么图、箱线图、柱状图。',
+      parameters: {
+        path: { type: 'string', required: true, description: 'CSV/TSV/Excel 数据文件路径（绝对或相对工作区）' },
+        group_cols: { type: 'array', description: '分组列名列表，如 ["group","condition"]', items: { type: 'string' } },
+      },
+      op: 'fig_profile',
+      timeoutMs: 120_000,
+    }),
+    bioTool(config, {
+      name: 'bio_fig_export',
+      description:
+        '图文件合规审计（投稿前机器检查）：对 PDF/SVG/PNG/TIFF 检查格式、DPI、' +
+        '目标尺寸偏差、PDF 字体嵌入（Type 3 拒收）。preview=true 额外生成 PNG 预览供查看。' +
+        '配合 pub-figure 协议的 figurelib.export_figure 使用，形成"导出→审计→回改"闭环。' +
+        '触发词：检查图片、DPI、投稿图、图合规。',
+      parameters: {
+        paths: { type: 'array', required: true, description: '图文件路径列表，如 ["fig1.pdf","fig1.png"]', items: { type: 'string' } },
+        min_dpi: { type: 'number', description: '位图最低 DPI 要求，默认 300' },
+        width_in: { type: 'number', description: '目标宽度（英寸），与 height_in 同传时校验尺寸' },
+        height_in: { type: 'number', description: '目标高度（英寸）' },
+        preview: { type: 'boolean', description: '是否生成 PNG 预览（默认 false）' },
+      },
+      op: 'fig_export',
+      timeoutMs: 120_000,
+    }),
+    bioTool(config, {
+      name: 'bio_fig_qa',
+      description:
+        '绘图环境自检：探测本机 CJK 中文字体可用性 + 测试期刊样式预设（Nature/IEEE 等）能否应用。' +
+        'cjk_ready=false 时中文标签必然渲染成方框——画图前先查本工具决定用中文还是英文标签。' +
+        '触发词：中文字体、方框、乱码、绘图环境。',
+      parameters: {
+        lang: { type: 'string', enum: ['zh', 'en'], description: '目标语言，默认 zh' },
+        journal: { type: 'string', enum: ['nature', 'science', 'ieee', 'general'], description: '目标期刊预设，默认 nature' },
+      },
+      op: 'fig_qa',
+      timeoutMs: 120_000,
+    }),
   ]
 }
 

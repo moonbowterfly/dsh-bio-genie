@@ -349,21 +349,63 @@ function findManagedPython(pyDir) {
   return walk(pyDir, 1)
 }
 
-/** 查询解释器元数据（python 版本 / biopython / numpy）。 */
+/** requirements.txt 中除 biopython/numpy 外必须可导入的包（环境完整性判断）。 */
+const REQUIRED_PACKAGES = ['matplotlib', 'pandas', 'seaborn', 'scipy', 'PIL']
+
+/** 查询解释器元数据（python 版本 / 核心库 / 绘图栈）。 */
 async function inspect(exe) {
+  const NL = String.fromCharCode(10)
   const probe = [
     'import json, sys',
-    'try:\n    import Bio\n    bv = Bio.__version__\n' + 'except Exception:\n    bv = None',
-    'try:\n    import numpy\n    nv = numpy.__version__\n' + 'except Exception:\n    nv = None',
-    'print(json.dumps({"pythonVersion": sys.version.split()[0], "biopython": bv, "numpy": nv}))',
-  ].join('\n')
+    'def _ver(name):',
+    '    try:',
+    '        m = __import__(name)',
+    '    except Exception:',
+    '        return None',
+    '    return getattr(m, "__version__", None)',
+    'info = {"pythonVersion": sys.version.split()[0],',
+    '        "biopython": _ver("Bio"), "numpy": _ver("numpy"),',
+    '        "matplotlib": _ver("matplotlib"),',
+    '        "packages": {"matplotlib": _ver("matplotlib"), "pandas": _ver("pandas"),',
+    '                     "seaborn": _ver("seaborn"), "scipy": _ver("scipy"), "PIL": _ver("PIL")}}',
+    'print(json.dumps(info))',
+  ].join(NL)
   const { code, stdout } = await run(exe, ['-I', '-c', probe])
-  if (code !== 0) return { pythonVersion: null, biopython: null, numpy: null }
+  const empty = () => ({ pythonVersion: null, biopython: null, numpy: null, matplotlib: null, packages: {} })
+  if (code !== 0) return empty()
   try {
-    return JSON.parse(stdout.trim().split('\n').pop())
+    return JSON.parse(stdout.trim().split(NL).pop())
   } catch {
-    return { pythonVersion: null, biopython: null, numpy: null }
+    return empty()
   }
+}
+
+/**
+ * 轻量补装：requirements 更新（如新增绘图依赖）后，已存在的旧 venv 会缺包。
+ * 用已下载的 uv 直接 pip install -r requirements.txt 补齐（幂等、不重建 venv），
+ * 让升级插件的存量用户在首次调用时无感自愈，而不是等到绘图 op 报 ModuleNotFoundError。
+ */
+async function repairPackages(exe, missing) {
+  const logs = []
+  const uv = uvBinary()
+  if (!existsSync(uv)) {
+    logs.push('[repair] uv 二进制不存在，无法轻量补装（将走完整自举）')
+    return { logs: logs.join(String.fromCharCode(10)), ok: false }
+  }
+  const req = join(PYTHON_DIR, 'requirements.txt')
+  logs.push(`[repair] 环境缺少 ${missing.join(', ')}，uv pip 补装 requirements`)
+  const pipMirror = pypiMirrorEnv()
+  let r = run(uv, ['pip', 'install', '--python', exe, '-r', req], pipMirror ? { env: pipMirror } : {})
+  if (r.code !== 0 && !pipMirror) {
+    logs.push(`[repair] 官方 PyPI 失败（${r.stderr.slice(0, 200)}），自动切换清华镜像`)
+    r = run(uv, ['pip', 'install', '--python', exe, '-r', req], { env: { UV_DEFAULT_INDEX: MIRROR_PYPI } })
+  }
+  if (r.code !== 0) {
+    logs.push(`[repair] 补装失败: ${r.stderr.slice(0, 300)}`)
+    return { logs: logs.join(String.fromCharCode(10)), ok: false }
+  }
+  logs.push('[repair] 补装完成')
+  return { logs: logs.join(String.fromCharCode(10)), ok: true }
 }
 
 /** 完整自举：下载 uv → uv python install → uv venv → uv pip install。 */
@@ -436,6 +478,12 @@ async function systemPythonBootstrap(envDir) {
 // 进程内锁：同一时刻只跑一个引导流程
 let bootstrapLock = Promise.resolve()
 
+// 进程内环境元数据缓存：inspect 需要 import 整个绘图栈（matplotlib/pandas/scipy
+// 约 4-6s）。每次工具调用都 spawn 探测会拖慢所有语义化工具与 bio_python，
+// 故首次探测成功后缓存，同进程后续调用直接复用（环境变更走 force/reinstall）。
+let cachedMeta = null
+let cachedEnvDir = null
+
 /**
  * 确保环境就绪（幂等）。首次调用执行完整自举，可能耗时数分钟。
  * @param {object} config - 插件配置
@@ -447,16 +495,50 @@ export async function ensureEnvironment(config, { force = false } = {}) {
   const exe = venvPython(envDir)
 
   const attempt = async () => {
+    let repairLogs = ''
+    if (!force && cachedMeta && cachedEnvDir === envDir) {
+      return {
+        ready: true, python: exe, envDir,
+        pythonVersion: cachedMeta.pythonVersion, biopython: cachedMeta.biopython, numpy: cachedMeta.numpy,
+        bootstrapped: false,
+      }
+    }
     if (!force && existsSync(exe)) {
       const meta = await inspect(exe)
       if (meta.biopython) {
-        return { ready: true, python: exe, envDir, ...meta, bootstrapped: false }
+        // 轻量补装：requirements 更新后旧环境缺包（如新增绘图栈）时，
+        // 用 uv 补装而非重建 venv；补装失败再走完整自举兜底。
+        const missing = REQUIRED_PACKAGES.filter((p) => !meta.packages?.[p])
+        if (missing.length) {
+          const repair = await repairPackages(exe, missing)
+          const meta2 = await inspect(exe)
+          if (repair.ok && missing.every((p) => meta2.packages?.[p])) {
+            cachedMeta = meta2
+            cachedEnvDir = envDir
+            return {
+              ready: true, python: exe, envDir,
+              pythonVersion: meta2.pythonVersion, biopython: meta2.biopython, numpy: meta2.numpy,
+              bootstrapped: false,
+            }
+          }
+          repairLogs = repair.logs
+        } else {
+          cachedMeta = meta
+          cachedEnvDir = envDir
+          // 显式字段返回：bio_env 输出 schema 是 additionalProperties:false，
+          // 不能像旧代码那样 ...meta 展开（inspect 现在多了 matplotlib/packages 字段）
+          return {
+            ready: true, python: exe, envDir,
+            pythonVersion: meta.pythonVersion, biopython: meta.biopython, numpy: meta.numpy,
+            bootstrapped: false,
+          }
+        }
       }
     }
-    let logs = ''
+    let logs = repairLogs
     let ok = false
     try {
-      logs = await selfBootstrap(envDir)
+      logs += await selfBootstrap(envDir)
       ok = true
     } catch (err) {
       logs += `\n[selfBootstrap failed: ${err.message}]\n`
@@ -474,7 +556,14 @@ export async function ensureEnvironment(config, { force = false } = {}) {
     if (!meta.biopython) {
       return { ready: false, python: exe, envDir, bootstrapped: true, error: `bootstrap completed but biopython missing:\n${logs}` }
     }
-    return { ready: true, python: exe, envDir, ...meta, bootstrapped: true, logs }
+    cachedMeta = meta
+    cachedEnvDir = envDir
+    // 显式字段：避免把 inspect 的 matplotlib/packages 泄漏进 bio_env 严格 schema
+    return {
+      ready: true, python: exe, envDir,
+      pythonVersion: meta.pythonVersion, biopython: meta.biopython, numpy: meta.numpy,
+      bootstrapped: true, logs,
+    }
   }
 
   bootstrapLock = bootstrapLock.then(attempt, attempt)

@@ -2,7 +2,7 @@
 // 用法：node scripts/test-ops.mjs          （全量，含网络）
 //       SKIP_NETWORK=1 node scripts/test-ops.mjs   （只跑离线用例）
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -127,6 +127,61 @@ rmSync(tmp, { recursive: true, force: true })
 
 const env = callOp('env_status')
 assert(env.ok && env.result.biopython, `env_status（biopython ${env.result.biopython}）`)
+
+// ---- 出版级绘图（figurelib，2026-08-17 吸收 scipilot/K-Dense）----
+// fig_qa：环境自检（Windows 自带 Microsoft YaHei → cjk_ready 应为 true）
+const figQa = callOp('fig_qa', { lang: 'zh', journal: 'nature' })
+assert(figQa.ok && figQa.result.matplotlib, 'fig_qa 返回 matplotlib 版本')
+assert(Array.isArray(figQa.result.cjk_fonts), 'fig_qa 返回 CJK 字体列表')
+assert(figQa.result.preset_test.ok === true, `fig_qa 期刊预设应用成功（${figQa.result.preset_test.error ?? '?'}）`)
+assert(figQa.result.cjk_ready === true, `fig_qa 检测到 CJK 字体（${JSON.stringify(figQa.result.cjk_fonts)}）`)
+
+// fig_profile：剖析 CSV + 分组 + 图型建议
+const tmpFig = mkdtempSync(join(tmpdir(), 'dshbio-fig-'))
+const figCsv = join(tmpFig, 'data.csv')
+writeFileSync(figCsv, 'group,value\nA,1.2\nA,1.8\nA,1.5\nB,3.1\nB,3.6\nB,3.3\n')
+const prof = callOp('fig_profile', { path: figCsv, group_cols: ['group'] })
+assert(prof.ok && prof.result.n_rows === 6 && prof.result.columns.value.type === 'continuous', `fig_profile 剖析 6 行 CSV（value=${prof.result.columns?.value?.type}）`)
+assert(prof.ok && prof.result.group_summary && prof.result.group_summary.n_groups === 2, 'fig_profile 分组结构 2 组')
+assert(prof.ok && prof.result.group_summary.small_groups_flag === true, 'fig_profile 小样本警告（每组 n=3<10）')
+assert(prof.ok && Array.isArray(prof.result.suggestions) && prof.result.suggestions.length > 0, 'fig_profile 给出图型建议')
+
+const badProf = callOp('fig_profile', { path: join(tmpFig, 'nope.csv') })
+assert(badProf.ok === false, 'fig_profile 文件不存在报错')
+
+// fig_export：用 venv python 画真实 PNG/JPEG 审计（300dpi PASS / 72dpi FAIL / JPEG FAIL）
+function makeFigure(outPath, dpi, fmt) {
+  const code = `import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+fig, ax = plt.subplots(figsize=(3.5, 2.625))
+ax.plot([0,1,2],[1,3,2])
+fig.savefig(${JSON.stringify(outPath)}, dpi=${dpi}, format='${fmt}')
+print('ok')`
+  return spawnSync(findPython(), ['-I', '-c', code], { encoding: 'utf8', timeout: 120_000 })
+}
+const okPng = join(tmpFig, 'fig300.png')
+assert(makeFigure(okPng, 300, 'png').status === 0, '画 300dpi PNG 成功')
+const expOk = callOp('fig_export', { paths: [okPng], min_dpi: 300 })
+assert(expOk.ok && expOk.result.results[0].verdict === 'PASS', `fig_export 300dpi PNG 审计 PASS（${JSON.stringify(expOk.result?.results?.[0]?.issues ?? expOk.error)}）`)
+
+const lowPng = join(tmpFig, 'fig72.png')
+assert(makeFigure(lowPng, 72, 'png').status === 0, '画 72dpi PNG 成功')
+const expLow = callOp('fig_export', { paths: [lowPng], min_dpi: 300 })
+assert(expLow.ok && expLow.result.results[0].verdict === 'FAIL' && /DPI/.test(JSON.stringify(expLow.result.results[0].issues)), 'fig_export 72dpi PNG 审计 FAIL（DPI 不足）')
+
+const jpg = join(tmpFig, 'fig.jpg')
+assert(makeFigure(jpg, 300, 'jpg').status === 0, '画 JPEG 成功')
+const expJpg = callOp('fig_export', { paths: [jpg] })
+assert(expJpg.ok && expJpg.result.results[0].verdict === 'FAIL' && /JPEG/.test(JSON.stringify(expJpg.result.results[0].issues)), 'fig_export JPEG 审计 FAIL（数据图禁用 JPEG）')
+
+const expPreview = callOp('fig_export', { paths: [okPng], preview: true })
+assert(expPreview.ok && expPreview.result.results[0].preview_png === okPng, 'fig_export PNG 预览返回原路径')
+
+const expMissing = callOp('fig_export', { paths: [join(tmpFig, 'no.png')] })
+assert(expMissing.ok && expMissing.result.results[0].verdict === 'FAIL', 'fig_export 文件不存在 → FAIL')
+
+rmSync(tmpFig, { recursive: true, force: true })
 
 // ---- 错误路径 ----
 const badOp = callOp('no_such_op')

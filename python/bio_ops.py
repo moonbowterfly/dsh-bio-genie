@@ -6,6 +6,7 @@ TS 侧通过 stdin 发送 {"op": "...", "args": {...}}，本脚本执行后
 每个 op 对应一个生物学操作，内部使用 Biopython。新增功能 = 新增 op 函数 + 注册。
 """
 import json
+import os
 import sys
 import traceback
 
@@ -14,6 +15,10 @@ import traceback
 sys.stdin.reconfigure(encoding='utf-8')
 sys.stdout.reconfigure(encoding='utf-8')
 sys.stderr.reconfigure(encoding='utf-8')
+
+# -I（isolated）模式下脚本目录不进 sys.path，同目录的 figurelib 包因此
+# 不可 import。显式把脚本目录加回（仅插件自己的 payload 目录，不污染宿主）。
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # 网络 op 统一 20s 单请求上限：慢网络（如中国直连 NCBI）下防无限挂起。
 # 带显式 timeout 参数的请求（enrichr/ref_genome）以各自参数为准。
@@ -618,6 +623,122 @@ def op_env_status(args):
     }
 
 
+# ---- 出版级绘图（figurelib）----
+
+def _to_jsonable(obj):
+    """递归把 numpy 标量/数组转成原生 JSON 类型（fig_profile 报告含 numpy 值）。"""
+    import numpy as np
+    if isinstance(obj, dict):
+        return {k: _to_jsonable(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_to_jsonable(v) for v in obj]
+    if isinstance(obj, np.integer):
+        return int(obj)
+    if isinstance(obj, np.floating):
+        return float(obj)
+    if isinstance(obj, np.bool_):
+        return bool(obj)
+    if isinstance(obj, np.ndarray):
+        return _to_jsonable(obj.tolist())
+    return obj
+
+
+def op_fig_profile(args):
+    """数据剖析 + 图型建议：CSV/TSV/Excel → 列类型/样本量/分布/异常/相关 + 建议。
+
+    对应 scipilot「思考-绘制」工作流的第 1 步。相对路径基于工作区。
+    """
+    from figurelib.profile_data import profile_data
+    path = args.get('path')
+    if not path:
+        raise ValueError('path is required (CSV/TSV/Excel 文件路径)')
+    group_cols = args.get('group_cols') or []
+    info = profile_data(path, group_cols=group_cols)
+    return _to_jsonable(info)
+
+
+def op_fig_export(args):
+    """图文件合规审计 + 可选 PNG 预览：格式/DPI/尺寸/字体嵌入检查。
+
+    对应 scipilot 工作流的第 7 步（投稿前机器审计）。对已落盘的 PDF/SVG/
+    PNG/TIFF 文件逐张检查：JPEG 数据图、DPI 不足、尺寸偏离目标、PDF 含
+    Type 3 字体等。preview=true 时额外渲染 PNG 预览（PDF 需要 pypdf/
+    PyMuPDF 支持）。相对路径基于工作区。
+    """
+    import os
+    from figurelib.check_figure import check_figure
+    from figurelib.visual_qa import render_preview
+
+    paths = args.get('paths')
+    if not isinstance(paths, list) or not paths:
+        raise ValueError('paths must be a non-empty list of figure file paths')
+    min_dpi = args.get('min_dpi', 300)
+    width_in = args.get('width_in')
+    height_in = args.get('height_in')
+    target = None
+    if width_in and height_in:
+        target = (float(width_in), float(height_in))
+    preview = bool(args.get('preview', False))
+
+    results = []
+    for p in paths:
+        issues, info = check_figure(p, min_dpi=min_dpi, target_inches=target)
+        sev = {'INFO': 0, 'WARN': 1, 'FAIL': 2}
+        verdict = 'PASS' if not issues else {0: 'INFO', 1: 'WARN', 2: 'FAIL'}[max(sev[s] for s, _ in issues)]
+        entry = {
+            'path': p,
+            'verdict': verdict,
+            'issues': [{'severity': s, 'message': m} for s, m in issues],
+            'info': _to_jsonable(info),
+        }
+        if preview:
+            try:
+                out = os.path.splitext(os.path.abspath(p))[0] + '_preview.png'
+                entry['preview_png'] = render_preview(p, out)
+            except Exception as e:  # PDF 缺 pypdf/PyMuPDF 等：审计不受影响
+                entry['preview_error'] = f'{type(e).__name__}: {e}'
+        results.append(entry)
+    return {'count': len(results), 'results': results}
+
+
+def op_fig_qa(args):
+    """绘图环境自检：CJK 字体可用性 + 期刊预设应用测试。
+
+    中文图出方框的根因是默认字体无 CJK 字符表。本 op 在画图前探测：
+    cjk_ready=false 时画中文图必然方框——应改用英文标签或提示安装
+    Noto Sans CJK。preset_test 验证期刊预设可应用（含中文模式字体配置）。
+    """
+    import matplotlib
+    from figurelib.setup_style import list_cjk_fonts, setup_style
+
+    lang = args.get('lang', 'zh')
+    journal = args.get('journal', 'nature')
+    cjk = list_cjk_fonts()
+    preset_ok = True
+    applied = None
+    error = None
+    try:
+        applied = setup_style(journal=journal, lang=lang)
+    except Exception as e:
+        preset_ok = False
+        error = f'{type(e).__name__}: {e}'
+    return {
+        'matplotlib': matplotlib.__version__,
+        'cjk_fonts': cjk,
+        'cjk_ready': len(cjk) > 0,
+        'preset_test': {
+            'journal': journal,
+            'lang': lang,
+            'ok': preset_ok,
+            'applied': _to_jsonable(applied) if applied else None,
+            'error': error,
+        },
+        'hint': ('中文图可正常渲染。' if cjk else
+                 '本机未检测到 CJK 字体——中文标签会渲染成方框。改用英文标签，'
+                 '或安装 Noto Sans CJK（见 bio-figure skill）。'),
+    }
+
+
 # ---- op 注册表 ----
 OPS = {
     'seq_analyze': op_seq_analyze,
@@ -634,6 +755,9 @@ OPS = {
     'pubmed_search': op_pubmed_search,
     'pubmed_abstract': op_pubmed_abstract,
     'ref_genome': op_ref_genome,
+    'fig_profile': op_fig_profile,
+    'fig_export': op_fig_export,
+    'fig_qa': op_fig_qa,
     'env_status': op_env_status,
 }
 
