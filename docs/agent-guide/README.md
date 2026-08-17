@@ -44,7 +44,7 @@ language: none
 | 指南 skill | 内容 | 何时加载 |
 |---|---|---|
 | `dsh-bio-genie-guide-tools` | 21 个工具完整参数/返回/示例 | 不确定工具怎么用、参数怎么传时 |
-| `dsh-bio-genie-guide-skills` | 33 个 skill 导航（15 领域+17 协议） | 选 skill、查协议时 |
+| `dsh-bio-genie-guide-skills` | 33 个 skill 导航与分类体系（功能层级 × 语言解释器） | 选 skill、查协议时 |
 | `dsh-bio-genie-guide-python` | bio_python 编程指南（可用库/契约/坑） | 写任何非平凡代码前 |
 | `dsh-bio-genie-guide-workflows` | 10 个端到端工作流 | 用户需求命中某场景时 |
 | `dsh-bio-genie-guide-plotting` | 出版级绘图专题（fig 工具+figurelib） | 任何画图需求 |

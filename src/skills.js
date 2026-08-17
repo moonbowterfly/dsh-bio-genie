@@ -401,7 +401,7 @@ bio_python 失败时返回 \`needs_repair: true\`，stderr 说明了失败原因
 |------|---------|
 | dsh-bio-genie-guide | 总览/阅读地图/铁律 |
 | dsh-bio-genie-guide-tools | 查工具参数与返回结构 |
-| dsh-bio-genie-guide-skills | 选领域/协议 skill |
+| dsh-bio-genie-guide-skills | skill 导航与分类体系（功能层级 × 语言解释器） |
 | dsh-bio-genie-guide-python | 写 bio_python 代码前 |
 | dsh-bio-genie-guide-workflows | 命中典型场景 |
 | dsh-bio-genie-guide-plotting | 画图需求 |

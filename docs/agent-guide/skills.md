@@ -6,6 +6,42 @@ language: none
 
 > skill 是插件内置的可加载知识库（配方/工作流/坑）。加载方式：用 skill 工具按名字加载。**写非平凡代码前先加载对应领域 skill；命中协议场景直接加载协议。**
 
+## 〇、Skill 分类体系（先懂分类，再选 skill）
+
+本插件的 skill 沿**两个正交维度**分类，加载前先看懂两个标签：
+
+### 维度一：按功能层级（这个 skill 是干什么的）
+
+| 层级 | 命名特征 | 分类依据 |
+|---|---|---|
+| 主 skill | `dsh-bio-genie`（唯一） | **路由中枢**：工具分层决策树、协议映射表、调用规则。任何生物分析先加载它 |
+| 领域 skill | `bio-*`（15 个） | 按 **Biopython 能力域**划分（io/seq/align/blast/entrez/phylo/structure/motif/restriction/utils/graphics/popgen/figure）——教「某个模块怎么用」 |
+| 协议 skill | `bio-proto-*`（17 个） | 按 **高频任务**划分（质控/建树/富集/坐标/统计/绘图…）——教「某类任务怎么完整做完」，含可执行代码模板 + 常见坑 |
+| 指南 skill | `dsh-bio-genie-guide-*`（8 个） | 插件**整体说明书**——教「这个插件怎么用」，按主题划分（总览/工具/skill/编程/工作流/绘图/排障/严谨性） |
+
+### 维度二：按语言解释器（这个 skill 的代码跑在哪个环境）
+
+每个 skill 开头 frontmatter 都有 `language:` 字段。**分类依据 = 可执行内容运行在哪个解释器环境**：
+
+| 值 | 含义 | 判定依据 |
+|---|---|---|
+| `python` | 仅用插件内置 Python 环境（bio_python / bio_* 工具 / figurelib） | 代码模板全是 Python，只调 Python 生态 |
+| `r` | 仅用 R 环境（bio_r 执行器 / Bioconductor 生态） | 代码模板全是 R |
+| `mixed` | 同一工作流混用 Python 与 R | 正文会明确标注哪一步用哪个解释器 |
+| `none` | 纯知识/导航/参考，不执行任何代码 | 无代码模板、无工具调用序列 |
+
+**当前状态**：全部领域/协议 skill 为 `python`（R 尚未接入）；8 份指南中 python-cookbook / workflows / plotting 为 `python`，其余为 `none`。**R 支持落地后**：R 专属能力（差异表达 DESeq2 / 微生物组 phyloseq 等）会以 `language: r` 的新 skill 出现，genie 主 skill 与 workflows 指南会改为 `mixed`。
+
+### 加载判定顺序（分类的实际用法）
+
+```
+1. 看 language 字段：确认 skill 依赖的解释器与任务匹配（R 任务配 R skill）
+2. 先加载主 skill dsh-bio-genie → 由决策树路由
+3. 命中协议任务（"批量转换""建树""富集"）→ 直接加载对应 bio-proto-* 协议
+4. 语义化工具覆盖不了且无协议命中 → 加载对应领域 skill 拿配方，写 bio_python 代码
+5. 不确定插件整体用法 / 工具参数 / 出错原因 → 加载对应指南
+```
+
 ## 一、主 skill：`dsh-bio-genie`
 
 任何生物分析**先加载**。内容：工具分层决策树（语义化工具表 → 协议映射表 → 调用规则 → ACR → 会话记忆 → 科学严谨性）。它告诉你去哪、用哪个工具、加载哪个 skill。
@@ -72,5 +108,3 @@ language: none
 | `dsh-bio-genie-guide-plotting` | 绘图专题 |
 | `dsh-bio-genie-guide-troubleshooting` | 故障排查与边界 |
 | `dsh-bio-genie-guide-rigor` | 严谨性与报告规范 |
-
-> 语言标注：每个 skill 开头 frontmatter 的 `language:` 字段标明其可执行内容运行在哪个解释器（`python` / `r` / `mixed` / `none`=纯知识导航）。加载 skill 前先看该字段，确认与任务匹配。
