@@ -47,9 +47,11 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 ## 常见坑
 
 - qblast 是远程 HTTP 提交，慢且受 NCBI 限流：一次任务只提交 1-2 条查询，批量任务加 `time.sleep(10)`
+- **qblast 返回的 handle 是文本流**（`StringIO`，`.read()` 得到 str 非 bytes）——如要写盘保存原始 XML，务必用**文本模式** `open("x.xml", "w")`；用 `wb` 会抛 `TypeError: a bytes-like object is required`（Biopython 1.88 实测）。解析时直接 `NCBIXML.parse(handle)`，无需 read
 - `NCBIXML.parse` 返回生成器，`list()[0]` 取第一条查询结果
 - 序列太短（<20 nt）blastn 可能无 hit，改用蛋白库或加长序列
-- 网络失败会抛 URLError：重试一次，仍失败如实报告（不编造 hit）
+- 网络失败会抛 URLError / IncompleteRead：重试一次（sleep 5-10s），仍失败如实报告（不编造 hit）；qblast 提交本身较慢（10s~2min），给足超时
+- 查询序列含低复杂度重复（poly-A、串联重复）容易命中假阳性——报告时说明并建议用"低复杂度过滤"或分段查询
 
 ## 解读要点
 

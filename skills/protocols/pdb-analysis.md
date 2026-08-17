@@ -59,8 +59,12 @@ print(f"RMSD over {n} CA atoms: {sup.rms:.2f} Å")
 - 水分子/配体的 hetflag 非空，遍历时先 `res.id[0] == " "` 过滤
 - Superimposer 要求两组原子一一对应且顺序一致，先按 CA 提取
 - 缺电子密度区没有原子，`"CA" in res` 检查防 KeyError
+- 按 PDB ID 下载结构用 `PDBList().retrieve_pdb_file(id, pdir="pdb_data", file_format="pdb")`（返回含 `.ent` 后缀的旧格式文件；新版默认 mmCIF，需传 `file_format="pdb"` 或改用 `MmCIFParser`）
+- ⚠️ **ResidueDepth 依赖外部 `msms` 二进制，DSSP 依赖 `dssp/mkdssp`**：插件环境不预装这些外部程序，`Bio.PDB.ResidueDepth` / `Bio.PDB.DSSP` 会直接抛错。**回退方案**：① 深度估算用 SASA 表面距离法（Shrake-Rupley 可由 `Bio.PDB.FreeSASA` 或简化原子到表面原子距离实现）；② 二级结构从 PDB 文件自带的 HELIX/SHEET 记录读取，或 `cif` 注解（不要假设 DSSP 可用）。
+- 可视化用 matplotlib（已随环境预装）：`matplotlib.use("Agg")` 无显示后端，CA 轨迹 3D 散点/折线即可输出 PNG。
 
 ## 解读要点
 
 - 距离 < 3.5 Å 通常视为直接相互作用（氢键/范德华接触）
 - RMSD < 2 Å 视为高度相似构象；报告时注明用的原子集合
+- 二级结构组成（螺旋/折叠/卷曲比例）应写明确数据来源（PDB HELIX/SHEET 记录 vs DSSP 计算），两者口径可能不同

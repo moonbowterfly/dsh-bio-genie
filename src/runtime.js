@@ -375,8 +375,9 @@ async function selfBootstrap(envDir) {
   const managedPython = findManagedPython(pyDir)
   if (!managedPython) throw new Error('managed python not found after uv install')
 
-  // 3. uv venv（指定完整解释器路径，确保用私有目录里的）
-  r = run(uv, ['venv', envDir, '--python', managedPython])
+  // 3. uv venv（指定完整解释器路径，确保用私有目录里的；--seed 预装 pip/setuptools/wheel，
+  //    否则 venv 无 pip——agent 想补装包时只能 ensurepip 绕路，2026-08-17 实战测试发现）
+  r = run(uv, ['venv', envDir, '--python', managedPython, '--seed'])
   if (r.code !== 0) throw new Error(`uv venv failed: ${r.stderr.slice(0, 500)}`)
 
   // 4. uv pip install biopython numpy（官方 PyPI 失败自动切清华镜像）

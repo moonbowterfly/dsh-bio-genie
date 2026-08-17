@@ -52,7 +52,7 @@ print("saved circular.png")
 
 ## 要点
 
-- GenomeDiagram 依赖 `reportlab`（需额外安装；若 `import reportlab` 失败，请在 `python/requirements.txt` 增加 `reportlab` 后重跑 `bio_env` 的 reinstall）。
+- GenomeDiagram 依赖 `reportlab`（已随插件环境预装，见 `python/requirements.txt`；若在旧环境下缺失，重跑 `bio_env` 的 reinstall 即可）。
 - `features.add_feature(feature, ...)` 需要 `SeqFeature`，常见于 GenBank 文件的 `record.features`。
 - `pagesize` 单位是 cm（线性）或 pt（环形），调大以容纳更多标注。
 - 生成的是 PNG/PDF；绘图后记得报告文件路径。

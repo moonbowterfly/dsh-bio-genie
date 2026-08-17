@@ -38,5 +38,7 @@ print(len(r), r.seq, r.id)
 - 现代 Biopython 的 `Seq` 不再带 alphabet；直接用 `.translate()` / `.transcribe()`。
 - NCBI/在线服务需要网络与邮箱（见 `bio-entrez`、`bio-blast`）。
 - 遇到 `ImportError` 先跑 `bio_env` 看环境状态，必要时 `reinstall`。
+- ⚠️ **不要用 dsh 的 bash/pwsh 直接调 venv python**：宿主进程的 `PYTHONPATH` 会污染导入路径（可能加载到错误平台的 numpy 等）。所有代码都走 `bio_python` 工具（它已用 `-I` 隔离环境）；确需安装 Python 包时，用 `bio_env` 的状态/安装能力，或在 `bio_python` 内 `import subprocess` 且显式清空 `PYTHONPATH`。
+- ⚠️ **绘图库已随环境预装**（matplotlib/reportlab，见 `python/requirements.txt`）；若旧环境缺失，`bio_env` reinstall 即可，不要手工 ensurepip 装 pip（uv 环境默认无 pip，2026-08-17 实测踩坑）。
 
 先按需加载领域技能（`bio-io`、`bio-seq`、`bio-align` …）再写非平凡代码。
