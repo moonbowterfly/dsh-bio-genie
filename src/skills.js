@@ -86,6 +86,37 @@ export const SKILL_MANIFEST = [
     description: '出版级科研绘图顾问（吸收 scipilot-figure-skill）：8 步思考-绘制工作流、图型决策速查表、18 条画图陷阱、期刊规格、中文 CJK 支持。任何画图/数据可视化需求先加载本 skill。',
     file: 'bio-figure.md',
   },
+  // ---- R/Bioconductor 领域（language: r，2026-08-17 起双引擎）----
+  {
+    name: 'bio-r-core',
+    description: 'R 执行器核心（bio_r）：执行契约、环境事实（R 4.6/Bioc 3.23 核心包清单）、与 bio_python 双引擎分工路由、ACR 信号表、高频陷阱。任何 R 分析先加载。',
+    file: 'bio-r-core.md',
+  },
+  {
+    name: 'bio-r-basics',
+    description: 'R 核心数据结构：Biostrings（序列对象）/ GenomicRanges（区间）/ SummarizedExperiment（组学容器）——对象模型优先，先懂类再记函数。',
+    file: 'bio-r-basics.md',
+  },
+  {
+    name: 'bio-r-rnaseq',
+    description: '差异表达分析：DESeq2 标准管道（对象模型：DESeqDataSet→DESeq→results→lfcShrink）/ edgeR 无重复路径 / 解读纪律（padj<0.05 且 |log2FC|>1 双阈值）。',
+    file: 'bio-r-rnaseq.md',
+  },
+  {
+    name: 'bio-r-enrichment',
+    description: 'R 富集与 GSEA：fgsea 排序富集管道 + enricher 通用 ORA；与 bio_enrichr 的 ORA 分工；org.Hs.eg.db 不在核心包的边界。',
+    file: 'bio-r-enrichment.md',
+  },
+  {
+    name: 'bio-r-microbiome',
+    description: '微生物组分析（phyloseq）：OTU 表组装（taxa_are_rows）、alpha/beta 多样性、PCoA、PERMANOVA 与解读纪律。',
+    file: 'bio-r-microbiome.md',
+  },
+  {
+    name: 'bio-r-vis',
+    description: 'R 生态可视化：ggplot2 火山图/ggtree 树图/ComplexHeatmap 复杂热图；与 Python figurelib 的出版级分工（中文图走 Python）。',
+    file: 'bio-r-vis.md',
+  },
   // ---- 协议库（高频任务的可执行工作流，含代码模板 + 常见坑）----
   {
     name: 'bio-proto-seq-qc',
@@ -172,6 +203,16 @@ export const SKILL_MANIFEST = [
     description: '统计分析协议：检验选择决策树、scipy 模板、多重校正（Bonferroni/BH-FDR）、效应量与功效、实验设计要点、APA 报告规范。',
     file: 'protocols/statistics.md',
   },
+  {
+    name: 'bio-proto-r-de',
+    description: 'R 差异表达工作流：counts+meta 输入约定 → DESeq2 全流程模板 → 火山图/富集下游衔接（language: r）。',
+    file: 'protocols/r-de.md',
+  },
+  {
+    name: 'bio-proto-r-gsea',
+    description: 'R GSEA 工作流：排序列表+GMT 输入约定 → fgsea 全流程模板 → padj<0.25 解读（language: r）。',
+    file: 'protocols/r-gsea.md',
+  },
 ]
 
 /**
@@ -204,6 +245,12 @@ export const GUIDE_MANIFEST = [
     description: 'bio_python 编程指南：执行契约、可用库清单（含 figurelib）、代码模板、ACR 修复表、限流纪律、高频陷阱。',
     whenToUse: '写任何非平凡 bio_python 代码前。',
     file: 'python-cookbook.md',
+  },
+  {
+    name: 'dsh-bio-genie-guide-r',
+    description: 'bio_r 编程指南：执行契约、R 4.6/Bioc 3.23 核心包清单与边界、代码模板、ACR 信号表、与 Python 引擎协作、高频陷阱。',
+    whenToUse: '写任何非平凡 bio_r 代码前。',
+    file: 'r-cookbook.md',
   },
   {
     name: 'dsh-bio-genie-guide-workflows',
@@ -283,7 +330,7 @@ export function registerSkills(ctx, skillsDir, guideDir) {
 
 /** 主 skill 正文（工具分层选择的决策树）。 */
 const GENIE_SKILL_CONTENT = `---
-language: python
+language: mixed
 ---
 
 # dsh-bio-genie 许愿式生物信息学分析
@@ -314,12 +361,24 @@ language: python
 | bio_log | 执行日志回溯（最近/检索） |
 | bio_memory | 会话记忆查询（成功模式/修复经验） |
 | bio_env | 环境诊断 |
+| bio_r | R 执行器（DESeq2/edgeR/limma 差异表达、fgsea 排序富集、phyloseq 微生物组、ggplot2/ggtree/ComplexHeatmap） |
+| bio_r_env | R 环境诊断（R 版本/Bioconductor 版本/核心包版本） |
 
-**第二优先：bio_python 执行器**（覆盖 Biopython 全部功能，适合语义化工具覆盖不到的场景）
+**第二优先：执行器**（语义化工具覆盖不到的场景）
 
-- 序列比对（Bio.Align）、PDB 结构（Bio.PDB）、系统发育（Bio.Phylo）、
-  motif（Bio.motifs）、BLAST（Bio.Blast）、多序列处理、自定义分析流程
-- 用法：写完整 Python 程序 → code 参数 → print 输出 → result 变量返回结构化值
+- Python 侧 bio_python：序列比对（Bio.Align）、PDB 结构（Bio.PDB）、系统发育（Bio.Phylo）、
+  motif（Bio.motifs）、BLAST（Bio.Blast）、多序列处理、自定义分析流程、出版级绘图（figurelib）
+- R 侧 bio_r：差异表达（DESeq2/edgeR/limma）、排序 GSEA（fgsea）、微生物组（phyloseq）、
+  基因组区间（GenomicRanges）、树图/复杂热图（ggtree/ComplexHeatmap）
+- 用法：写完整程序 → code 参数 → print 输出 → result 变量返回结构化值
+
+**双引擎路由（选哪个引擎）**
+
+| 任务 | 引擎 |
+|------|------|
+| 差异表达 / GSEA 排序富集 / 微生物组多样性 / GenomicRanges 区间 | R（bio_r，先加载 bio-r-core） |
+| 序列 IO/比对/BLAST/Entrez/结构/建树/出版级统计图/列表型富集 | Python（bio_python / bio_* 工具） |
+| 跨引擎协作 | Python 预处理 → R 分析 → Python 出图，用工作区文件衔接 |
 
 **常见任务 → 协议映射**（命中先加载协议 skill，含可执行代码模板）
 
@@ -342,6 +401,9 @@ language: python
 | 论文配图/统计图（选图+出版级出图） | bio-figure + bio-proto-pub-figure |
 | 基因组坐标转换/off-by-one 排查 | bio-proto-coords |
 | 统计检验/多重校正/功效 | bio-proto-statistics |
+| 差异表达（counts 矩阵） | bio-proto-r-de（R） |
+| 排序富集 GSEA | bio-proto-r-gsea（R） |
+| 微生物组多样性 | bio-r-microbiome（R） |
 
 ## 调用规则
 
@@ -357,6 +419,7 @@ language: python
 10. 语义化工具的 NCBI/Enrichr/Ensembl 限流已由插件内置，无需自己在参数里处理；但 bio_python 代码里直接调 Bio.Entrez 时仍需自己遵守速率限制。
 11. 画统计图/论文图：先 bio_fig_profile 剖析数据再选图型（见 bio-figure skill）；中文图先 bio_fig_qa 查字体；绘制配方见 bio-proto-pub-figure（figurelib 可 import）；投稿前 bio_fig_export 审计。
 12. 统计结论必须跑检验（bio-proto-statistics）：组间比较给 p 值+效应量，多重比较必须校正；误差棒图注写清 SD/SEM/CI + n。
+13. R 任务用 bio_r：差异表达/GSEA/微生物组等先加载 bio-r-core 与对应 r 领域 skill；R 环境首次引导约 5-20 分钟（惰性触发），提前告知用户等待、不要重复调用；R 生态问题查 bio_r_env。
 
 ## 自动代码修复（ACR）
 
@@ -390,6 +453,8 @@ bio_python 失败时返回 \`needs_repair: true\`，stderr 说明了失败原因
 - bio_python 代码里调 NCBI 必须设 Bio.Entrez.email，且注意 3 req/s 速率限制。
 - bio_enrichr 的结果按 adjusted_p_value 升序解读；combined_score 越高证据越强。
 - ImportError → 先 bio_env 看环境，必要时 reinstall。
+- R 首次引导慢（5-20 分钟）；R 包加载也慢（DESeq2 ~10s），bio_r 默认超时 120s 不够就传大 timeoutMs。
+- R 报 "there is no package called 'X'" → X 不在核心包集（org.Hs.eg.db 等），换等效实现或如实告知边界。
 
 加载领域 skill（bio-io、bio-seq、bio-align…）获取详细配方后再写非平凡代码。
 

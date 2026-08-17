@@ -15,7 +15,18 @@ language: none
 | ImportError（某个包） | 升级后新依赖未补装（或环境损坏） | 插件会**自动补装**；若仍失败 `bio_env reinstall=true` |
 | 引导日志提到 GitHub 下载失败 | 官方源不可达 | 插件自动切国内镜像（无需你处理）；用户显式设过 DSH_BIO_UV_BASE 时要提醒检查其镜像 |
 
-## 2. bio_python 失败
+## 2. R 环境类故障（bio_r / bio_r_env）
+
+| 现象 | 原因 | 处理 |
+|---|---|---|
+| 首次 bio_r 几分钟不返回 | 正在惰性引导（下载 R 安装器 ~90MB + 核心包集数百 MB，5-20 分钟） | 告知用户等待，**不要重复调用** |
+| `bio_r_env` ready=false | 引导失败（网络/安装器/包安装） | 看 error 字段；一次重试；仍失败 `bio_r_env reinstall=true`（只重建包集，不重装 R） |
+| `there is no package called 'X'` | X 不在核心包集（org.Hs.eg.db、showtext、biomformat 等） | 换核心包等效实现（见各 bio-r-* skill 的边界说明），**不引导用户手动装** |
+| 源码包编译失败（`compilation failed`） | 无 Rtools 工具链（二进制优先策略下不应出现；除非某包无 Windows 二进制） | 如实报告该包不可用 + 给替代路径 |
+| macOS/Linux 上 bio_r 报"仅支持 Windows" | R 安装器无可移植静默安装路径 | 如实告知：用户自行装 R（≥4.6）并在插件配置 `rscriptPath` 指向 Rscript 后重试 |
+| R 进程超时（timedOut） | 包加载慢（DESeq2 ~10s）或任务重 | 传大 timeoutMs（如 300000）；仍超时才怀疑死循环 |
+
+## 3. bio_python 失败
 
 `needs_repair: true` 时按 stderr 修复重试（最多 2 次修复），常见签名：
 
@@ -43,13 +54,14 @@ language: none
 | 用户想要 | 插件现状 | 替代方案（你可以做的） |
 |---|---|---|
 | 单细胞分析（scanpy/Seurat） | ❌ 不内置（numba/torch 体积 1GB+） | 建议用在线平台；插件可做下游基因列表富集（bio_enrichr） |
-| RNA-seq 上游（STAR/Salmon/FastQC） | ❌ 外部二进制不可装 | 用户给 counts 矩阵，插件可做统计检验+绘图+富集 |
+| RNA-seq 上游（STAR/Salmon/FastQC） | ❌ 外部二进制不可装 | 用户给 counts 矩阵，插件用 bio_r 做 DESeq2 差异表达 |
 | MAFFT/IQ-TREE 精确建树 | ❌ 外部工具 | Bio.Phylo 距离法 NJ（小数据集够用），如实说明近似 |
 | 分子对接/蛋白结构预测（AlphaFold 等） | ❌ GPU 级 | 建议云平台；插件可做 Bio.PDB 结构分析 |
 | 化学信息学（RDKit/SMILES） | ❌ 明确排除 | 建议其他工具链 |
-| GSEA 排序富集 | ⚠️ 仅 ORA（bio_enrichr） | 可用 numpy 手写简化 GSEA，或如实说明需外部 gseapy |
-| 交互式图（plotly） | ❌ 未内置 | matplotlib 静态图完全够期刊投稿 |
+| 物种注释库（org.Hs.eg.db） | ❌ 不在 R 核心集（体积大） | enrichGO 不可用；用 enricher 自带基因集，或 Python bio_enrichr |
+| 交互式图（plotly） | ❌ 未内置 | matplotlib/ggplot2 静态图完全够期刊投稿 |
 | 图像 AI 读图复核 | ⚠️ 依赖 dsh 模型多模态 | 无多模态时用程序自检（audit_layout）+ 清单核对 |
+| R 生态超核心集的包（几十上百 MB 的扩展） | ⚠️ 惰性引导只装核心集 | 如实告知当前包集，不引导用户手动装；需求反馈给插件开发者 |
 
 原则：**说"做不到"时，永远跟一个"但你可以……"**；绝不让用户手动装东西（违反对"零安装"的承诺时，改成推荐替代路径）。
 

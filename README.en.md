@@ -21,8 +21,8 @@
 | Feature | Description |
 |---------|-------------|
 | 🪄 **Wish-style Analysis (Wish Coding)** | Plain language in, results out: *"What's the GC content and EcoRI cut sites of this sequence?"* |
-| 🧩 **Full Biopython Coverage** | `bio_python` executor runs arbitrary Biopython code (alignment, PDB, Phylo, motif, BLAST…) plus 15 domain skill recipes |
-| ⚡ **High-Frequency Semantic Tools** | 17 fixed-parameter tools (GC content, translation, restriction enzymes, k-mer, file IO, Entrez, pathway enrichment, PubMed literature, reference genome, publication-grade plotting) + 4 executor tools (bio_python / bio_env / bio_log / bio_memory) — token-efficient, stable output, validated arguments |
+| 🧩 **Dual-Engine Coverage** | `bio_python` executor runs arbitrary Biopython code (alignment, PDB, Phylo, motif, BLAST…) + `bio_r` executor ships R 4.6/Bioconductor 3.23 (DESeq2 differential expression, fgsea GSEA, phyloseq microbiome), backed by 21 domain skill recipes |
+| ⚡ **High-Frequency Semantic Tools** | 17 fixed-parameter tools (GC content, translation, restriction enzymes, k-mer, file IO, Entrez, pathway enrichment, PubMed literature, reference genome, publication-grade plotting) + 6 executor tools (bio_python / bio_r / bio_env / bio_r_env / bio_log / bio_memory) — token-efficient, stable output, validated arguments |
 | 📦 **Zero Installation** | Automatically downloads an isolated Python environment (uv + venv + Biopython) to `$DSH_HOME/dsh-bio-genie/`, no system pollution |
 | 🇨🇳 **China-Network Ready** | Auto network adaptation: official sources by default, automatic switch to domestic mirrors on any failure (uv→Tsinghua PyPI, CPython→npmmirror, PyPI packages→Tsinghua), zero configuration required |
 | 🛡️ **Environment Isolation** | Python subprocesses run in `-I` (isolated) mode, immune to host PYTHONPATH pollution |
@@ -30,7 +30,7 @@
 | 📜 **Transparency Log** | Every code execution / tool call appends an async JSONL log (hash/preview/duration); `bio_log` traces back any analysis |
 | 🧬 **Scientific Rigor Guardrails** | Persona enforces "biological conclusions must trace to tool output"; pure inference is marked [inferred — unverified] |
 | 🧠 **Session Memory** | Successful code patterns + error→fix lessons accumulate automatically (local JSON); query via `bio_memory`, gets smarter over time |
-| 📚 **Protocol Knowledge Base** | 17 high-frequency task protocols (QC/alignment/BLAST/cloning/trees/structure/enrichment/publication figures/coordinate systems/statistics…), each with runnable code templates + pitfalls, bundled with the plugin |
+| 📚 **Protocol Knowledge Base** | 19 high-frequency task protocols (QC/alignment/BLAST/cloning/trees/structure/enrichment/publication figures/coordinate systems/statistics/differential expression/GSEA…), each with runnable code templates + pitfalls, bundled with the plugin |
 
 ---
 
@@ -118,12 +118,12 @@ X and gaps are treated as unknown bases during translation (Biopython standard b
 
 ---
 
-## 📚 Skill System (16 total)
+## 📚 Skill System (22 total)
 
 ### Master skill: `dsh-bio-genie`
-Tool-layering decision tree: **check the semantic tool table first → use it if matched; otherwise write code via `bio_python`**.
+Tool-layering decision tree + dual-engine routing table: **check the semantic tool table first → use it if matched; otherwise pick the engine (Python/R) and write code**.
 
-### 15 Domain Recipes
+### 21 Domain Recipes (15 Python + 6 R)
 
 | Skill | Biopython modules covered |
 |-------|---------------------------|
@@ -142,6 +142,12 @@ Tool-layering decision tree: **check the semantic tool table first → use it if
 | `bio-graphics` | Bio.Graphics.GenomeDiagram (map drawing) |
 | `bio-popgen` | Bio.PopGen (population genetics) |
 | `bio-figure` | Publication-grade figure consultant (figurelib: chart selection, 18 pitfalls, journal specs, CJK Chinese support) |
+| `bio-r-core` | R executor core (bio_r contract, dual-engine routing, ACR signals) |
+| `bio-r-basics` | Biostrings / GenomicRanges / SummarizedExperiment (object models) |
+| `bio-r-rnaseq` | DESeq2 / edgeR differential expression pipelines & interpretation discipline |
+| `bio-r-enrichment` | fgsea GSEA + enricher ORA (division of labor with bio_enrichr) |
+| `bio-r-microbiome` | phyloseq microbiome diversity (alpha/beta/PCoA/PERMANOVA) |
+| `bio-r-vis` | ggplot2 / ggtree / ComplexHeatmap (R ecosystem visualization) |
 
 ---
 
@@ -244,6 +250,7 @@ node --input-type=module -e "import('./src/runtime.js').then(m => m.ensureEnviro
 - **numpy**: BSD License
 - **scipilot-figure-skill** (figurelib plotting scripts): MIT (Copyright Haojae, see THIRD_PARTY_NOTICES.md)
 - **K-Dense scientific-agent-skills** (figurelib style assets + knowledge protocol sources): MIT (Copyright K-Dense Inc., see THIRD_PARTY_NOTICES.md)
+- **R / Bioconductor ecosystem**: GPL-2|GPL-3 (R core) / Artistic-2.0 / MIT / LGPL-3 / GPL-2 / AGPL-3 (phyloseq) — runtime-install + API-call model with zero source redistribution; per-package license table and compliance rationale in THIRD_PARTY_NOTICES.md
 - **BioSQL intentionally excluded** (LGPL)
 
 ---

@@ -19,17 +19,18 @@ language: none
 | 层 | 工具 | 何时用 |
 |---|---|---|
 | 语义化工具 ×17 | `bio_seq_analyze` / `bio_enrichr` / `bio_fig_export` 等 | 高频稳定操作，**第一优先** |
-| 执行器 | `bio_python` | 语义化工具覆盖不到的一切（比对、PDB、Phylo、motif、BLAST、自定义流程、绘图配方），**第二优先** |
-| 元工具 ×3 | `bio_env` / `bio_log` / `bio_memory` | 环境诊断、日志回溯、经验查询 |
+| 双引擎执行器 | `bio_python`（Python：Biopython 全功能 + 出版级绘图）/ `bio_r`（R 4.6 + Bioconductor 3.23：差异表达/GSEA/微生物组） | 语义化工具覆盖不到的一切，**第二优先**（先按任务选引擎，见主 skill 双引擎路由表） |
+| 元工具 ×4 | `bio_env` / `bio_r_env` / `bio_log` / `bio_memory` | 双环境诊断、日志回溯、经验查询 |
 
 完整参数与返回结构 → 加载 `dsh-bio-genie-guide-tools`。
 
 ## 3. 环境机制（重要，影响用户体验）
 
-- **首次调用自动引导**：插件自动下载 uv + CPython 3.12 + 隔离 venv（biopython/numpy/matplotlib/pandas/scipy/seaborn/Pillow 等）到 `~/.dsh/dsh-bio-genie/`，**可能需要几分钟**。你要做的是：提前告知用户"正在初始化分析环境（仅首次，约 1-2 分钟）"，**绝不要因为慢就重复调用**（引导幂等，重复调用只会排队）。
-- **插件升级后自动补装**：版本升级新增依赖时，首次调用会自动补装（约 1 分钟），同样不要重试。
-- **用户零操作**：任何情况下都不要求用户手动装 Python/pip/包。
-- 环境异常时用 `bio_env` 诊断，`bio_env reinstall=true` 强制重建。
+- **Python 环境（插件加载时预热）**：自动下载 uv + CPython 3.12 + 隔离 venv（biopython/numpy/matplotlib/pandas/scipy/seaborn/Pillow 等）到 `~/.dsh/dsh-bio-genie/`，首次约 1-2 分钟。告知用户"正在初始化（仅首次）"，**不要重复调用**。
+- **R 环境（首次 bio_r 调用时惰性引导）**：自动下载 R 4.6.0 安装器 + BiocManager 安装核心包集（DESeq2/edgeR/limma/fgsea/phyloseq/ggplot2/ggtree/ComplexHeatmap 等）到私有目录，首次约 **5-20 分钟**。R 任务开始前先告知用户等待。
+- **插件升级后自动补装**：两个环境缺包都会自动补齐（Python：uv pip；R：幂等包安装器），不要重试。
+- **用户零操作**：任何情况下都不要求用户手动装 Python/R/pip/包。
+- 环境异常：`bio_env`（Python）/ `bio_r_env`（R）诊断；reinstall=true 重建。
 
 ## 4. 输出规范（用户看到的是你）
 
@@ -43,10 +44,11 @@ language: none
 
 | 指南 skill | 内容 | 何时加载 |
 |---|---|---|
-| `dsh-bio-genie-guide-tools` | 21 个工具完整参数/返回/示例 | 不确定工具怎么用、参数怎么传时 |
-| `dsh-bio-genie-guide-skills` | 33 个 skill 导航与分类体系（功能层级 × 语言解释器） | 选 skill、查协议时 |
-| `dsh-bio-genie-guide-python` | bio_python 编程指南（可用库/契约/坑） | 写任何非平凡代码前 |
-| `dsh-bio-genie-guide-workflows` | 10 个端到端工作流 | 用户需求命中某场景时 |
+| `dsh-bio-genie-guide-tools` | 23 个工具完整参数/返回/示例 | 不确定工具怎么用、参数怎么传时 |
+| `dsh-bio-genie-guide-skills` | 41 个 skill 导航与分类体系（功能层级 × 语言解释器） | 选 skill、查协议时 |
+| `dsh-bio-genie-guide-python` | bio_python 编程指南（可用库/契约/坑） | 写任何非平凡 Python 代码前 |
+| `dsh-bio-genie-guide-r` | bio_r 编程指南（R/Bioconductor 核心包/契约/坑） | 写任何非平凡 R 代码前 |
+| `dsh-bio-genie-guide-workflows` | 13 个端到端工作流（10 Python + 3 R） | 用户需求命中某场景时 |
 | `dsh-bio-genie-guide-plotting` | 出版级绘图专题（fig 工具+figurelib） | 任何画图需求 |
 | `dsh-bio-genie-guide-troubleshooting` | 故障排查 + 插件边界 | 出错了、或用户要超能力时 |
 | `dsh-bio-genie-guide-rigor` | 科学严谨性与报告规范 | 写结论/报告前 |

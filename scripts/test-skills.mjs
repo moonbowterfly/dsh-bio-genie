@@ -18,8 +18,8 @@ const protocols = SKILL_MANIFEST.filter((s) => s.file.startsWith('protocols/'))
 const domain = SKILL_MANIFEST.filter((s) => !s.file.startsWith('protocols/'))
 
 console.log(`[skills] ${SKILL_MANIFEST.length} 个 skill（${domain.length} 领域 + ${protocols.length} 协议）+ ${GUIDE_MANIFEST.length} 个指南`)
-assert(protocols.length === 17, `协议数 = 17（实际 ${protocols.length}）`)
-assert(GUIDE_MANIFEST.length === 8, `指南数 = 8（实际 ${GUIDE_MANIFEST.length}）`)
+assert(protocols.length === 19, `协议数 = 19（实际 ${protocols.length}）`)
+assert(GUIDE_MANIFEST.length === 9, `指南数 = 9（实际 ${GUIDE_MANIFEST.length}）`)
 
 // ---- 语言标注约定（用户 2026-08-17）：所有 skill 开头 frontmatter 必须含 language 字段 ----
 const NL = String.fromCharCode(10)

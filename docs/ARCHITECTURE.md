@@ -89,6 +89,33 @@ model ──bio_seq_analyze(seq)──▶ tools.js
 幂等 + 进程内锁（`bootstrapLock`）防并发；`state.json` 记录状态。插件加载时后台预热
 （`warmUp`），工具调用时若未就绪则等待（最长 10 分钟超时）。
 
+### 5.1 R 环境引导（双引擎，2026-08-17 起）
+
+与 Python 侧同构的零依赖自举模型（`src/r-runtime.js`，独立模块不动 Python 侧）：
+
+1. **下载 R 4.6.0 安装器**（官方 CRAN → 失败自动切清华镜像；校验文件是
+   `md5sum.R-4.6.0.txt`——按版本命名，非 `md5sum.txt`，两源实测踩坑修正）
+2. **静默安装**到 `$DSH_HOME/dsh-bio-genie/r/`（Inno Setup `/VERYSILENT /NORESTART /DIR`）
+3. **BiocManager 装核心包集**到 `r-lib/`（版本对固定 R 4.6.0 ↔ Bioc 3.23；
+   `install.packages.compile.from.source="never"` 二进制优先；清华 CRAN + 清华
+   Bioconductor 镜像回退）
+
+与 Python 侧的差异：
+- **惰性引导**：`warmUpR` 默认 false（R+核心包数百 MB，不为从未用 R 的用户强制下载）；
+  首次 `bio_r` 调用触发（工具等待上限 40 分钟）。
+- **包级修复**：缺包 → 幂等安装器补装（R 本体不重装）；`bio_r_env reinstall=true` 强制重装包集。
+- **平台边界**：引导器仅 Windows（R 安装器无可移植静默安装路径）；macOS/Linux 需用户
+  自行装 R 并配置 `rscriptPath`（诚实报错，不假装支持）。
+- **许可模型**：R/CRAN/Bioc 软件全部运行时从官方仓库安装到用户私有目录，
+  插件零源码分发（逐包许可证清单与 AGPL phyloseq 论证见 THIRD_PARTY_NOTICES.md）。
+
+执行层 `r/r_bridge.R`：与 `python/bridge.py` 同构的 JSON 信封（stdin 读
+`{code, cwd}` → stdout 一行 `{ok, stdout, stderr, result}`）；`result <- 值`
+结构化返回；错误被捕获写 stderr（`Error`/`Execution halted` 标记），TS 侧据此
+判定 `needs_repair`（与 Python 的 traceback 判定对称）。UTF-8 走原始字节通道
+（Windows GBK 环境防乱码）。R 子进程环境隔离：`R_LIBS` 指向私有库、
+`R_ENVIRON_USER/R_PROFILE_USER` 清空 + `--vanilla`。
+
 ## 6. 工具 schema 约定
 
 - 参数用 `ParameterSchemaSpec`；输出用 `ValueSchemaSpec`。
@@ -106,9 +133,13 @@ model ──bio_seq_analyze(seq)──▶ tools.js
 ## 8. 扩展方式
 
 - **加语义化工具**：`bio_ops.py` 加 op 函数 + 注册表登记；`src/tools.js` 加 bioTool 条目。
-- **加领域 skill**：`skills/bio-xxx.md` + `src/skills.js` 的 SKILL_MANIFEST 加条目。
+- **加领域 skill**：`skills/bio-xxx.md` + `src/skills.js` 的 SKILL_MANIFEST 加条目；
+  **所有 skill（领域/协议/指南）开头 frontmatter 必须含 `language:` 字段**
+  （`python`/`r`/`mixed`/`none`），test-skills.mjs 强制校验。
 - **加依赖**：改 `python/requirements.txt`；`bio_env reinstall` 生效。
+- **加 R 核心包**：改 `r/requirements-r.txt`（安装器自动读取）；存量环境缺包自动补装。
 - **改提示词**：编辑 `prompts/persona.md` 后重启 dsh。
+- **说明书同步义务**：工具/skill/依赖变更必须同步更新 `docs/agent-guide/` 对应指南。
 
 ## 9. 平台兼容
 

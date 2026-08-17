@@ -2,9 +2,9 @@
 language: none
 ---
 
-# 工具全参考（21 个）
+# 工具全参考（23 个）
 
-> 每个工具：功能 → 参数（★=必填）→ 返回关键字段 → 典型触发词。**选工具第一优先，bio_python 第二优先。**
+> 每个工具：功能 → 参数（★=必填）→ 返回关键字段 → 典型触发词。**选工具第一优先，双引擎执行器（bio_python/bio_r）第二优先**——先按任务选引擎（见 dsh-bio-genie 主 skill 的双引擎路由表），再选工具。
 
 ## 一、执行器
 
@@ -25,13 +25,39 @@ language: none
 
 编程规范 → 加载 `dsh-bio-genie-guide-python`。
 
-### bio_env — 环境诊断/重建
+### bio_r — R 执行器（差异表达/富集/微生物组）
+
+写完整 R 程序到 `code` 参数，在插件隔离的 **R 4.6.0 + Bioconductor 3.23** 环境中执行。工作目录 = 会话工作区。
+
+| 参数 | 说明 |
+|---|---|
+| code ★ | 完整 R 源码 |
+| workdir | 工作目录（绝对路径；默认会话工作区） |
+| timeoutMs | 超时（默认 120000ms——R 包加载慢，长任务请加大） |
+
+返回：`ok / stdout / stderr / error / result / exitCode / timedOut / truncated / needs_repair`。
+- `result`：顶层 `result <- <JSON 可序列化值>`（推荐命名 list；data.frame 亦可）。
+- `needs_repair: true`：stderr 含 `Error`/`Execution halted`，修复重试（最多 3 次尝试）。
+- 可用核心包：DESeq2/edgeR/limma、fgsea、phyloseq、Biostrings/GenomicRanges/SummarizedExperiment、ggplot2/ggtree/ComplexHeatmap、dplyr/tibble/readr（完整清单与版本见 `bio_r_env`；clusterProfiler 与 org.Hs.eg.db **不在**核心集——Windows 下 Bioc 3.23 无 GO.db 二进制）。
+- **首次调用惰性引导**（下载 R + 核心包约 5-20 分钟）：提前告知用户等待，不要重复调用。
+
+编程规范 → 加载 `dsh-bio-genie-guide-r`。
+
+### bio_env — 环境诊断/重建（Python 侧）
 
 | 参数 | 说明 |
 |---|---|
 | reinstall | true 时强制重建环境（引导失败或包损坏时用） |
 
 返回：`ready / python / pythonVersion / biopython / numpy / envDir / bootstrapped`。
+
+### bio_r_env — R 环境诊断/核心包重建
+
+| 参数 | 说明 |
+|---|---|
+| reinstall | true 时重新安装核心包集（R 本体不重装） |
+
+返回：`ready / rscript / rVersion / bioc / packages（核心包版本表）/ libDir / bootstrapped`。R 包加载失败时先查这里；`packages` 里没有的包 = 不在核心集（换等效实现或如实告知边界）。
 
 ### bio_log — 执行日志回溯
 
@@ -118,6 +144,10 @@ language: none
 | "人类参考基因组版本" | `bio_ref_genome species=human` |
 | "这组数据怎么画/画成论文图" | `bio_fig_profile` → bio_python 画 → `bio_fig_export` 审计 |
 | "中文图会不会出方框" | `bio_fig_qa` |
-| 以上都覆盖不了 | `bio_python`（+ 先查 `dsh-bio-genie-guide-skills` 的领域/协议） |
+| "counts 矩阵差异表达" | `bio_r`（bio-proto-r-de 协议） |
+| "全基因组排序 GSEA" | `bio_r`（bio-proto-r-gsea 协议） |
+| "微生物组多样性/PCoA" | `bio_r`（bio-r-microbiome skill） |
+| "系统发育树美化/复杂热图" | `bio_r`（bio-r-vis skill） |
+| 以上都覆盖不了 | `bio_python` / `bio_r`（先查 `dsh-bio-genie-guide-skills` 的领域/协议） |
 
 **缓存与限流**（插件已内置，无需你处理）：NCBI 查询类 350ms 间隔、Enrichr 600ms；查询类工具（entrez_search/enrichr/pubmed_search/pubmed_abstract/ref_genome）相同参数 24h 内命中缓存（最多 100 条）。bio_python 代码里直接调 Bio.Entrez 时**必须自己**设 email + 遵守 3 req/s。

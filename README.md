@@ -21,16 +21,16 @@
 | 特性 | 说明 |
 |------|------|
 | 🪄 **许愿式分析（Wish Coding）** | 说人话就能分析：*"这条序列的 GC 含量和 EcoRI 酶切位点？"* |
-| 🧩 **全功能覆盖** | `bio_python` 执行器可运行任意 Biopython 代码（比对、PDB、Phylo、motif、BLAST…），配合 15 个领域 skill 配方 |
-| ⚡ **高频语义化工具** | 17 个固定参数工具（GC 含量、翻译、限制酶、k-mer、文件 IO、Entrez 检索、通路富集、PubMed 文献、参考基因组、出版级绘图）+ 4 个执行器工具（bio_python / bio_env / bio_log / bio_memory）——省 token、输出稳定、参数有校验 |
-| 📦 **零安装** | 自动下载隔离的 Python 环境（uv + venv + Biopython）到 `$DSH_HOME/dsh-bio-genie/`，不污染系统 |
+| 🧩 **双引擎全功能覆盖** | `bio_python` 执行器可运行任意 Biopython 代码（比对、PDB、Phylo、motif、BLAST…）+ `bio_r` 执行器内置 R 4.6/Bioconductor 3.23（DESeq2 差异表达、fgsea GSEA、phyloseq 微生物组），配合 21 个领域 skill 配方 |
+| ⚡ **高频语义化工具** | 17 个固定参数工具（GC 含量、翻译、限制酶、k-mer、文件 IO、Entrez 检索、通路富集、PubMed 文献、参考基因组、出版级绘图）+ 6 个执行器工具（bio_python / bio_r / bio_env / bio_r_env / bio_log / bio_memory）——省 token、输出稳定、参数有校验 |
+| 📦 **零安装** | 自动下载隔离的双环境（uv + venv + Biopython 绘图栈；R 4.6 安装器 + BiocManager 核心包集）到 `$DSH_HOME/dsh-bio-genie/`，不污染系统 |
 | 🇨🇳 **网络自动适配** | 默认直连官方源，任一环节失败自动切换国内镜像（uv→清华 PyPI、CPython→npmmirror、PyPI 包→清华镜像），无需任何配置 |
 | 🛡️ **环境隔离** | Python 子进程以 `-I`（isolated）模式运行，不受宿主 PYTHONPATH 污染 |
 | 🔁 **自愈执行（ACR）** | bio_python 失败返回 `needs_repair` 信号 + stderr，模型自动修复重试（最多 3 次），失败即如实报告 |
 | 📜 **透明性日志** | 每次代码执行/工具调用异步记 JSONL 日志（哈希/预览/耗时），`bio_log` 可回溯任何一次分析 |
 | 🧬 **科学严谨性约束** | persona 强制「生物学结论必须可溯源到工具输出」，纯推断标注 [推断-未验证] |
 | 🧠 **会话记忆** | 成功代码模式 + 错误→修复经验自动沉淀（本地 JSON），`bio_memory` 查询，越用越聪明 |
-| 📚 **协议知识库** | 17 个高频任务协议（质控/比对/BLAST/克隆/建树/结构/富集/出版级绘图/坐标系统/统计检验…），每个含可执行代码模板 + 常见坑，随插件打包 |
+| 📚 **协议知识库** | 19 个高频任务协议（质控/比对/BLAST/克隆/建树/结构/富集/出版级绘图/坐标系统/统计检验/差异表达/GSEA…），每个含可执行代码模板 + 常见坑，随插件打包 |
 
 ---
 
@@ -81,13 +81,15 @@ cp -r src index.js cordis.patch.yml package.json skills prompts python docs \
 
 ## 🛠 工具总览
 
-### 执行器（覆盖 100% Biopython 功能）
+### 执行器（双引擎，覆盖 100% 需求）
 
 | 工具 | 功能 |
 |------|------|
-| `bio_python` | 运行任意 Biopython Python 程序（比对/PDB/Phylo/motif/复杂流程/自定义分析） |
-| `bio_env` | 环境诊断 / 重建 |
-| `bio_log` | 执行日志回溯（bio_python 代码哈希/预览/耗时 + 工具调用记录） |
+| `bio_python` | 运行任意 Biopython Python 程序（比对/PDB/Phylo/motif/复杂流程/自定义分析/出版级绘图） |
+| `bio_r` | 运行任意 R 程序（R 4.6 + Bioconductor 3.23：DESeq2/edgeR/limma 差异表达、fgsea GSEA、phyloseq 微生物组、ggtree/ComplexHeatmap） |
+| `bio_env` | Python 环境诊断 / 重建 |
+| `bio_r_env` | R 环境诊断 / 核心包集重建 |
+| `bio_log` | 执行日志回溯（bio_python/bio_r 代码哈希/预览/耗时 + 工具调用记录） |
 | `bio_memory` | 会话记忆查询（成功代码模式 / 错误修复经验，越用越聪明） |
 
 ### 语义化工具（高频稳定操作）
@@ -120,12 +122,12 @@ X 与 gap 在翻译时按未知碱基处理（Biopython 标准行为），含 X/
 
 ---
 
-## 📚 Skill 体系（16 个）
+## 📚 Skill 体系（22 个）
 
 ### 主 skill：`dsh-bio-genie`
-工具分层决策树：**先查语义化工具表 → 命中就用；否则用 `bio_python` 写代码执行**。
+工具分层决策树 + **双引擎路由表**：**先查语义化工具表 → 命中就用；否则按任务选引擎（Python/R）写代码执行**。
 
-### 15 个领域配方
+### 21 个领域配方（15 Python + 6 R）
 
 | Skill | 覆盖的 Biopython 模块 |
 |-------|---------------------|
@@ -144,6 +146,12 @@ X 与 gap 在翻译时按未知碱基处理（Biopython 标准行为），含 X/
 | `bio-graphics` | Bio.Graphics.GenomeDiagram（图谱绘制） |
 | `bio-popgen` | Bio.PopGen（群体遗传学） |
 | `bio-figure` | 出版级科研绘图顾问（figurelib：选图决策、18 陷阱、期刊规格、CJK 中文） |
+| `bio-r-core` | R 执行器核心（bio_r 契约、双引擎分工、ACR 信号表） |
+| `bio-r-basics` | Biostrings / GenomicRanges / SummarizedExperiment（对象模型） |
+| `bio-r-rnaseq` | DESeq2 / edgeR 差异表达管道与解读纪律 |
+| `bio-r-enrichment` | fgsea GSEA + enricher ORA（与 bio_enrichr 分工） |
+| `bio-r-microbiome` | phyloseq 微生物组多样性（alpha/beta/PCoA/PERMANOVA） |
+| `bio-r-vis` | ggplot2 / ggtree / ComplexHeatmap（R 生态可视化） |
 
 ---
 
@@ -199,6 +207,16 @@ agent 自动（实测行为）：
 4. uv pip install     → biopython + numpy + matplotlib + reportlab + pandas/scipy/seaborn/Pillow（出版级绘图栈；官方 PyPI 失败自动切换清华镜像）
 ```
 
+**R 环境（首次 bio_r 调用时惰性引导，默认不随插件加载预热）**：
+
+```
+1. 下载 R 4.6.0 安装器 → $DSH_HOME/dsh-bio-genie/r/（官方 CRAN 失败自动切清华镜像，MD5 校验）
+2. 静默安装（/VERYSILENT，用户零操作）
+3. Rscript install_packages.R → BiocManager 安装核心包集（DESeq2/edgeR/limma/
+   fgsea/phyloseq/ggplot2/ggtree/ComplexHeatmap 等）到 r-lib/（CRAN 走清华镜像、
+   Bioconductor 走官方源——清华 Bioc 镜像二进制 zip 缺失；Windows 二进制优先）
+```
+
 - **网络自动适配**：每个环节默认直连官方源，失败自动切换国内镜像，全程无需用户配置；
   高级用户可用环境变量覆盖镜像地址（`DSH_BIO_UV_BASE` / `DSH_BIO_PYTHON_MIRROR` / `DSH_BIO_PYPI_INDEX`，
   也尊重 uv 官方变量 `UV_PYTHON_INSTALL_MIRROR` / `UV_DEFAULT_INDEX` / `UV_INDEX_URL`）；
@@ -247,6 +265,7 @@ node --input-type=module -e "import('./src/runtime.js').then(m => m.ensureEnviro
 - **numpy**：BSD License
 - **scipilot-figure-skill**（figurelib 绘图脚本）：MIT（Copyright Haojae，详见 THIRD_PARTY_NOTICES.md）
 - **K-Dense scientific-agent-skills**（figurelib 样式资产 + 知识型协议来源）：MIT（Copyright K-Dense Inc.，详见 THIRD_PARTY_NOTICES.md）
+- **R / Bioconductor 生态**：GPL-2|GPL-3（R 本体）/ Artistic-2.0 / MIT / LGPL-3 / GPL-2 / AGPL-3（phyloseq）——运行时安装 + API 调用模型，零源码分发，逐包许可证清单与合规论证见 THIRD_PARTY_NOTICES.md
 - **不含 BioSQL**（LGPL，刻意排除）
 
 ---
