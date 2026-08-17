@@ -230,6 +230,7 @@ node --input-type=module -e "import('./src/runtime.js').then(m => m.ensureEnviro
 ```
 
 - Architecture: see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- **Agent manuals**: [docs/agent-guide/](docs/agent-guide/) — 8 guides (overview / tool reference / skill navigation / bio_python programming / workflows / plotting / troubleshooting / rigor), registered as `dsh-bio-genie-guide-*` skills for the dsh agent
 - Add a semantic tool: add an op in `python/bio_ops.py` + a `bioTool` entry in `src/tools.js`
 - Add a domain skill: `skills/bio-xxx.md` + a SKILL_MANIFEST entry in `src/skills.js`
 

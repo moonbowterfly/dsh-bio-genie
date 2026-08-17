@@ -17,6 +17,7 @@ import { registerTools } from './tools.js'
 import { ensureEnvironment } from './runtime.js'
 
 const SKILLS_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'skills')
+const GUIDES_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'docs', 'agent-guide')
 
 /** Cordis 插件名（cordis.patch.yml 的 row id）。 */
 export const name = 'dsh-bio-genie'
@@ -41,7 +42,7 @@ const DEFAULT_CONFIG = {
 export function apply(ctx, config) {
   const cfg = { ...DEFAULT_CONFIG, ...(config ?? {}) }
   ctx.systemPrompt.section(BIO_PROMPT_SECTION)
-  registerSkills(ctx, SKILLS_DIR)
+  registerSkills(ctx, SKILLS_DIR, GUIDES_DIR)
   registerTools(ctx, cfg)
 
   // 后台预热（不阻塞加载；失败不致命，工具调用时会重试）

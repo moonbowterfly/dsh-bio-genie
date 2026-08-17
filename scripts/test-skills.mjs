@@ -3,7 +3,7 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { SKILL_MANIFEST } from '../src/skills.js'
+import { SKILL_MANIFEST, GUIDE_MANIFEST } from '../src/skills.js'
 
 let failures = 0
 function assert(cond, msg) {
@@ -11,12 +11,25 @@ function assert(cond, msg) {
   else { failures++; console.error(`  FAIL ${msg}`) }
 }
 
-const skillsDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'skills')
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
+const skillsDir = join(repoRoot, 'skills')
+const guidesDir = join(repoRoot, 'docs', 'agent-guide')
 const protocols = SKILL_MANIFEST.filter((s) => s.file.startsWith('protocols/'))
 const domain = SKILL_MANIFEST.filter((s) => !s.file.startsWith('protocols/'))
 
-console.log(`[skills] ${SKILL_MANIFEST.length} 个 skill（${domain.length} 领域 + ${protocols.length} 协议）`)
+console.log(`[skills] ${SKILL_MANIFEST.length} 个 skill（${domain.length} 领域 + ${protocols.length} 协议）+ ${GUIDE_MANIFEST.length} 个指南`)
 assert(protocols.length === 17, `协议数 = 17（实际 ${protocols.length}）`)
+assert(GUIDE_MANIFEST.length === 8, `指南数 = 8（实际 ${GUIDE_MANIFEST.length}）`)
+
+for (const g of GUIDE_MANIFEST) {
+  const p = join(guidesDir, g.file)
+  assert(existsSync(p), `指南文件存在: docs/agent-guide/${g.file}`)
+  if (existsSync(p)) {
+    const text = readFileSync(p, 'utf8')
+    assert(text.length > 500, `指南内容非空且完整: ${g.name}（${text.length} 字符）`)
+    assert(!text.includes('[SKILL_PRUNED]'), `指南未被裁剪: ${g.name}`)
+  }
+}
 
 for (const s of SKILL_MANIFEST) {
   const p = join(skillsDir, s.file)

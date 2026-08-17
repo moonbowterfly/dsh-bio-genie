@@ -174,8 +174,65 @@ export const SKILL_MANIFEST = [
   },
 ]
 
-/** 注册全部 skill（领域 + genie 主 skill）。 */
-export function registerSkills(ctx, skillsDir) {
+/**
+ * 指南清单（docs/agent-guide/*.md，注册为 dsh-bio-genie-guide-* 嵌入式 skill）。
+ * 面向最终使用者（dsh 里的 agent）的说明书：总览/工具参考/skill 导航/
+ * bio_python 编程/工作流/绘图专题/故障排查/严谨性。与领域 skill 的区别：
+ * 指南教"怎么用插件整体"，领域/协议 skill 教"怎么做某类分析"。
+ */
+export const GUIDE_MANIFEST = [
+  {
+    name: 'dsh-bio-genie-guide',
+    description: 'dsh-bio-genie 使用指南总览：许愿式心智模型、三层工具架构、环境引导机制、输出规范、五条铁律、阅读地图。',
+    whenToUse: '用户首次使用本插件、或不确定整体怎么用本插件时。',
+    file: 'README.md',
+  },
+  {
+    name: 'dsh-bio-genie-guide-tools',
+    description: '21 个工具完整参考：每个工具的参数/返回字段/典型触发词 + 愿望→工具选择速查 + 缓存限流说明。',
+    whenToUse: '不确定某个 bio_* 工具的参数、返回结构或选哪个工具时。',
+    file: 'tools.md',
+  },
+  {
+    name: 'dsh-bio-genie-guide-skills',
+    description: '33 个 skill 导航：主 skill + 15 领域 + 17 协议的加载时机与触发任务表。',
+    whenToUse: '需要决定加载哪个领域/协议 skill 时。',
+    file: 'skills.md',
+  },
+  {
+    name: 'dsh-bio-genie-guide-python',
+    description: 'bio_python 编程指南：执行契约、可用库清单（含 figurelib）、代码模板、ACR 修复表、限流纪律、高频陷阱。',
+    whenToUse: '写任何非平凡 bio_python 代码前。',
+    file: 'python-cookbook.md',
+  },
+  {
+    name: 'dsh-bio-genie-guide-workflows',
+    description: '10 个端到端工作流：序列质控/组合分析/BLAST/基因查询/富集/文献/建树/结构/绘图/统计，每个含工具调用序列。',
+    whenToUse: '用户需求命中某个典型分析场景时。',
+    file: 'workflows.md',
+  },
+  {
+    name: 'dsh-bio-genie-guide-plotting',
+    description: '出版级绘图专题：fig 三工具分工、8 步闭环、figurelib API、中文 CJK、主动拦截、五条硬性原则。',
+    whenToUse: '任何画图/数据可视化/论文配图需求。',
+    file: 'plotting.md',
+  },
+  {
+    name: 'dsh-bio-genie-guide-troubleshooting',
+    description: '故障排查与插件边界：环境/bio_python/网络类故障处理表 + 用户要超能力时的替代方案。',
+    whenToUse: '工具报错、分析失败、或用户需求超出插件能力时。',
+    file: 'troubleshooting.md',
+  },
+  {
+    name: 'dsh-bio-genie-guide-rigor',
+    description: '科学严谨性与报告规范：溯源规则、报告模板、p 值/效应量纪律、命名单位约定、诚实边界。',
+    whenToUse: '写结论/报告/生物学解读前。',
+    file: 'rigor.md',
+  },
+]
+
+/** 注册全部 skill（领域 + genie 主 skill + 指南）。 */
+export function registerSkills(ctx, skillsDir, guideDir) {
   const disposers = []
 
   // 主 skill：工具选择 + 许愿式工作流总纲
@@ -198,6 +255,24 @@ export function registerSkills(ctx, skillsDir) {
     disposers.push(ctx.skills.register({
       name: skill.name,
       description: skill.description,
+      source: 'custom',
+      provider: 'dsh-bio-genie',
+      content,
+    }))
+  }
+
+  // 指南（docs/agent-guide，agent 说明书）
+  for (const guide of GUIDE_MANIFEST) {
+    let content = ''
+    try {
+      content = readFileSync(join(guideDir, guide.file), 'utf8')
+    } catch {
+      content = `Guide body for "${guide.name}" is missing from the plugin package.`
+    }
+    disposers.push(ctx.skills.register({
+      name: guide.name,
+      description: guide.description,
+      whenToUse: guide.whenToUse,
       source: 'custom',
       provider: 'dsh-bio-genie',
       content,
@@ -312,4 +387,19 @@ bio_python 失败时返回 \`needs_repair: true\`，stderr 说明了失败原因
 - bio_enrichr 的结果按 adjusted_p_value 升序解读；combined_score 越高证据越强。
 - ImportError → 先 bio_env 看环境，必要时 reinstall。
 
-加载领域 skill（bio-io、bio-seq、bio-align…）获取详细配方后再写非平凡代码。`
+加载领域 skill（bio-io、bio-seq、bio-align…）获取详细配方后再写非平凡代码。
+
+## 使用指南（说明书，按需加载）
+
+插件内置 8 份 agent 指南（docs/agent-guide），注册为 dsh-bio-genie-guide-* 系列 skill：
+
+| 指南 | 何时加载 |
+|------|---------|
+| dsh-bio-genie-guide | 总览/阅读地图/铁律 |
+| dsh-bio-genie-guide-tools | 查工具参数与返回结构 |
+| dsh-bio-genie-guide-skills | 选领域/协议 skill |
+| dsh-bio-genie-guide-python | 写 bio_python 代码前 |
+| dsh-bio-genie-guide-workflows | 命中典型场景 |
+| dsh-bio-genie-guide-plotting | 画图需求 |
+| dsh-bio-genie-guide-troubleshooting | 报错/超能力需求 |
+| dsh-bio-genie-guide-rigor | 写结论报告前 |`
