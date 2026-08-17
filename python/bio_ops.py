@@ -52,7 +52,9 @@ def op_seq_analyze(args):
         upper = sequence.upper()
         # 完整 IUPAC DNA 字母表：ACGTN + 模糊碱基 RYSWKMBDHV + X（未知/修饰碱基，
         # 引物/探针/SNP 标记常用；Biopython 的 gc_fraction/reverse_complement/translate 均支持 X）
-        dna_iupac = set('ACGTRYSWKMBDHVNX')
+        # + gap 字符 -/.（比对结果/多序列比对常见；只含核酸+gap 的序列判 DNA 而非蛋白，
+        # 蛋白序列由于几乎总含 DNA 字母表外的氨基酸（E/L/P/Q/I/F 等）不受影响）
+        dna_iupac = set('ACGTRYSWKMBDHVNX-.')
         if 'U' in upper and 'T' not in upper:
             seq_type = 'rna'
         elif set(upper) - dna_iupac - {'U'}:
@@ -69,12 +71,13 @@ def op_seq_analyze(args):
         if seq_type == 'dna':
             result['complement'] = str(s.complement())
             # 六框翻译：正链 3 框 + 负链（反向互补）3 框。
-            # 含 X（未知/修饰碱基）的序列直接 translate 会因 XXG 等模糊密码子抛
-            # TranslationError——翻译前把 X 视作 N（未知碱基），Biopython 对 N 密码子
-            # 正常翻译为 X 氨基酸，避免整个分析失败。
+            # 含 X（未知/修饰碱基）或 gap 字符（-/.，比对序列常见）的序列直接 translate
+            # 会因 XXG / --A / ... 等模糊密码子抛 TranslationError——翻译前统一把
+            # X → N、gap → N（未知碱基），Biopython 对 N 密码子正常翻译为 X 氨基酸，
+            # 避免整个分析失败（长度不变，逐位对齐保持一致）。
             rc = s.reverse_complement()
-            translate_seq = s.replace('X', 'N')
-            translate_rc = rc.replace('X', 'N')
+            translate_seq = s.replace('X', 'N').replace('-', 'N').replace('.', 'N')
+            translate_rc = rc.replace('X', 'N').replace('-', 'N').replace('.', 'N')
             frames = {}
             for frame in range(3):
                 frames[f'+{frame + 1}'] = str(translate_seq[frame:].translate(to_stop=False))
@@ -82,9 +85,9 @@ def op_seq_analyze(args):
             result['translations'] = frames
         elif seq_type == 'rna':
             result['complement'] = str(s.complement())
-            # 与 DNA 分支一致：含 X 的 RNA（探针/引物常见修饰碱基）翻译前 X→N，
-            # 避免 XXA 等模糊密码子抛 TranslationError（WB 第二轮审查 S2 确认）
-            translate_rna = s.replace('X', 'N')
+            # 与 DNA 分支一致：含 X 的 RNA（探针/引物常见修饰碱基）或 gap 序列翻译前
+            # X/gap → N，避免 XXA / --A 等模糊密码子抛 TranslationError（WB 第二轮 S2 确认）
+            translate_rna = s.replace('X', 'N').replace('-', 'N').replace('.', 'N')
             frames = {}
             for frame in range(3):
                 frames[f'+{frame + 1}'] = str(translate_rna[frame:].translate())

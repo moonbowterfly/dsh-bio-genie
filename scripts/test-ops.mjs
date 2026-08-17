@@ -81,6 +81,20 @@ assert(degenerate.ok && degenerate.result.seq_type === 'dna', '简并引物(N/S)
 const aa20 = callOp('seq_analyze', { sequence: 'ACDEFGHIKLMNPQRSTVWY' })
 assert(aa20.ok && aa20.result.seq_type === 'protein' && aa20.result.molecular_weight > 2000, '20 种标准氨基酸判为蛋白')
 
+// gap 字符(比对序列):2026-08-17 WB 审查 N3 延伸处理——含 gap 的 DNA 比对序列
+// 曾被误判 protein 且翻译遇 --A 崩;按设计修复:gap 入 IUPAC 字母表 + 翻译前 gap→N
+const gapDna = callOp('seq_analyze', { sequence: 'ATGCGT--ACGT--' })
+assert(gapDna.ok, '含 gap 的 DNA 不崩溃')
+assert(gapDna.result.seq_type === 'dna', `含 gap 的 DNA 判为 dna(实际=${gapDna.result?.seq_type})`)
+assert(gapDna.result.gc_percent === 50, '含 gap 的 DNA GC 计算正常')
+assert(gapDna.result.translations?.['+1'] === 'MRXR', 'gap 密码子按 N 翻译为 X 氨基酸')
+
+const gapRna = callOp('seq_analyze', { sequence: 'AUG--CUU' })
+assert(gapRna.ok && gapRna.result.seq_type === 'rna', '含 gap 的 RNA 判为 rna 且不崩溃')
+
+const gapProt = callOp('seq_analyze', { sequence: 'MKT-L' })
+assert(gapProt.ok && gapProt.result.seq_type === 'protein', '蛋白含 gap 仍判 protein(不误判为 DNA)')
+
 const tl = callOp('seq_translate', { sequence: 'ATGAAATAA' })
 assert(tl.ok && tl.result.protein === 'MK*', '翻译（含终止）')
 const tls = callOp('seq_translate', { sequence: 'ATGAAATAA', to_stop: true })
