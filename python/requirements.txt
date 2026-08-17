@@ -9,6 +9,9 @@ numpy>=1.26
 # 捆绑 skill 实际依赖的绘图库（2026-08-17 实战测试发现缺失后补齐）：
 #  - matplotlib: 结构可视化（PDB 散点/轨迹图, bio-proto-pdb-analysis 模板使用）
 #  - reportlab:  GenomeDiagram 序列图谱（bio-graphics skill 使用）
-# 两者都是纯 wheel 无编译依赖，安装体积适中，属「添加后立即可用」而非按需手动补装
+#  - rlPyCairo:  reportlab 的 PNG 渲染后端（GenomeDiagram write("PNG") 依赖, 缺失时报
+#                "cannot render PNG without rlPyCairo", 2026-08-17 实战测试踩坑后被 agent 装上的）
+# 三者都是纯 wheel 无编译依赖，安装体积适中，属「添加后立即可用」而非按需手动补装
 matplotlib>=3.8
 reportlab>=4.0
+rlPyCairo>=0.3
