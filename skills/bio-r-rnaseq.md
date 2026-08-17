@@ -24,9 +24,11 @@ suppressPackageStartupMessages({
 })
 
 # 输入：counts.csv（整数矩阵，行=基因，列=样本）+ meta.csv（sample, condition）
-counts <- as.matrix(read_csv("counts.csv", show_col_types = FALSE))
+# ⚠️ as.matrix() 对含字符列的 data.frame 会强制全部转字符！
+#    必须先移除基因列再转矩阵。
+counts <- read_csv("counts.csv", show_col_types = FALSE) %>%
+  tibble::column_to_rownames("gene") %>% as.matrix()
 meta <- read_csv("meta.csv", show_col_types = FALSE)
-rownames(counts) <- counts[, 1]; counts <- counts[, -1]   # 第一列是基因名时
 meta$condition <- factor(meta$condition)                   # 必须 factor！
 
 dds <- DESeqDataSetFromMatrix(countData = counts,
@@ -34,7 +36,8 @@ dds <- DESeqDataSetFromMatrix(countData = counts,
                               design = ~ condition)
 dds <- DESeq(dds)                                          # 核心步骤：~10-60s
 res <- results(dds, contrast = c("condition", "trt", "ctrl"))  # 处理 vs 对照
-res <- lfcShrink(dds, coef = "condition_trt_vs_ctrl", type = "apeglm")  # 收缩 log2FC（防小样本高估）
+# type = "normal" 无需额外包；apeglm 结果更佳但需安装 apeglm（不在核心集）
+res <- lfcShrink(dds, coef = "condition_trt_vs_ctrl", type = "normal")
 res_df <- as.data.frame(res) %>% tibble::rownames_to_column("gene")
 res_df <- arrange(res_df, padj)
 readr::write_csv(res_df, "de_results.csv")

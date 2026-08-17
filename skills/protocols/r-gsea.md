@@ -11,6 +11,10 @@ language: r
 
 **适用场景**：用户有全基因组**排序**数据（如差异表达分析的 log2FC 全表），想知道"哪些通路整体上调/下调"——注意与 ORA 的区别：输入不是截断列表而是带方向的排序。
 
+**GMT 格式纪律**：每个基因必须是单独的制表符分隔字段，不可用空格合并。
+正确：`HALLMARK_DNA_REPAIR\tDNA repair\tgene1\tgene2\tgene3\n`
+错误：`HALLMARK_DNA_REPAIR\tDNA repair\tgene1 gene2 gene3\n`（会识别为单个基因）
+
 ## 输入约定
 
 - `rank.csv`：两列 `gene, stat`；stat 用 log2FC 或 t 值（**带方向**，正=上调）。

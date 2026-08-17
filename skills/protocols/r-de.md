@@ -25,19 +25,23 @@ bio_r（code = 下方模板，timeoutMs = 180000）
 
 ### 代码模板（写入 bio_r 的 code 参数）
 
+**坑**：`as.matrix()` 对含字符列的 data.frame 会将全部列转为字符！
+**正确做法**：先用 `column_to_rownames` 移除基因列，再 `as.matrix`。
+
 ```r
 suppressPackageStartupMessages({
   library(DESeq2); library(readr); library(dplyr)
 })
-counts <- as.matrix(read_csv("counts.csv", show_col_types = FALSE))
+counts <- read_csv("counts.csv", show_col_types = FALSE) %>%
+  tibble::column_to_rownames("gene") %>% as.matrix()
 meta <- read_csv("meta.csv", show_col_types = FALSE)
-rownames(counts) <- counts[, 1]; counts <- counts[, -1, drop = FALSE]
 counts <- counts[, meta$sample]                      # 对齐列序
 meta$condition <- factor(meta$condition, levels = c("ctrl", "trt"))
 
 dds <- DESeqDataSetFromMatrix(countData = counts, colData = meta, design = ~ condition)
 dds <- DESeq(dds)
-res <- lfcShrink(dds, coef = resultsNames(dds)[2], type = "apeglm")
+# type = "normal" 无需额外包；apeglm 结果更好但需安装 apeglm（不在核心集）
+res <- lfcShrink(dds, coef = resultsNames(dds)[2], type = "normal")
 out <- as.data.frame(res) %>% tibble::rownames_to_column("gene") %>% arrange(padj)
 readr::write_csv(out, "de_results.csv")
 
