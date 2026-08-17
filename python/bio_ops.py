@@ -50,8 +50,9 @@ def op_seq_analyze(args):
     # 自动判断序列类型（含蛋白启发式：出现非核酸字母判为蛋白）
     if seq_type == 'auto':
         upper = sequence.upper()
-        # 完整 IUPAC DNA 字母表：ACGTN + 模糊碱基 RYSWKMBDHV（引物/探针/SNP 常用）
-        dna_iupac = set('ACGTRYSWKMBDHVN')
+        # 完整 IUPAC DNA 字母表：ACGTN + 模糊碱基 RYSWKMBDHV + X（未知/修饰碱基，
+        # 引物/探针/SNP 标记常用；Biopython 的 gc_fraction/reverse_complement/translate 均支持 X）
+        dna_iupac = set('ACGTRYSWKMBDHVNX')
         if 'U' in upper and 'T' not in upper:
             seq_type = 'rna'
         elif set(upper) - dna_iupac - {'U'}:
@@ -67,12 +68,17 @@ def op_seq_analyze(args):
 
         if seq_type == 'dna':
             result['complement'] = str(s.complement())
-            # 六框翻译：正链 3 框 + 负链（反向互补）3 框
+            # 六框翻译：正链 3 框 + 负链（反向互补）3 框。
+            # 含 X（未知/修饰碱基）的序列直接 translate 会因 XXG 等模糊密码子抛
+            # TranslationError——翻译前把 X 视作 N（未知碱基），Biopython 对 N 密码子
+            # 正常翻译为 X 氨基酸，避免整个分析失败。
             rc = s.reverse_complement()
+            translate_seq = s.replace('X', 'N')
+            translate_rc = rc.replace('X', 'N')
             frames = {}
             for frame in range(3):
-                frames[f'+{frame + 1}'] = str(s[frame:].translate(to_stop=False))
-                frames[f'-{frame + 1}'] = str(rc[frame:].translate(to_stop=False))
+                frames[f'+{frame + 1}'] = str(translate_seq[frame:].translate(to_stop=False))
+                frames[f'-{frame + 1}'] = str(translate_rc[frame:].translate(to_stop=False))
             result['translations'] = frames
         elif seq_type == 'rna':
             result['complement'] = str(s.complement())
@@ -83,7 +89,12 @@ def op_seq_analyze(args):
 
     if seq_type == 'protein':
         result['seq_type'] = 'protein'
-        result['molecular_weight'] = round(molecular_weight(s, seq_type='protein'), 2)
+        try:
+            result['molecular_weight'] = round(molecular_weight(s, seq_type='protein'), 2)
+        except ValueError:
+            # 蛋白序列含 X（未知氨基酸，如重组蛋白 N 端 X 标记）时 molecular_weight
+            # 会抛 ValueError——降级为 None，避免整个分析失败
+            result['molecular_weight'] = None
         # 氨基酸组成
         from collections import Counter
         result['aa_composition'] = dict(Counter(sequence.upper()))

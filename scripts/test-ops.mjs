@@ -58,6 +58,24 @@ const dna8 = callOp('seq_analyze', { sequence: 'ACGTTGCA' })
 assert(dna8.ok && dna8.result.length === 8 && dna8.result.gc_percent === 50, 'DNA 长度/GC=50%')
 assert(dna8.result.reverse_complement === 'TGCAACGT', '反向互补正确')
 
+// X 未知碱基:2026-08-17 实战测试发现——含 X 的 DNA 曾被误判为 protein 且六框翻译
+// 因 XXG 模糊密码子抛 TranslationError(边用边修:auto 判 DNA + X→N 再翻译 + protein 分子量降级)
+const dnaX = callOp('seq_analyze', { sequence: 'ATGCXX' })
+assert(dnaX.ok, `含 X 序列不崩溃(此前 TranslationError)`)
+assert(dnaX.result.seq_type === 'dna', `含 X 的 DNA 判为 dna(实际=${dnaX.result?.seq_type})`)
+assert(dnaX.result.gc_percent === 50, '含 X 序列 GC 计算正常(X 不计入)')
+assert(dnaX.result.reverse_complement === 'XXGCAT', '含 X 序列反向互补正确')
+assert(dnaX.result.translations?.['+1'] === 'MX', 'X 密码子按 N 翻译为 X 氨基酸')
+
+const protX = callOp('seq_analyze', { sequence: 'MKTX', seq_type: 'protein' })
+assert(protX.ok && protX.result.molecular_weight === null, '蛋白含 X 时分子量降级为 null 不崩溃')
+
+const degenerate = callOp('seq_analyze', { sequence: 'ATGCNNSATGC' })
+assert(degenerate.ok && degenerate.result.seq_type === 'dna', '简并引物(N/S)判为 DNA')
+
+const aa20 = callOp('seq_analyze', { sequence: 'ACDEFGHIKLMNPQRSTVWY' })
+assert(aa20.ok && aa20.result.seq_type === 'protein' && aa20.result.molecular_weight > 2000, '20 种标准氨基酸判为蛋白')
+
 const tl = callOp('seq_translate', { sequence: 'ATGAAATAA' })
 assert(tl.ok && tl.result.protein === 'MK*', '翻译（含终止）')
 const tls = callOp('seq_translate', { sequence: 'ATGAAATAA', to_stop: true })
