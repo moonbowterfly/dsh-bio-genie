@@ -22,7 +22,7 @@
 |---------|-------------|
 | 🪄 **Wish-style Analysis (Wish Coding)** | Plain language in, results out: *"What's the GC content and EcoRI cut sites of this sequence?"* |
 | 🧩 **Full Biopython Coverage** | `bio_python` executor runs arbitrary Biopython code (alignment, PDB, Phylo, motif, BLAST…) plus 14 domain skill recipes |
-| ⚡ **High-Frequency Semantic Tools** | 15 fixed-parameter tools (GC content, translation, restriction enzymes, k-mer, file IO, Entrez, pathway enrichment, PubMed literature, reference genome…) — token-efficient, stable output, validated arguments |
+| ⚡ **High-Frequency Semantic Tools** | 14 fixed-parameter tools (GC content, translation, restriction enzymes, k-mer, file IO, Entrez, pathway enrichment, PubMed literature, reference genome…) + 4 executor tools (bio_python / bio_env / bio_log / bio_memory) — token-efficient, stable output, validated arguments |
 | 📦 **Zero Installation** | Automatically downloads an isolated Python environment (uv + venv + Biopython) to `$DSH_HOME/dsh-bio-genie/`, no system pollution |
 | 🇨🇳 **China-Network Ready** | Auto network adaptation: official sources by default, automatic switch to domestic mirrors on any failure (uv→Tsinghua PyPI, CPython→npmmirror, PyPI packages→Tsinghua), zero configuration required |
 | 🛡️ **Environment Isolation** | Python subprocesses run in `-I` (isolated) mode, immune to host PYTHONPATH pollution |
@@ -111,8 +111,10 @@ Finally restart the dsh web service.
 
 `bio_seq_analyze` defaults `seq_type` to `auto`, auto-detecting three types:
 - Contains U but no T → **RNA**
-- Contains IUPAC ambiguity codes (R/Y/S/W/K/M/B/D/H/V) → **DNA** (primer/probe/SNP safe)
+- Contains IUPAC ambiguity codes (R/Y/S/W/K/M/B/D/H/V), X (unknown/modified base), or alignment gap chars (-/.) → **DNA** (primer/probe/SNP/alignment safe)
 - Contains non-nucleic letters → **Protein**
+
+X and gaps are treated as unknown bases during translation (Biopython standard behavior); sequences containing X/gaps never crash on ambiguous codons.
 
 ---
 
@@ -190,8 +192,8 @@ On first tool call (or background warm-up at dsh startup) the plugin automatical
    (official GitHub; auto-fallback to Tsinghua PyPI uv wheel on failure, ~18MB/2s)
 2. uv python install      → $DSH_HOME/dsh-bio-genie/python/ (private CPython 3.12)
    (auto-fallback to npmmirror python-build-standalone on failure)
-3. uv venv                → $DSH_HOME/dsh-bio-genie/python-env/
-4. uv pip install         → biopython + numpy (auto-fallback to Tsinghua PyPI on failure)
+3. uv venv --seed         → $DSH_HOME/dsh-bio-genie/python-env/ (pip preinstalled for on-demand packages)
+4. uv pip install         → biopython + numpy + matplotlib + reportlab (auto-fallback to Tsinghua PyPI on failure)
 ```
 
 - **Auto network adaptation**: each step tries official sources first, then automatically

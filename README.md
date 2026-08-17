@@ -22,7 +22,7 @@
 |------|------|
 | 🪄 **许愿式分析（Wish Coding）** | 说人话就能分析：*"这条序列的 GC 含量和 EcoRI 酶切位点？"* |
 | 🧩 **全功能覆盖** | `bio_python` 执行器可运行任意 Biopython 代码（比对、PDB、Phylo、motif、BLAST…），配合 14 个领域 skill 配方 |
-| ⚡ **高频语义化工具** | 15 个固定参数工具（GC 含量、翻译、限制酶、k-mer、文件 IO、Entrez 检索、通路富集、PubMed 文献、参考基因组…）——省 token、输出稳定、参数有校验 |
+| ⚡ **高频语义化工具** | 14 个固定参数工具（GC 含量、翻译、限制酶、k-mer、文件 IO、Entrez 检索、通路富集、PubMed 文献、参考基因组…）+ 4 个执行器工具（bio_python / bio_env / bio_log / bio_memory）——省 token、输出稳定、参数有校验 |
 | 📦 **零安装** | 自动下载隔离的 Python 环境（uv + venv + Biopython）到 `$DSH_HOME/dsh-bio-genie/`，不污染系统 |
 | 🇨🇳 **网络自动适配** | 默认直连官方源，任一环节失败自动切换国内镜像（uv→清华 PyPI、CPython→npmmirror、PyPI 包→清华镜像），无需任何配置 |
 | 🛡️ **环境隔离** | Python 子进程以 `-I`（isolated）模式运行，不受宿主 PYTHONPATH 污染 |
@@ -113,8 +113,10 @@ cp -r src index.js cordis.patch.yml package.json skills prompts python docs \
 
 `bio_seq_analyze` 的 `seq_type` 默认 `auto`，自动识别三类序列：
 - 含 U 无 T → **RNA**
-- 含 IUPAC 模糊碱基（R/Y/S/W/K/M/B/D/H/V）→ **DNA**（引物/探针/SNP 安全）
+- 含 IUPAC 模糊碱基（R/Y/S/W/K/M/B/D/H/V）、X（未知/修饰碱基）、比对 gap 字符（-/.）→ **DNA**（引物/探针/SNP/比对结果安全）
 - 出现非核酸字母 → **蛋白质**
+
+X 与 gap 在翻译时按未知碱基处理（Biopython 标准行为），含 X/gap 的序列不会因模糊密码子崩溃。
 
 ---
 
@@ -192,8 +194,8 @@ agent 自动（实测行为）：
    （官方 GitHub 直连失败自动切换清华 PyPI 的 uv wheel，实测 18MB/约 2 秒）
 2. uv python install  → $DSH_HOME/dsh-bio-genie/python/（私有 CPython 3.12）
    （官方源失败自动切换 npmmirror 的 python-build-standalone 镜像）
-3. uv venv            → $DSH_HOME/dsh-bio-genie/python-env/
-4. uv pip install     → biopython + numpy（官方 PyPI 失败自动切换清华镜像）
+3. uv venv --seed     → $DSH_HOME/dsh-bio-genie/python-env/（预装 pip，方便按需补包）
+4. uv pip install     → biopython + numpy + matplotlib + reportlab（官方 PyPI 失败自动切换清华镜像）
 ```
 
 - **网络自动适配**：每个环节默认直连官方源，失败自动切换国内镜像，全程无需用户配置；

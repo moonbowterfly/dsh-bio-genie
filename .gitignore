@@ -20,3 +20,9 @@ Thumbs.db
 .idea/
 .vscode/
 *.log
+
+# 内部审查/调研文档(不入库)
+docs/WB审查报告*.md
+docs/面向WB审查.md
+docs/待吸收报告*.md
+docs/可借鉴工具调研.md
