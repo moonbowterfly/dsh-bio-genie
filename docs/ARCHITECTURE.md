@@ -141,13 +141,34 @@ model ──bio_seq_analyze(seq)──▶ tools.js
 - **改提示词**：编辑 `prompts/persona.md` 后重启 dsh。
 - **说明书同步义务**：工具/skill/依赖变更必须同步更新 `docs/agent-guide/` 对应指南。
 
-## 9. 平台兼容
+## 9. 客户端半面（浏览器设置面板）
+
+除宿主侧（Node）插件外，本插件还带一个**浏览器客户端半面**（`lib/client.js`），
+在 dsh Web UI 的设置面板侧栏注册「BioGenie」一级菜单项，点击进入本插件的独立设置页。
+
+- **契约**：package.json 声明 `dsh.client`（`platform: "web"` + inject 边）与
+  `exports["./client"]`；`dsh-client-modules` 的 Node 半扫描到后把包加入
+  `window.__DSH_BOOT__` 浏览器名册，并按 `/plugins/<id>/client.js` 提供 bundle。
+  无需新增 cordis 组合行——现有 bundle row 自动生效。
+- **bundle 形态**：classic script 调 `window.__ModuleLoader__.load({ id, factory })`
+  （与 @linxin666 / @deepseek-ai 各客户端的 tsdown 产物同构）。**零构建手写**，
+  仅依赖浏览器静态模块表中的 seed 词（`react` / `react/jsx-runtime` /
+  `@deepseek-ai/dsh-client-ui-slots`），刻意不引入 tsdown 工具链。
+- **注册方式**：`ctx.slots.inject('settings.section', …)` → `ctx.slots.register(...)`
+  注册 `settings.section` 列表条目（`id: biogenie`、`order: 50`、`label: BioGenie`），
+  即设置面板侧栏一级菜单 + 右侧内容页。`inject = ['slots']`（cordis 服务，由
+  `@deepseek-ai/dsh-client-runtime` 提供）。
+- **当前内容为占位**：面板具体设置项尚未设计，渲染标题 + 说明文字。
+- **扩展路径**：设置内容复杂化后可迁到 tsdown 构建（`src/client/*.tsx`），
+  宿主侧逻辑完全不受影响。
+
+## 10. 平台兼容
 
 - `pythonExecutable()` 按平台区分 `Scripts/python.exe`（win32）与 `bin/python`（POSIX）。
 - `windowsHide: true` + AbortSignal 监听，跨平台一致。
 - uv 下载 URL 按 `process.platform`/`process.arch` 选择。
 
-## 10. 已知限制
+## 11. 已知限制
 
 - `bio_python` 直接 spawn Python，未走 dsh 沙箱；信任级别等同用户本机 Python。
   这是「许愿式编程」（执行模型写的任意代码）的固有属性。
