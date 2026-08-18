@@ -148,7 +148,55 @@ Tool-layering decision tree + dual-engine routing table: **check the semantic to
 | `bio-r-rnaseq` | DESeq2 / edgeR differential expression pipelines & interpretation discipline |
 | `bio-r-enrichment` | fgsea GSEA + enricher ORA (division of labor with bio_enrichr) |
 | `bio-r-microbiome` | phyloseq microbiome diversity (alpha/beta/PCoA/PERMANOVA) |
-| `bio-r-vis` | ggplot2 / ggtree / ComplexHeatmap (R ecosystem visualization) |
+| `bio-r-vis` | ggplot2 / ggtree / ComplexHeatmap (R ecosystem viz) |
+
+---
+
+## 🧞 Genie Expert Persona (`bio-genie` preset)
+
+This plugin also ships a **dsh agent preset** — `bio-genie` — that turns the AI into a **biological-data genie** expert from the moment a session starts.
+
+### What it is
+
+- **Persona files** (`preset/bio-genie/preset.yml` + `agent.cordis.yml`) — override the base persona, telling AI: "you have 21 tools + 33 skills + two engines at hand".
+- **Onboarding mantra** (`skills/dsh-bio-genie-expert.md`) — a meta-skill: "1. Inspect workspace → 2. Pick tool / `bio_python` / `bio_r` → 3. Fail by ACR three-layer repair → 4. Report with traceable chain".
+- **One-shot install**: `pnpm install` runs postinstall hook to copy the preset to `~/.dsh/.agent-presets/bio-genie/`; no manual steps.
+
+### What it is **not**
+
+- ❌ **Does NOT own the 21 tools** — every `bio_*` tool is still injected by the plugin's `cordis.patch.yml`; the preset **does not redeclare** any tool to avoid conflicts.
+- ❌ **Does NOT change the default persona** — after postinstall, "生物基因精灵" appears in dsh's preset selector; users **actively pick** it to activate. `agent-presets.default` is **not** changed to `bio-genie`.
+- ❌ **Does NOT break other plugins** — presets and plugins are two independent seams in dsh; they coexist without conflict.
+
+### How to use
+
+1. **Install this plugin**: `pnpm add @dsh-bio/dsh-bio-genie` (postinstall handles the preset copy).
+2. **Restart dsh web**.
+3. **Settings panel** → select "**生物基因精灵**" persona.
+4. The AI now opens each session with: "I'm the biological-data genie… your working directory is `{{cwd}}`… let me see what data you have first".
+
+### Manual install / uninstall
+
+```bash
+# Manual copy (when postinstall fails)
+node scripts/install-preset.js
+
+# Force overwrite (overrides user-edited preset files)
+node scripts/install-preset.js --force
+
+# Dry run (only show what would happen)
+node scripts/install-preset.js --dry-run
+
+# Uninstall: delete the directory
+#   Windows: rd /s /q %USERPROFILE%\.dsh\.agent-presets\bio-genie
+#   macOS/Linux: rm -rf ~/.dsh/.agent-presets/bio-genie
+```
+
+### Troubleshooting
+
+- **Preset selector doesn't show "生物基因精灵"** → check `~/.dsh/.agent-presets/bio-genie/preset.yml` exists; otherwise run `node scripts/install-preset.js` manually.
+- **After switching to preset, tools are missing** → tools are injected by the plugin, not the preset; double-check the plugin is in `dependencies` (`pnpm ls @dsh-bio/dsh-bio-genie`).
+- **Customize persona** → edit `~/.dsh/.agent-presets/bio-genie/agent.cordis.yml` directly (not auto-overwritten unless `--force`).
 
 ---
 

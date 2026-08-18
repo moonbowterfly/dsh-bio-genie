@@ -156,6 +156,54 @@ X 与 gap 在翻译时按未知碱基处理（Biopython 标准行为），含 X/
 
 ---
 
+## 🧞 精灵专家人设（`bio-genie` preset）
+
+本插件同时提供一个 **dsh agent preset（智能体预设）**——`bio-genie`，让 AI 一进 dsh 就成为精通本插件的「**生物基因精灵**」专家人设。
+
+### 它是什么
+
+- **人设文件**（`preset/bio-genie/preset.yml` + `agent.cordis.yml`）——覆盖 base persona，告诉 AI「你手头有 21 个工具 + 33 个 skill + 双引擎」。
+- **入门口诀**（`skills/dsh-bio-genie-expert.md`）——一个 meta-skill：「先看工作区 → 二选一（语义化工具 / `bio_python` / `bio_r`） → 失败按 ACR 三层修 → 报告带可追溯链」。
+- **一键安装**：`pnpm install` 跑 postinstall 钩子会自动把 preset 复制到 `~/.dsh/.agent-presets/bio-genie/`；无需手动操作。
+
+### 它**不是**
+
+- ❌ **不接管 21 个工具**——所有 `bio_*` 工具仍由本插件的 `cordis.patch.yml` 注入，preset **不重声明**任何工具，避免冲突。
+- ❌ **不抢默认人设**——postinstall 装完后，「生物基因精灵」出现在 dsh 预设选择器里；用户**主动选择**才激活。`agent-presets.default` 不会被改成 `bio-genie`。
+- ❌ **不破坏其他插件**——presets 与 plugins 是 dsh 的两个独立 seam，共存不冲突。
+
+### 怎么用
+
+1. **安装本插件**：`pnpm add @dsh-bio/dsh-bio-genie`（postinstall 会自动装 preset）。
+2. **重启 dsh web**。
+3. **设置面板** → 选「**生物基因精灵**」人设。
+4. 之后 AI 启动会话即说：「我是生物基因精灵……你的工作区是 `{{cwd}}`……先看看你有什么数据再开工」。
+
+### 手动安装 / 卸载
+
+```bash
+# 手动复制（postinstall 失败时）
+node scripts/install-preset.js
+
+# 强制覆盖（用户就地编辑过 preset 时也覆盖）
+node scripts/install-preset.js --force
+
+# 试运行（只看会做什么）
+node scripts/install-preset.js --dry-run
+
+# 卸载：直接删
+#   Windows: rd /s /q %USERPROFILE%\.dsh\.agent-presets\bio-genie
+#   macOS/Linux: rm -rf ~/.dsh/.agent-presets/bio-genie
+```
+
+### 故障排除
+
+- **预设选择器看不见「生物基因精灵」** → 检查 `~/.dsh/.agent-presets/bio-genie/preset.yml` 是否存在；不存在则 `node scripts/install-preset.js` 手动装。
+- **切到 preset 后工具没出现** → 工具由插件注入，与 preset 无关；检查插件是否真在 `dependencies`（`pnpm ls @dsh-bio/dsh-bio-genie`）。
+- **想自定义 persona** → 直接编辑 `~/.dsh/.agent-presets/bio-genie/agent.cordis.yml`（不被自动覆盖除非 `--force`）。
+
+---
+
 ## 🚀 使用示例
 
 **场景 1：语义化工具路径（高频操作）**

@@ -22,6 +22,8 @@
     "python/requirements.txt",
     "python/figurelib/**/*",
     "r/**/*",
+    "preset/**/*",
+    "scripts/install-preset.js",
     "docs/**/*.md",
     "README.md",
     "README.en.md",
@@ -44,7 +46,9 @@
   ],
   "license": "MIT",
   "scripts": {
-    "bench": "node scripts/test-throttle.mjs && node scripts/test-log.mjs && node scripts/test-memory.mjs && node scripts/test-skills.mjs && node scripts/test-ops.mjs && node scripts/test-r.mjs"
+    "bench": "node scripts/test-throttle.mjs && node scripts/test-log.mjs && node scripts/test-memory.mjs && node scripts/test-skills.mjs && node scripts/test-ops.mjs && node scripts/test-r.mjs",
+    "install:preset": "node scripts/install-preset.js",
+    "postinstall": "node scripts/install-preset.js"
   },
   "engines": {
     "node": "^22.19 || >=24"
