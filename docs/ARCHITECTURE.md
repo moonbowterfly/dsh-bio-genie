@@ -158,9 +158,23 @@ model ──bio_seq_analyze(seq)──▶ tools.js
   注册 `settings.section` 列表条目（`id: biogenie`、`order: 50`、`label: BioGenie`），
   即设置面板侧栏一级菜单 + 右侧内容页。`inject = ['slots']`（cordis 服务，由
   `@deepseek-ai/dsh-client-runtime` 提供）。
-- **当前内容为占位**：面板具体设置项尚未设计，渲染标题 + 说明文字。
+- **当前内容（v0.3.1+，2026-08-18 起）**：四 tab 内部 state 切换的设置面板
+  - **总览 tab**：包元信息 + 配置默认值只读视图 + 文档导航（v0.3.0 原有）
+  - **Skill 模块 tab**：调 GET /api/dsh-bio-genie/skills 拉真实清单，主 skill 1 +
+    40 领域/R/协议 + 9 指南共 50 个条目，按 category 分组显示
+  - **Python 环境 tab**：调 GET /api/dsh-bio-genie/python-packages 拉 venv 内
+    `pip list --format=json` 真实结果，name + version 按字母排序；venv 未引导时
+    明确标注 + 引导触发方式
+  - **R 环境 tab**：调 GET /api/dsh-bio-genie/r-packages 拉 Rscript 临时脚本跑
+    `installed.packages()` 真实结果（同上排序与降级逻辑）
+- **数据通道（v0.3.1 新增，loopback-only RPC）**：浏览器 fetch('/api/dsh-bio-genie/<endpoint>')
+  同源调宿主侧 server.js 注册的路由；server.js 用 isLoopbackRequest 守卫
+  （127.0.0.1/localhost/sec-fetch-site/origin 三层校验）拒绝跨站/非本地访问。
+  返回统一信封 { ok, value } 或 { ok:false, code, message }，失败 code 区分
+  env-not-ready/network/parse-failed/internal，方便面板渲染对应占位与重试。
 - **扩展路径**：设置内容复杂化后可迁到 tsdown 构建（`src/client/*.tsx`），
-  宿主侧逻辑完全不受影响。
+  宿主侧逻辑完全不受影响。RPC 端点可继续扩展（写端点 mutate 已在 guard 中保留
+  POST 支持，但当前未对外暴露）。
 
 ## 10. 平台兼容
 
@@ -168,7 +182,32 @@ model ──bio_seq_analyze(seq)──▶ tools.js
 - `windowsHide: true` + AbortSignal 监听，跨平台一致。
 - uv 下载 URL 按 `process.platform`/`process.arch` 选择。
 
-## 11. 已知限制
+## 11. 自愈执行（ACR）— 三层职责边界
+
+**核心原则**（2026-08-18 文档化）：开发时主动消除错误根源（修复插件 bug、补 requirements），运行时只在「确定可解的失败」上自愈，其余交给 agent。**自愈与修复不是二选一，是分层协作**。
+
+| 层 | 实现位置 | 触发条件 | 动作 | 上限 |
+|---|------|----------|------|------|
+| **L1 插件自愈** | 插件代码 | 当前**不实现任何自动重试**——所有失败统一透传到 stderr，让 agent 看见 | — | 0 次（占位；后续若加白名单错误类型的自动重试，必须以 `stderr` 追加 `[bio-genie self-healed: ...]` 让用户可见） |
+| **L2 记忆复用** | 插件（`pendingFixes` Map）+ agent 决策 | `bio_python` 失败后，stderr 错误签名若在 `~/.dsh/dsh-bio-genie/memory/error_lessons.json` 命中 | agent 主动 `bio_memory action=lessons` 查 fix_hint；命中即套用再调 | agent 试错 ≤ 1 次 |
+| **L3 agent 自愈** | agent（prompt 驱动） | 任何 L1/L2 未覆盖的失败（代码逻辑错、API 误用、路径错、限流、数据结构错） | 读 stderr → 改 code → 再调 | agent 最多自动修复 2 次（共 3 次尝试） |
+| **终止** | — | 累计 3 次仍失败 | **停止自愈，如实向用户报告**：错误原文 + 已尝试的修复路径 + 残余不确定性。绝不编造结果 | — |
+
+**L1 边界（必须严格遵守，不要扩大）**：插件自愈只对「确定的事」负责——环境缺包、venv 损坏、镜像切换这类可机械执行的恢复。**不要让插件自动改 code**——code 是模型写的，插件不应擅改，改坏了 agent 反而看不到原始失败信号。
+
+**L3 触发与修法速查**（写入主 skill `dsh-bio-genie` 的 ACR 章节与 `bio-core.md`，本节是索引）：
+
+- `ImportError/ModuleNotFoundError` → 先 `bio_env` 看环境；若环境就绪却仍缺包是插件 bug——停止自愈，报告插件 bug（不要自行 pip install，违反「零安装」原则）
+- `HTTP 429` / 速率限制 → code 里加 `time.sleep(0.4)`；批量任务走 `bio-proto-entrez-batch`
+- `FileNotFoundError` → 相对路径基于工作区；不确定就用绝对路径
+- `KeyError/AttributeError` → 读 stderr 行号定位
+- `UnicodeDecodeError` → 中文 Windows 文件用 `open(path, encoding='utf-8', errors='replace')`
+- `TimeoutError` / `timedOut=true` → 传更大 `timeoutMs`；大数据写文件而非 print
+- 模糊密码子 `TranslationError` → 翻译前 `seq.replace('X','N').replace('-','N').replace('.','N')`
+
+**沉淀**：`pendingFixes` Map 配对失败→修复成功 → 写入 `error_lessons.json`，下次同类错误直接套用 fix_hint（无需重新发明）。
+
+## 12. 已知限制
 
 - `bio_python` 直接 spawn Python，未走 dsh 沙箱；信任级别等同用户本机 Python。
   这是「许愿式编程」（执行模型写的任意代码）的固有属性。

@@ -16,6 +16,7 @@ import { registerSkills } from './skills.js'
 import { registerTools } from './tools.js'
 import { ensureEnvironment } from './runtime.js'
 import { ensureREnvironment } from './r-runtime.js'
+import { registerApiRoutes } from './server.js'
 
 const SKILLS_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'skills')
 const GUIDES_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'docs', 'agent-guide')
@@ -23,8 +24,15 @@ const GUIDES_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'docs', '
 /** Cordis 插件名（cordis.patch.yml 的 row id）。 */
 export const name = 'dsh-bio-genie'
 
-/** 需要的服务。 */
-export const inject = ['tools', 'skills', 'systemPrompt']
+/** 需要的服务。
+ *
+ * tools/skills/systemPrompt 之外新增 'webServer'：浏览器侧设置面板的
+ * /api/dsh-bio-genie/* 路由（skill 清单 / Python 包列表 / R 包列表）
+ * 注册在 webServer 上，路由细节见 src/server.js。webServer 是 dsh 宿主
+ * 服务，第三方插件无法在缺少它的部署中提供面板的动态数据；这种部署
+ * 下面板会优雅降级（静态部分照常渲染，RPC 端点返回 ok:false）。
+ */
+export const inject = ['tools', 'skills', 'systemPrompt', 'webServer']
 
 /** 插件配置默认值（不导出 schemastery schema，避免版本差异）。 */
 const DEFAULT_CONFIG = {
@@ -52,6 +60,11 @@ export function apply(ctx, config) {
   ctx.systemPrompt.section(BIO_PROMPT_SECTION)
   registerSkills(ctx, SKILLS_DIR, GUIDES_DIR)
   registerTools(ctx, cfg)
+
+  // 设置面板 RPC 路由（loopback-only）：skill 清单 / Python 包列表 / R 包列表。
+  // registerApiRoutes 内部用 ctx.webServer.register 注册路由，若 webServer
+  // 不可用 cordis 会自动降级（inject = ['webServer'] 排队等待）。
+  ctx.effect(() => registerApiRoutes(ctx, cfg), 'dsh-bio-genie: api routes')
 
   // 后台预热（不阻塞加载；失败不致命，工具调用时会重试）
   if (cfg.warmUp !== false) {

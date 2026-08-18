@@ -1,222 +1,280 @@
 /**
- * dsh-bio-genie — skill 目录（合并版：14 个领域 skill + 1 个 genie 主 skill）
+ * dsh-bio-genie — skill 目录（合并版：40 个领域 skill + 1 个 genie 主 skill + 9 份指南）
  *
  * 每个 skill body 在插件加载时从 skills/*.md 读入，经 ctx.skills.register
  * 注册为 embedded runtime skill（不依赖文件系统发现，实现"one is all"）。
+ *
+ * 每项的 `category` 字段给设置面板「Skill 模块」按功能层级分组：
+ *   - main:     主 skill（dsh-bio-genie，注册见 src/index.js 的 GENIE_SKILL_CONTENT）
+ *   - domain:   Biopython 领域（15 个）
+ *   - r:        R/Bioconductor 领域（6 个）
+ *   - protocol: 协议库——高频任务的可执行工作流（18 个，含 2 个 R 协议）
+ *   - guide:    docs/agent-guide 说明书（走 GUIDE_MANIFEST）
  *
  * @module dsh-bio-genie/skills
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-/** 领域 skill 清单（从 dsh-bio-workbuddy 继承）。 */
+/** 领域 skill 清单（从 dsh-bio-workbuddy 继承）。每项带 category 字段。 */
 export const SKILL_MANIFEST = [
+  // ---- Biopython 领域 ----
   {
     name: 'bio-core',
+    category: 'domain',
     description: 'Core dsh-bio-genie workflow: how to use the bio_python tool and express a bioinformatics wish as Biopython code. Load first for any analysis.',
     file: 'bio-core.md',
   },
   {
     name: 'bio-io',
+    category: 'domain',
     description: 'Read and write sequence files with Bio.SeqIO: FASTA, FASTQ, GenBank, EMBL, Swiss-Prot; format conversion; large-file streaming.',
     file: 'bio-io.md',
   },
   {
     name: 'bio-seq',
+    category: 'domain',
     description: 'Sequence manipulation: reverse complement, transcribe/translate, GC content and skew, molecular weight, melting temperature (Bio.SeqUtils).',
     file: 'bio-seq.md',
   },
   {
     name: 'bio-align',
+    category: 'domain',
     description: 'Pairwise and multiple alignment with Bio.Align.PairwiseAligner and Bio.AlignIO: scoring, reading/writing alignments, consensus.',
     file: 'bio-align.md',
   },
   {
     name: 'bio-blast',
+    category: 'domain',
     description: 'BLAST searches via Bio.Blast.NCBIWWW and result parsing with Bio.Blast.NCBIXML/Record; note network and rate limits.',
     file: 'bio-blast.md',
   },
   {
     name: 'bio-searchio',
+    category: 'domain',
     description: 'Parse search outputs (BLAST, HMMER, Exonerate) uniformly with Bio.SearchIO: querying hits, HSPs, and extracting alignments.',
     file: 'bio-searchio.md',
   },
   {
     name: 'bio-entrez',
+    category: 'domain',
     description: 'Query NCBI E-utilities with Bio.Entrez: esearch/efetch/esummary/elink for sequences, taxonomy, and literature; email requirement.',
     file: 'bio-entrez.md',
   },
   {
     name: 'bio-phylo',
+    category: 'domain',
     description: 'Phylogenetics with Bio.Phylo: parse/write Newick and Nexus trees, traverse, reroot, prune, and draw trees.',
     file: 'bio-phylo.md',
   },
   {
     name: 'bio-structure',
+    category: 'domain',
     description: 'Protein structure analysis with Bio.PDB: parse PDB/mmCIF, iterate atoms/residues/chains, compute distances, superimpose structures.',
     file: 'bio-structure.md',
   },
   {
     name: 'bio-motif',
+    category: 'domain',
     description: 'Sequence motifs with Bio.motifs: position-weight matrices, motif creation, scanning sequences, reading MEME/JASPAR output.',
     file: 'bio-motif.md',
   },
   {
     name: 'bio-restriction',
+    category: 'domain',
     description: 'Restriction enzyme analysis with Bio.Restriction: list enzymes, find cut sites, in-silico digestion and fragment sizes.',
     file: 'bio-restriction.md',
   },
   {
     name: 'bio-utils',
+    category: 'domain',
     description: 'Bio.SeqUtils utilities, genetic codes and codon tables (Bio.Data.CodonTable), translation tables, and codon usage statistics.',
     file: 'bio-utils.md',
   },
   {
     name: 'bio-graphics',
+    category: 'domain',
     description: 'Vector graphics with Bio.Graphics.GenomeDiagram: draw annotated sequences, feature maps, and linear/circular diagrams.',
     file: 'bio-graphics.md',
   },
   {
     name: 'bio-popgen',
+    category: 'domain',
     description: 'Population genetics with Bio.PopGen: Fst, linkage disequilibrium, haplotype analysis from population data.',
     file: 'bio-popgen.md',
   },
   {
     name: 'bio-figure',
+    category: 'domain',
     description: '出版级科研绘图顾问（吸收 scipilot-figure-skill）：8 步思考-绘制工作流、图型决策速查表、18 条画图陷阱、期刊规格、中文 CJK 支持。任何画图/数据可视化需求先加载本 skill。',
     file: 'bio-figure.md',
   },
   // ---- R/Bioconductor 领域（language: r，2026-08-17 起双引擎）----
   {
     name: 'bio-r-core',
+    category: 'r',
     description: 'R 执行器核心（bio_r）：执行契约、环境事实（R 4.6/Bioc 3.23 核心包清单）、与 bio_python 双引擎分工路由、ACR 信号表、高频陷阱。任何 R 分析先加载。',
     file: 'bio-r-core.md',
   },
   {
     name: 'bio-r-basics',
+    category: 'r',
     description: 'R 核心数据结构：Biostrings（序列对象）/ GenomicRanges（区间）/ SummarizedExperiment（组学容器）——对象模型优先，先懂类再记函数。',
     file: 'bio-r-basics.md',
   },
   {
     name: 'bio-r-rnaseq',
+    category: 'r',
     description: '差异表达分析：DESeq2 标准管道（对象模型：DESeqDataSet→DESeq→results→lfcShrink）/ edgeR 无重复路径 / 解读纪律（padj<0.05 且 |log2FC|>1 双阈值）。',
     file: 'bio-r-rnaseq.md',
   },
   {
     name: 'bio-r-enrichment',
+    category: 'r',
     description: 'R 富集与 GSEA：fgsea 排序富集管道 + enricher 通用 ORA；与 bio_enrichr 的 ORA 分工；org.Hs.eg.db 不在核心包的边界。',
     file: 'bio-r-enrichment.md',
   },
   {
     name: 'bio-r-microbiome',
+    category: 'r',
     description: '微生物组分析（phyloseq）：OTU 表组装（taxa_are_rows）、alpha/beta 多样性、PCoA、PERMANOVA 与解读纪律。',
     file: 'bio-r-microbiome.md',
   },
   {
     name: 'bio-r-vis',
+    category: 'r',
     description: 'R 生态可视化：ggplot2 火山图/ggtree 树图/ComplexHeatmap 复杂热图；与 Python figurelib 的出版级分工（中文图走 Python）。',
     file: 'bio-r-vis.md',
   },
   // ---- 协议库（高频任务的可执行工作流，含代码模板 + 常见坑）----
   {
     name: 'bio-proto-seq-qc',
+    category: 'protocol',
     description: '序列质控工作流：批量统计长度/GC/N比例/碱基组成并标记低质量序列。',
     file: 'protocols/seq-qc.md',
   },
   {
     name: 'bio-proto-format-convert',
+    category: 'protocol',
     description: '序列格式批量转换工作流：FASTA/GenBank/EMBL/FASTQ 互转，流式处理大文件。',
     file: 'protocols/format-convert.md',
   },
   {
     name: 'bio-proto-pairwise-align',
+    category: 'protocol',
     description: '双序列比对工作流：PairwiseAligner 参数选择、一致度与差异位点定位。',
     file: 'protocols/pairwise-align.md',
   },
   {
     name: 'bio-proto-msa-consensus',
+    category: 'protocol',
     description: '多序列比对解析工作流：保守性统计、consensus 生成、保守区段提取。',
     file: 'protocols/msa-consensus.md',
   },
   {
     name: 'bio-proto-blast-remote',
+    category: 'protocol',
     description: '远程 BLAST 工作流：qblast 提交、结果解析、E-value 解读与污染排查。',
     file: 'protocols/blast-remote.md',
   },
   {
     name: 'bio-proto-entrez-batch',
+    category: 'protocol',
     description: 'Entrez 批量获取工作流：esearch→分批 efetch、限流合规、写出序列文件。',
     file: 'protocols/entrez-batch.md',
   },
   {
     name: 'bio-proto-restriction-cloning',
+    category: 'protocol',
     description: '限制酶克隆设计工作流：位点检查、消化片段预测、克隆可行性判断。',
     file: 'protocols/restriction-cloning.md',
   },
   {
     name: 'bio-proto-orf-annotation',
+    category: 'protocol',
     description: 'ORF 预测工作流：六框扫描、完整/截断判定、翻译产物注释。',
     file: 'protocols/orf-annotation.md',
   },
   {
     name: 'bio-proto-motif-pwm-scan',
+    category: 'protocol',
     description: 'Motif/PWM 扫描工作流：PWM 构建、伪计数、PSSM 阈值扫描与 MEME 解析。',
     file: 'protocols/motif-pwm-scan.md',
   },
   {
     name: 'bio-proto-phylo-nj',
+    category: 'protocol',
     description: '系统发育树工作流：距离矩阵、NJ/UPGMA 建树、树操作与输出。',
     file: 'protocols/phylo-nj.md',
   },
   {
     name: 'bio-proto-pdb-analysis',
+    category: 'protocol',
     description: '蛋白结构分析工作流：残基距离、活性位点邻域、结构叠加 RMSD。',
     file: 'protocols/pdb-analysis.md',
   },
   {
     name: 'bio-proto-codon-optimization',
+    category: 'protocol',
     description: '密码子优化工作流：使用统计、按宿主频率表回译、回译验证。',
     file: 'protocols/codon-optimization.md',
   },
   {
     name: 'bio-proto-enrichment-workflow',
+    category: 'protocol',
     description: '富集分析工作流：bio_enrichr 多库交叉、p 值解读、结论自洽性检查。',
     file: 'protocols/enrichment-workflow.md',
   },
   {
     name: 'bio-proto-literature-review',
+    category: 'protocol',
     description: '文献调研工作流：PubMed 检索式技巧、批量摘要、OpenAlex 补充检索、引用可溯源汇总。',
     file: 'protocols/literature-review.md',
   },
   {
     name: 'bio-proto-pub-figure',
+    category: 'protocol',
     description: '出版级出图执行协议：profile→选图→setup_style→9 类图配方→自检→导出→审计的完整闭环（figurelib 代码模板）。',
     file: 'protocols/pub-figure.md',
   },
   {
     name: 'bio-proto-coords',
+    category: 'protocol',
     description: '基因组坐标系统协议：0/1-based 转换、BED/GFF/VCF 惯例、GRCh37/38、indel 左对齐归一化、区间运算与审计清单。',
     file: 'protocols/coords.md',
   },
   {
     name: 'bio-proto-statistics',
+    category: 'protocol',
     description: '统计分析协议：检验选择决策树、scipy 模板、多重校正（Bonferroni/BH-FDR）、效应量与功效、实验设计要点、APA 报告规范。',
     file: 'protocols/statistics.md',
   },
   {
     name: 'bio-proto-r-de',
+    category: 'protocol',
     description: 'R 差异表达工作流：counts+meta 输入约定 → DESeq2 全流程模板 → 火山图/富集下游衔接（language: r）。',
     file: 'protocols/r-de.md',
   },
   {
     name: 'bio-proto-r-gsea',
+    category: 'protocol',
     description: 'R GSEA 工作流：排序列表+GMT 输入约定 → fgsea 全流程模板 → padj<0.25 解读（language: r）。',
     file: 'protocols/r-gsea.md',
   },
 ]
 
 /**
+ * 主 skill 元数据（设置面板显示用；主 skill 注册见 src/index.js）。
+ */
+export const GENIE_SKILL = {
+  name: 'dsh-bio-genie',
+  category: 'main',
+  description: '生物信息学「许愿式分析」主指引：工具分层选择（语义化 bio_* 工具 vs bio_python 执行器）、工作流、常见坑。任何生物分析先加载本 skill。',
+}
+
+/**
  * 指南清单（docs/agent-guide/*.md，注册为 dsh-bio-genie-guide-* 嵌入式 skill）。
+ *
  * 面向最终使用者（dsh 里的 agent）的说明书：总览/工具参考/skill 导航/
  * bio_python 编程/工作流/绘图专题/故障排查/严谨性。与领域 skill 的区别：
  * 指南教"怎么用插件整体"，领域/协议 skill 教"怎么做某类分析"。
@@ -224,59 +282,80 @@ export const SKILL_MANIFEST = [
 export const GUIDE_MANIFEST = [
   {
     name: 'dsh-bio-genie-guide',
+    category: 'guide',
     description: 'dsh-bio-genie 使用指南总览：许愿式心智模型、三层工具架构、环境引导机制、输出规范、五条铁律、阅读地图。',
     whenToUse: '用户首次使用本插件、或不确定整体怎么用本插件时。',
     file: 'README.md',
   },
   {
     name: 'dsh-bio-genie-guide-tools',
+    category: 'guide',
     description: '21 个工具完整参考：每个工具的参数/返回字段/典型触发词 + 愿望→工具选择速查 + 缓存限流说明。',
     whenToUse: '不确定某个 bio_* 工具的参数、返回结构或选哪个工具时。',
     file: 'tools.md',
   },
   {
     name: 'dsh-bio-genie-guide-skills',
+    category: 'guide',
     description: '33 个 skill 导航：主 skill + 15 领域 + 17 协议的加载时机与触发任务表。',
     whenToUse: '需要决定加载哪个领域/协议 skill 时。',
     file: 'skills.md',
   },
   {
     name: 'dsh-bio-genie-guide-python',
+    category: 'guide',
     description: 'bio_python 编程指南：执行契约、可用库清单（含 figurelib）、代码模板、ACR 修复表、限流纪律、高频陷阱。',
     whenToUse: '写任何非平凡 bio_python 代码前。',
     file: 'python-cookbook.md',
   },
   {
     name: 'dsh-bio-genie-guide-r',
+    category: 'guide',
     description: 'bio_r 编程指南：执行契约、R 4.6/Bioc 3.23 核心包清单与边界、代码模板、ACR 信号表、与 Python 引擎协作、高频陷阱。',
     whenToUse: '写任何非平凡 bio_r 代码前。',
     file: 'r-cookbook.md',
   },
   {
     name: 'dsh-bio-genie-guide-workflows',
+    category: 'guide',
     description: '10 个端到端工作流：序列质控/组合分析/BLAST/基因查询/富集/文献/建树/结构/绘图/统计，每个含工具调用序列。',
     whenToUse: '用户需求命中某个典型分析场景时。',
     file: 'workflows.md',
   },
   {
     name: 'dsh-bio-genie-guide-plotting',
+    category: 'guide',
     description: '出版级绘图专题：fig 三工具分工、8 步闭环、figurelib API、中文 CJK、主动拦截、五条硬性原则。',
     whenToUse: '任何画图/数据可视化/论文配图需求。',
     file: 'plotting.md',
   },
   {
     name: 'dsh-bio-genie-guide-troubleshooting',
+    category: 'guide',
     description: '故障排查与插件边界：环境/bio_python/网络类故障处理表 + 用户要超能力时的替代方案。',
     whenToUse: '工具报错、分析失败、或用户需求超出插件能力时。',
     file: 'troubleshooting.md',
   },
   {
     name: 'dsh-bio-genie-guide-rigor',
+    category: 'guide',
     description: '科学严谨性与报告规范：溯源规则、报告模板、p 值/效应量纪律、命名单位约定、诚实边界。',
     whenToUse: '写结论/报告/生物学解读前。',
     file: 'rigor.md',
   },
 ]
+
+/**
+ * 序列化所有可在设置面板展示的 skill 元数据（含主 skill + SKILL_MANIFEST + GUIDE_MANIFEST）。
+ * 给宿主侧 /api/dsh-bio-genie/skills 路由用，不返回 body（避免传输 200KB markdown）。
+ */
+export function listSkillsForPanel() {
+  return {
+    main: GENIE_SKILL,
+    skills: SKILL_MANIFEST.map(({ name, category, description }) => ({ name, category, description })),
+    guides: GUIDE_MANIFEST.map(({ name, category, description, whenToUse }) => ({ name, category, description, whenToUse })),
+  }
+}
 
 /** 注册全部 skill（领域 + genie 主 skill + 指南）。 */
 export function registerSkills(ctx, skillsDir, guideDir) {
@@ -421,16 +500,38 @@ language: mixed
 12. 统计结论必须跑检验（bio-proto-statistics）：组间比较给 p 值+效应量，多重比较必须校正；误差棒图注写清 SD/SEM/CI + n。
 13. R 任务用 bio_r：差异表达/GSEA/微生物组等先加载 bio-r-core 与对应 r 领域 skill；R 环境首次引导约 5-20 分钟（惰性触发），提前告知用户等待、不要重复调用；R 生态问题查 bio_r_env。
 
-## 自动代码修复（ACR）
+## 自动代码修复（ACR）— 三层职责边界
 
-bio_python 失败时返回 \`needs_repair: true\`，stderr 说明了失败原因。修复代码后重新调用，不要一次失败就放弃：
+**核心原则**：开发时主动消除错误根源（修复插件 bug、补 requirements），运行时只在「确定可解的失败」上自愈，其余交给 agent。**自愈与修复不是二选一，是分层协作**。
 
-- ImportError/ModuleNotFoundError → 检查模块名拼写；缺依赖先 bio_env（reinstall=true）
-- HTTP 429/速率限制 → 代码里加 time.sleep()
+bio_python / bio_r 失败时返回 \`needs_repair: true\` + 完整 stderr。下面分三层规定各自职责，agent 只接手「agent 该干的部分」：
+
+| 层 | 谁修 | 触发条件 | 动作 | 上限 |
+|---|------|----------|------|------|
+| **L1 插件自愈** | 插件代码 | 当前**不实现任何自动重试**——所有失败统一透传到 stderr，让 agent 看见 | — | 0 次（占位；后续若加白名单错误类型的自动重试，必须以 \`stderr\` 追加 \`[bio-genie self-healed: ...]\` 让用户看见） |
+| **L2 记忆复用** | 插件（已存在） + agent 决策 | \`bio_python\` 失败后，stderr 错误签名若在 \`~/.dsh/dsh-bio-genie/memory/error_lessons.json\` 命中 | agent 主动 \`bio_memory action=lessons\` 查 fix_hint；命中即套用再调 | agent 试错 ≤ 1 次（用提示词的方式让 agent 先查记忆再改码）|
+| **L3 agent 自愈** | agent（你） | 任何 L1/L2 未覆盖的失败（代码逻辑错、API 误用、路径错、限流、数据结构错） | 读 stderr → 改 code → 再调 | agent 最多自动修复 2 次（同一任务共 3 次尝试）|
+| **终止** | — | 累计 3 次仍失败 | **停止自愈，如实向用户报告**：错误原文 + 已尝试的修复路径 + 残余不确定性。绝不编造结果 | — |
+
+**L1 的边界（必须严格遵守，不要扩大）**：插件自愈只对「确定的事」负责——环境缺包、venv 损坏、镜像切换这类可机械执行的恢复。**不要让插件自动改 code**（code 是模型写的，插件不应擅改；改坏了 agent 反而看不到原始失败信号）。
+
+**L3 的纪律**：
+
+- ImportError/ModuleNotFoundError → 先 \`bio_env\` 看环境状态；若提示环境就绪却仍缺包，是插件 bug 而非任务 bug，**停止自愈、报告插件 bug**
+- HTTP 429/速率限制 → 在 code 里加 \`time.sleep(0.4)\`（NCBI 限流 3 req/s 对应间隔）；批量任务走 \`bio-proto-entrez-batch\` 协议的分批与 sleep
 - FileNotFoundError → 检查路径（相对路径基于工作区；不确定就用绝对路径）
 - KeyError/AttributeError → 读 stderr 行号定位，检查数据结构
+- UnicodeDecodeError → 中文 Windows 文件用 \`open(path, encoding='utf-8', errors='replace')\`
+- TimeoutError / \`timedOut=true\` → 传更大 \`timeoutMs\`；大数据改成写文件而非 print
+- 模糊密码子 \`TranslationError\` → 翻译前 \`seq.replace('X','N').replace('-','N').replace('.','N')\`
 
-同一任务最多自动修复 2 次（共 3 次尝试），仍失败就停止，如实向用户报告错误，不要无限重试。
+**绝对禁止**：
+
+- 不要无限重试同一个失败（违反「3 次上限」即放弃）
+- 不要让 \`needs_repair=true\` 触发后用同一份 code 再调一次（不读 stderr 不改码 = 浪费时间）
+- 不要把 ImportError 当作「环境没引导好」自行 pip install 任何东西（违反「零安装」原则；除非插件代码本身定义了白名单自动补装）
+
+**沉淀纪律**：失败→修复成功的配对由插件（\`pendingFixes\` Map）自动写入 \`error_lessons.json\`，下次同类错误直接套用 fix_hint（无需重新发明）。**插件层自愈动作也必须写日志**（未来若加），格式 \`[bio-genie self-healed: <动作>]\` 追加在 stderr 末尾。
 
 ## 会话记忆（越用越聪明）
 

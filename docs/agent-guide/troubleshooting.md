@@ -12,7 +12,7 @@ language: none
 |---|---|---|
 | 首次调用几分钟没返回 | 正在引导环境（下载 uv/CPython/装包） | 告知用户等待，**不要重复调用**（重复调用只是排队） |
 | `bio_env` ready=false | 引导失败（网络/磁盘） | 看 error 字段；建议 `bio_env reinstall=true` 重试一次 |
-| ImportError（某个包） | 升级后新依赖未补装（或环境损坏） | 插件会**自动补装**；若仍失败 `bio_env reinstall=true` |
+| ImportError（某个包） | 升级后新依赖未补装（或环境损坏） | **先跑 `bio_env` 看环境状态**：若环境已就绪却仍缺包，**是插件 bug 不是任务 bug**——停止自愈，报告插件 bug（不要自己 pip install，违反「零安装」原则）|
 | 引导日志提到 GitHub 下载失败 | 官方源不可达 | 插件自动切国内镜像（无需你处理）；用户显式设过 DSH_BIO_UV_BASE 时要提醒检查其镜像 |
 
 ## 2. R 环境类故障（bio_r / bio_r_env）
@@ -41,6 +41,25 @@ language: none
 | `Process killed` / timedOut | 超时（默认 60s） | 传更大 `timeoutMs`；大数据改成写文件而非 print |
 
 3 次尝试后仍失败：**停止并如实报告**（错误 + 已尝试的修复），绝不编造。
+
+## 4. 自愈执行（ACR）— 插件与 agent 的职责边界
+
+**核心原则**：开发时主动消除错误根源（修复插件 bug、补 requirements）；运行时只在「确定可解的失败」上自愈，其余交给 agent。**自愈与修复不是二选一，是分层协作**。
+
+| 层 | 谁修 | 触发 | 动作 | 上限 |
+|---|------|------|------|------|
+| **L1 插件自愈** | 插件代码 | 当前**不实现任何自动重试**——所有失败透传到 stderr 让 agent 看见 | — | 0 次（占位） |
+| **L2 记忆复用** | agent | stderr 错误签名若命中 `~/.dsh/dsh-bio-genie/memory/error_lessons.json` | `bio_memory action=lessons` 查 fix_hint，命中即套用再调 | 1 次 |
+| **L3 agent 自愈** | agent | L1/L2 未覆盖的失败（代码逻辑、API 误用、路径、限流、数据结构） | 读 stderr → 改 code → 再调 | 最多 2 次（共 3 次尝试）|
+| **终止** | — | 累计 3 次仍失败 | 如实报告：错误原文 + 已尝试的修复 + 残余不确定性 | — |
+
+**绝对禁止**：
+
+- 无限重试同一个失败
+- `needs_repair=true` 后用同一份 code 再调一次（不读 stderr 不改码 = 浪费时间）
+- 把 ImportError 当作「环境没引导好」自行 pip install（违反「零安装」原则；除非插件代码本身定义了白名单自动补装）
+
+**L1 的边界**：插件自愈只对「确定的事」负责（环境缺包、venv 损坏、镜像切换）。**不要让插件自动改 code**——code 是模型写的，插件不应擅改。
 
 ## 3. 网络类
 

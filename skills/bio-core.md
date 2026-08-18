@@ -36,6 +36,17 @@ print(len(r), r.seq, r.id)
 - `SeqRecord`：`id` / `name` / `description` / `seq` / `features` / `annotations` / `letter_annotations`。
 - `SeqFeature`：`type` / `location` / `qualifiers`，GenBank/EMBL 注释都挂在 `record.features` 上。
 
+## 失败与自愈（与主 skill ACR 三层职责对齐）
+
+`bio_python` 失败时返回 `needs_repair: true` + 完整 stderr。**严格遵守三层职责边界**（详见主 skill `dsh-bio-genie` 的 ACR 章节）：
+
+- **L1 插件自愈**：当前**不实现任何自动重试**——所有失败透传到 stderr。若后续插件加了白名单自愈，stderr 必追加 `[bio-genie self-healed: <动作>]` 提示。
+- **L2 记忆复用**：失败后**先 `bio_memory action=lessons` 查同类修复经验**，命中 fix_hint 即套用再调（最多试 1 次）。
+- **L3 agent 自愈**：L1/L2 未覆盖时，**读 stderr → 改 code → 再调**，最多 2 次修复（共 3 次尝试）。
+- **终止**：3 次仍失败 → 如实报告（错误原文 + 已尝试的修复），绝不编造结果。
+
+**ImportError 的特殊处理**：先跑 `bio_env` 看环境状态——若提示环境就绪却仍缺包，**这是插件 bug 不是任务 bug**，停止自愈并报告插件 bug（不要自行 pip install，违反「零安装」原则；除非插件代码本身定义了白名单自动补装）。
+
 ## 常见坑
 
 - `Bio.SeqIO.parse()` 是生成器：多次复用请先 `list(...)`。
