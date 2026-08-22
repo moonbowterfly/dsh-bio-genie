@@ -7,7 +7,7 @@
  * 每项的 `category` 字段给设置面板「Skill 模块」按功能层级分组：
  *   - main:     主 skill（dsh-bio-genie，注册见 src/index.js 的 GENIE_SKILL_CONTENT）
  *   - domain:   Biopython 领域（15 个）
- *   - r:        R/Bioconductor 领域（6 个）
+ *   - r:        R/Bioconductor 领域（8 个）
  *   - protocol: 协议库——高频任务的可执行工作流（18 个，含 2 个 R 协议）
  *   - guide:    docs/agent-guide 说明书（走 GUIDE_MANIFEST）
  *
@@ -113,7 +113,7 @@ export const SKILL_MANIFEST = [
   {
     name: 'bio-r-core',
     category: 'r',
-    description: 'R 执行器核心（bio_r）：执行契约、环境事实（R 4.6/Bioc 3.23 核心包清单）、与 bio_python 双引擎分工路由、ACR 信号表、高频陷阱。任何 R 分析先加载。',
+    description: 'R 执行器核心（bio_r）：执行契约、环境事实（R 4.6.1/Bioc 3.23 核心包清单）、与 bio_python 双引擎分工路由、ACR 信号表、高频陷阱。任何 R 分析先加载。',
     file: 'bio-r-core.md',
   },
   {
@@ -145,6 +145,18 @@ export const SKILL_MANIFEST = [
     category: 'r',
     description: 'R 生态可视化：ggplot2 火山图/ggtree 树图/ComplexHeatmap 复杂热图；与 Python figurelib 的出版级分工（中文图走 Python）。',
     file: 'bio-r-vis.md',
+  },
+  {
+    name: 'bio-r-genesets',
+    category: 'r',
+    description: 'MSigDB 基因集分析（msigdbr + fgsea）：按物种/分类即时查询基因集，免手动下载 GMT；fgsea 排序 GSEA + enricher ORA 管道。',
+    file: 'bio-r-genesets.md',
+  },
+  {
+    name: 'bio-r-dimred',
+    category: 'r',
+    description: '降维与聚类（Rtsne + cluster）：t-SNE 降维可视化 + 层次聚类分群；PCA 前处理 + perplexity 选择策略。',
+    file: 'bio-r-dimred.md',
   },
   // ---- 协议库（高频任务的可执行工作流，含代码模板 + 常见坑）----
   {
@@ -261,6 +273,35 @@ export const SKILL_MANIFEST = [
     description: 'R GSEA 工作流：排序列表+GMT 输入约定 → fgsea 全流程模板 → padj<0.25 解读（language: r）。',
     file: 'protocols/r-gsea.md',
   },
+  // ---- 科研专精（preset skills，含统计严谨性 + 完整代码模板）----
+  {
+    name: 'bio-survival-analysis',
+    category: 'research',
+    description: '生存分析完整工作流：Kaplan-Meier 与 log-rank、Cox 比例风险回归（单/多因素）、PH 假设检验、竞争风险、时间依赖 ROC。Python lifelines 与 R survival/survminer 双实现。含统计严谨性清单和常见错误。',
+    whenToUse: '做生存分析、KM 曲线、Cox 回归、预后模型、表达-生存关联时。',
+    file: 'bio-survival-analysis.md',
+  },
+  {
+    name: 'bio-variant-analysis',
+    category: 'research',
+    description: '变异分析完整工作流：VCF 读取/过滤、ClinVar 致病性注释、gnomAD 群体频率、ACMG 分类标准。Python vcfpy 与 R vcfR 双实现。',
+    whenToUse: '处理 VCF 变异数据、变异注释、变异致病性解读、群体频率分析时。',
+    file: 'bio-variant-analysis.md',
+  },
+  {
+    name: 'bio-paper-writing',
+    category: 'research',
+    description: '科研论文写作：IMRaD 结构模板、摘要写作、统计报告规范、学术英语要点、参考文献格式化（Vancouver/APA/Nature）。',
+    whenToUse: '撰写论文、摘要、综述、实验报告时。',
+    file: 'bio-paper-writing.md',
+  },
+  {
+    name: 'bio-literature-review',
+    category: 'research',
+    description: '文献检索与综述：PubMed 检索式构建、文献筛选流程（PRISMA）、文献信息提取、综述写作结构、引用格式速查。',
+    whenToUse: '文献检索、文献综述、研究背景调研、参考文献收集时。',
+    file: 'bio-literature-review.md',
+  },
 ]
 
 /**
@@ -290,14 +331,14 @@ export const GUIDE_MANIFEST = [
   {
     name: 'dsh-bio-genie-guide-tools',
     category: 'guide',
-    description: '21 个工具完整参考：每个工具的参数/返回字段/典型触发词 + 愿望→工具选择速查 + 缓存限流说明。',
+    description: '23 个工具完整参考：每个工具的参数/返回字段/典型触发词 + 愿望→工具选择速查 + 缓存限流说明。',
     whenToUse: '不确定某个 bio_* 工具的参数、返回结构或选哪个工具时。',
     file: 'tools.md',
   },
   {
     name: 'dsh-bio-genie-guide-skills',
     category: 'guide',
-    description: '33 个 skill 导航：主 skill + 15 领域 + 17 协议的加载时机与触发任务表。',
+    description: '51 个 skill 导航：主 skill + 15 领域 + 8 指南 + 19 协议的加载时机与触发任务表。',
     whenToUse: '需要决定加载哪个领域/协议 skill 时。',
     file: 'skills.md',
   },
@@ -456,6 +497,8 @@ language: mixed
 | 任务 | 引擎 |
 |------|------|
 | 差异表达 / GSEA 排序富集 / 微生物组多样性 / GenomicRanges 区间 | R（bio_r，先加载 bio-r-core） |
+| MSigDB 基因集查询 / 免 GMT 的 fgsea | R（bio_r + bio-r-genesets） |
+| t-SNE 降维 / 层次聚类分群 | R（bio_r + bio-r-dimred） |
 | 序列 IO/比对/BLAST/Entrez/结构/建树/出版级统计图/列表型富集 | Python（bio_python / bio_* 工具） |
 | 跨引擎协作 | Python 预处理 → R 分析 → Python 出图，用工作区文件衔接 |
 
@@ -483,6 +526,8 @@ language: mixed
 | 差异表达（counts 矩阵） | bio-proto-r-de（R） |
 | 排序富集 GSEA | bio-proto-r-gsea（R） |
 | 微生物组多样性 | bio-r-microbiome（R） |
+| MSigDB 基因集 / 免 GMT 的 fgsea | bio-r-genesets（R） |
+| t-SNE 降维 / 聚类分群 | bio-r-dimred（R） |
 
 ## 调用规则
 
@@ -571,5 +616,72 @@ bio_python / bio_r 失败时返回 \`needs_repair: true\` + 完整 stderr。下�
 | dsh-bio-genie-guide-python | 写 bio_python 代码前 |
 | dsh-bio-genie-guide-workflows | 命中典型场景 |
 | dsh-bio-genie-guide-plotting | 画图需求 |
-| dsh-bio-genie-guide-troubleshooting | 报错/超能力需求 |
+|| dsh-bio-genie-guide-troubleshooting | 报错/超能力需求 |
+
+// ---- 工具调试面板：可调试工具的参数 schema（供 server.js 和 client.js 共用）----
+export const TOOL_SCHEMAS = [
+  { name: 'seq_analyze', label: '序列分析', engine: 'python', params: [
+    { key: 'sequence', type: 'text', required: true, placeholder: 'ATGCGATCGATCGATCG...', desc: '核酸或蛋白质序列' },
+    { key: 'seq_type', type: 'select', options: ['auto','dna','rna','protein'], default: 'auto', desc: '序列类型' },
+  ]},
+  { name: 'seq_translate', label: '序列翻译', engine: 'python', params: [
+    { key: 'sequence', type: 'text', required: true, placeholder: 'ATGCGATCGATCG...', desc: 'DNA/RNA 序列' },
+    { key: 'table', type: 'number', default: 1, desc: '遗传密码表编号' },
+    { key: 'to_stop', type: 'boolean', default: false, desc: '遇到终止密码子停止' },
+  ]},
+  { name: 'seq_gc_skew', label: 'GC Skew', engine: 'python', params: [
+    { key: 'sequence', type: 'text', required: true, placeholder: 'ATGCGATCG...', desc: 'DNA 序列' },
+    { key: 'window', type: 'number', default: 100, desc: '窗口大小' },
+  ]},
+  { name: 'seq_find_orf', label: 'ORF 查找', engine: 'python', params: [
+    { key: 'sequence', type: 'text', required: true, placeholder: 'ATGCGATCG...', desc: 'DNA 序列' },
+    { key: 'min_len', type: 'number', default: 30, desc: '最小 ORF 长度' },
+  ]},
+  { name: 'seq_kmer', label: 'K-mer 统计', engine: 'python', params: [
+    { key: 'sequence', type: 'text', required: true, placeholder: 'ATGCGATCG...', desc: '核酸序列' },
+    { key: 'k', type: 'number', default: 3, desc: 'k 值' },
+    { key: 'top', type: 'number', default: 10, desc: '返回前 N 个' },
+  ]},
+  { name: 'seq_restriction', label: '限制酶切', engine: 'python', params: [
+    { key: 'sequence', type: 'text', required: true, placeholder: 'ATGCGAATTCGATCG...', desc: 'DNA 序列' },
+    { key: 'enzymes', type: 'text', placeholder: 'EcoRI,BamHI', desc: '酶名列表（逗号分隔）' },
+    { key: 'linear', type: 'boolean', default: true, desc: '线性分子' },
+  ]},
+  { name: 'entrez_search', label: 'NCBI 检索', engine: 'python', params: [
+    { key: 'term', type: 'text', required: true, placeholder: 'TP53[Gene Name] AND human[Organism]', desc: '检索式' },
+    { key: 'db', type: 'select', options: ['nucleotide','gene','protein'], default: 'nucleotide', desc: '数据库' },
+    { key: 'retmax', type: 'number', default: 5, desc: '最大返回数' },
+  ]},
+  { name: 'enrichr', label: 'Enrichr 富集', engine: 'python', params: [
+    { key: 'genes', type: 'text', required: true, placeholder: 'TP53,BRCA1,EGFR', desc: '基因列表（逗号分隔）' },
+    { key: 'library', type: 'text', default: 'GO_Biological_Process_2023', desc: '富集库' },
+    { key: 'top', type: 'number', default: 10, desc: '返回前 N 条' },
+  ]},
+  { name: 'pubmed_search', label: 'PubMed 检索', engine: 'python', params: [
+    { key: 'term', type: 'text', required: true, placeholder: 'CRISPR gene editing', desc: '检索式' },
+    { key: 'retmax', type: 'number', default: 10, desc: '最大返回数' },
+  ]},
+  { name: 'metabolic_model', label: '代谢模型', engine: 'python', params: [
+    { key: 'action', type: 'select', options: ['list','load','info'], default: 'list', desc: '操作类型' },
+    { key: 'model_id', type: 'text', default: 'textbook', desc: '模型 ID' },
+  ]},
+  { name: 'fba', label: 'FBA 分析', engine: 'python', params: [
+    { key: 'model_id', type: 'text', default: 'textbook', desc: '模型 ID' },
+    { key: 'objective', type: 'text', placeholder: 'Biomass_Ecoli_core', desc: '目标函数（可选）' },
+  ]},
+  { name: 'gene_knockout', label: '基因敲除', engine: 'python', params: [
+    { key: 'model_id', type: 'text', default: 'textbook', desc: '模型 ID' },
+    { key: 'gene', type: 'text', required: true, placeholder: 'b2779', desc: '基因 ID' },
+  ]},
+  { name: 'pathway_search', label: '通路搜索', engine: 'python', params: [
+    { key: 'target_metabolite', type: 'text', required: true, placeholder: 'glycolysis', desc: '目标代谢物/关键词' },
+    { key: 'organism', type: 'text', default: 'eco', desc: '生物代码' },
+    { key: 'limit', type: 'number', default: 10, desc: '返回数量' },
+  ]},
+  { name: 'pathway_design', label: '通路设计', engine: 'python', params: [
+    { key: 'target_product', type: 'text', required: true, placeholder: 'ethanol', desc: '目标产物' },
+    { key: 'host_organism', type: 'text', default: 'eco', desc: '宿主生物' },
+    { key: 'strategy', type: 'select', options: ['shortest','max_yield','fewest_steps'], default: 'shortest', desc: '设计策略' },
+  ]},
+]
 | dsh-bio-genie-guide-rigor | 写结论报告前 |`

@@ -8,8 +8,8 @@ language: r
 
 ## 环境事实（牢记）
 
-- **固定版本对**：R 4.6.0 ↔ Bioconductor 3.23（引导器锁定，不随上游漂移）。
-- 核心包已预装（私有库 `~/.dsh/dsh-bio-genie/r-lib/`，`bio_r_env` 可查版本）：DESeq2 / edgeR / limma / fgsea / phyloseq / Biostrings / GenomicRanges / SummarizedExperiment / ggplot2 / ggtree / ComplexHeatmap / dplyr / tibble / readr / jsonlite。
+- **固定版本对**：R 4.6.1 ↔ Bioconductor 3.23（引导器锁定，不随上游漂移）。
+- 核心包已预装（私有库 `~/.dsh/dsh-bio-genie/r-lib/`，`bio_r_env` 可查版本）：DESeq2 / edgeR / limma / fgsea / msigdbr（MSigDB 基因集，免手写 GMT） / Rtsne（t-SNE 降维） / phyloseq / Biostrings / GenomicRanges / SummarizedExperiment / ggplot2 / ggtree / ComplexHeatmap / dplyr / tibble / readr / jsonlite。
 - **不在环境里**（如实告知，别引导用户装）：clusterProfiler（依赖 GO.db 在 Bioc 3.23 无 Windows 二进制，上游缺口——富集用 fgsea/ORA 用 bio_enrichr）、org.Hs.eg.db（enrichGO 需要）、ape 之外的重生态包、Bioc 源码编译包（无 Rtools 工具链，二进制优先策略）。
 - 首次 bio_r 调用会惰性引导 R 环境（下载 R + 核心包，约 5-20 分钟）——提前告知用户等待，**不要重复调用**。
 
@@ -26,9 +26,10 @@ language: r
 | 任务 | 引擎 |
 |---|---|
 | 差异表达（DESeq2/edgeR/limma） | **R** |
-| GSEA 排序富集（fgsea） | **R** |
+| GSEA 排序富集（fgsea + msigdbr 基因集） | **R** |
 | 微生物组多样性（phyloseq） | **R** |
 | 基因组区间运算（GenomicRanges） | **R**（小规模 Python 亦可） |
+| t-SNE 降维 / 层次聚类 | **R**（Rtsne + cluster） |
 | ggtree 系统发育树图 / ComplexHeatmap | **R** |
 | 序列 IO/比对/BLAST/Entrez/结构/建树/出版级统计图 | **Python**（bio_python + figurelib） |
 | 列表型通路富集（ORA） | **Python**（bio_enrichr，更快更省） |

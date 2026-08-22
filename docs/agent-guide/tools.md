@@ -2,7 +2,7 @@
 language: none
 ---
 
-# 工具全参考（23 个）
+# 工具全参考（22 个）
 
 > 每个工具：功能 → 参数（★=必填）→ 返回关键字段 → 典型触发词。**选工具第一优先，双引擎执行器（bio_python/bio_r）第二优先**——先按任务选引擎（见 dsh-bio-genie 主 skill 的双引擎路由表），再选工具。
 
@@ -151,3 +151,13 @@ language: none
 | 以上都覆盖不了 | `bio_python` / `bio_r`（先查 `dsh-bio-genie-guide-skills` 的领域/协议） |
 
 **缓存与限流**（插件已内置，无需你处理）：NCBI 查询类 350ms 间隔、Enrichr 600ms；查询类工具（entrez_search/enrichr/pubmed_search/pubmed_abstract/ref_genome）相同参数 24h 内命中缓存（最多 100 条）。bio_python 代码里直接调 Bio.Entrez 时**必须自己**设 email + 遵守 3 req/s。
+
+**bio_metabolic_model** — 代谢模型管理：`action`（`list` 列出可用模型 / `load` 加载模型 / `info` 显示详情）、`model_id`（默认 `textbook`，COBRApy 内置 E. coli core）。触发词：代谢模型、SBML、代谢网络。
+
+**bio_fba** — 通量平衡分析（FBA）：`model_id`（默认 `textbook`）、`objective`（目标函数反应，可选）。返回最优生长速率、主要反应通量、代谢物影子价格。触发词：FBA、通量平衡、生长速率预测。
+
+**bio_gene_knockout** — 基因敲除分析：`model_id`（默认 `textbook`）、`gene`★（基因 ID 如 `b2779`）。返回敲除后生长速率、变化百分比、必需性判断。触发词：基因敲除、必需基因。
+
+**bio_pathway_search** — 代谢通路搜索（KEGG）：`target_metabolite`★（目标代谢物/关键词）、`organism`（默认 `eco`）、`limit`（默认 10）。触发词：代谢通路、KEGG 通路。
+
+**bio_pathway_design** — 代谢通路设计：`target_product`★（目标产物）、`host_organism`（默认 `eco`）、`strategy`（`shortest`/`max_yield`/`fewest_steps`）。触发词：通路设计、代谢工程。

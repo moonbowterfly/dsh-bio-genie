@@ -701,6 +701,264 @@ def op_fig_export(args):
     return {'count': len(results), 'results': results}
 
 
+def op_metabolic_model(args):
+    """代谢模型管理：加载、查看、列出可用模型。"""
+    import cobra
+    
+    action = args.get('action', 'list')
+    
+    if action == 'list':
+        # 列出可用模型
+        model_dir = os.path.join(os.path.dirname(__file__), '..', 'data', 'models')
+        if not os.path.exists(model_dir):
+            os.makedirs(model_dir, exist_ok=True)
+        
+        models = [
+            {'id': 'textbook', 'file': 'COBRApy built-in', 'description': 'E. coli core model (built-in)'},
+        ]
+        
+        for f in os.listdir(model_dir):
+            if f.endswith(('.xml', '.sbml', '.json')):
+                model_path = os.path.join(model_dir, f)
+                models.append({
+                    'id': os.path.splitext(f)[0],
+                    'file': f,
+                    'path': model_path,
+                    'size_kb': round(os.path.getsize(model_path) / 1024, 1)
+                })
+        return {'models': models}
+    
+    elif action == 'load':
+        model_id = args.get('model_id', 'textbook')
+        file_path = args.get('file_path')
+        
+        if file_path:
+            if not os.path.exists(file_path):
+                return {'error': f'Model file not found: {file_path}'}
+            model = cobra.io.read_sbml_model(file_path)
+        elif model_id == 'textbook' or model_id == 'e_coli_core':
+            # 使用COBRApy自带的模型
+            model = cobra.io.load_model('textbook')
+        else:
+            # 从默认目录加载
+            model_dir = os.path.join(os.path.dirname(__file__), '..', 'data', 'models')
+            model_path = os.path.join(model_dir, f'{model_id}.xml')
+            if not os.path.exists(model_path):
+                return {'error': f'Model not found: {model_id}.xml in {model_dir}'}
+            model = cobra.io.read_sbml_model(model_path)
+        
+        # 返回模型信息
+        return {
+            'id': model.id,
+            'name': model.name,
+            'reactions': len(model.reactions),
+            'metabolites': len(model.metabolites),
+            'genes': len(model.genes),
+            'objective': str(model.objective),
+            'compartments': model.compartments,
+            'exchanges': len(model.exchanges),
+        }
+    
+    elif action == 'info':
+        model_id = args.get('model_id', 'textbook')
+        
+        if model_id == 'textbook' or model_id == 'e_coli_core':
+            # 使用COBRApy自带的模型
+            model = cobra.io.load_model('textbook')
+        else:
+            model_dir = os.path.join(os.path.dirname(__file__), '..', 'data', 'models')
+            model_path = os.path.join(model_dir, f'{model_id}.xml')
+            
+            if not os.path.exists(model_path):
+                return {'error': f'Model not found: {model_id}.xml'}
+            
+            model = cobra.io.read_sbml_model(model_path)
+        
+        # 获取反应信息
+        reactions = []
+        for r in model.reactions:
+            reactions.append({
+                'id': r.id,
+                'name': r.name,
+                'reaction': r.reaction,
+                'bounds': r.bounds,
+            })
+        
+        # 获取代谢物信息
+        metabolites = []
+        for m in model.metabolites:
+            metabolites.append({
+                'id': m.id,
+                'name': m.name,
+                'formula': m.formula,
+                'compartment': m.compartment,
+            })
+        
+        return {
+            'id': model.id,
+            'name': model.name,
+            'reactions': reactions,
+            'metabolites': metabolites,
+            'genes': [g.id for g in model.genes],
+            'objective': str(model.objective),
+        }
+    
+    else:
+        return {'error': f'Unknown action: {action}'}
+
+
+def op_fba(args):
+    """通量平衡分析（FBA）：预测代谢通量分布。"""
+    import cobra
+    
+    model_id = args.get('model_id', 'ecoli_core_model')
+    objective = args.get('objective')
+    
+    # 加载模型
+    if model_id == 'textbook' or model_id == 'e_coli_core':
+        # 使用COBRApy自带的模型
+        model = cobra.io.load_model('textbook')
+    else:
+        model_dir = os.path.join(os.path.dirname(__file__), '..', 'data', 'models')
+        model_path = os.path.join(model_dir, f'{model_id}.xml')
+        
+        if not os.path.exists(model_path):
+            return {'error': f'Model not found: {model_id}.xml'}
+        
+        model = cobra.io.read_sbml_model(model_path)
+    
+    # 设置目标函数
+    if objective:
+        if objective in model.reactions:
+            model.objective = objective
+        else:
+            return {'error': f'Objective reaction not found: {objective}'}
+    
+    # 运行FBA
+    solution = model.optimize()
+    
+    if solution.status != 'optimal':
+        return {'error': f'FBA failed: {solution.status}'}
+    
+    # 收集结果
+    fluxes = {}
+    for r in model.reactions:
+        flux = solution.fluxes[r.id]
+        if abs(flux) > 1e-10:  # 只返回非零通量
+            fluxes[r.id] = round(flux, 6)
+    
+    # 影子价格（代谢物）
+    shadow_prices = {}
+    for m in model.metabolites:
+        price = solution.shadow_prices[m.id]
+        if abs(price) > 1e-10:
+            shadow_prices[m.id] = round(price, 6)
+    
+    return {
+        'objective_value': round(solution.objective_value, 6),
+        'status': solution.status,
+        'fluxes': fluxes,
+        'shadow_prices': shadow_prices,
+        'model_id': model_id,
+        'objective': str(model.objective),
+    }
+
+
+def op_gene_knockout(args):
+    """基因敲除分析：预测基因敲除对生长的影响。"""
+    import cobra
+    
+    model_id = args.get('model_id', 'ecoli_core_model')
+    gene = args.get('gene')
+    
+    if not gene:
+        return {'error': 'Gene ID required'}
+    
+    # 加载模型
+    if model_id == 'textbook' or model_id == 'e_coli_core':
+        # 使用COBRApy自带的模型
+        model = cobra.io.load_model('textbook')
+    else:
+        model_dir = os.path.join(os.path.dirname(__file__), '..', 'data', 'models')
+        model_path = os.path.join(model_dir, f'{model_id}.xml')
+        
+        if not os.path.exists(model_path):
+            return {'error': f'Model not found: {model_id}.xml'}
+        
+        model = cobra.io.read_sbml_model(model_path)
+    
+    # 检查基因是否存在
+    gene_obj = model.genes.get_by_id(gene)
+    if not gene_obj:
+        return {'error': f'Gene not found: {gene}'}
+    
+    # 野生型FBA
+    wt_solution = model.optimize()
+    wt_growth = wt_solution.objective_value
+    
+    # 基因敲除
+    with model:
+        gene_obj.knock_out()
+        ko_solution = model.optimize()
+        ko_growth = ko_solution.objective_value
+    
+    # 计算影响
+    growth_change = ko_growth - wt_growth
+    growth_percent = (growth_change / wt_growth * 100) if wt_growth > 0 else 0
+    
+    # 判断必需性
+    is_essential = ko_growth < 1e-6  # 生长率接近0
+    
+    return {
+        'gene': gene,
+        'gene_name': gene_obj.name,
+        'model_id': model_id,
+        'wild_type_growth': round(wt_growth, 6),
+        'knockout_growth': round(ko_growth, 6),
+        'growth_change': round(growth_change, 6),
+        'growth_change_percent': round(growth_percent, 2),
+        'is_essential': is_essential,
+        'essentiality': 'essential' if is_essential else ('reduced' if growth_percent < -10 else 'non-essential'),
+    }
+
+
+def op_pathway_search(args):
+    """代谢通路搜索：在KEGG数据库中搜索代谢通路。"""
+    from kegg_client import search_pathways
+    
+    target_metabolite = args.get('target_metabolite')
+    organism = args.get('organism', 'eco')
+    limit = args.get('limit', 10)
+    
+    if not target_metabolite:
+        return {'error': 'Target metabolite required'}
+    
+    pathways = search_pathways(target_metabolite, organism, limit)
+    
+    return {
+        'target_metabolite': target_metabolite,
+        'organism': organism,
+        'pathways': pathways,
+        'count': len(pathways),
+    }
+
+
+def op_pathway_design(args):
+    """代谢通路设计：设计异源代谢通路。"""
+    from kegg_client import design_pathway
+    
+    target_product = args.get('target_product')
+    host_organism = args.get('host_organism', 'eco')
+    strategy = args.get('strategy', 'shortest')
+    
+    if not target_product:
+        return {'error': 'Target product required'}
+    
+    result = design_pathway(target_product, host_organism, strategy)
+    
+    return result
+
+
 def op_fig_qa(args):
     """绘图环境自检：CJK 字体可用性 + 期刊预设应用测试。
 
@@ -759,6 +1017,11 @@ OPS = {
     'fig_export': op_fig_export,
     'fig_qa': op_fig_qa,
     'env_status': op_env_status,
+    'metabolic_model': op_metabolic_model,
+    'fba': op_fba,
+    'gene_knockout': op_gene_knockout,
+    'pathway_search': op_pathway_search,
+    'pathway_design': op_pathway_design,
 }
 
 

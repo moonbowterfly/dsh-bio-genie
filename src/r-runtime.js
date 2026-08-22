@@ -2,10 +2,10 @@
  * dsh-bio-genie — R 环境运行时（零依赖自举，镜像 runtime.js 的 Python 引导器模型）
  *
  *   $DSH_HOME/dsh-bio-genie/
- *     r/R-4.6.0/          静默安装的 R（官方 CRAN 安装器，失败自动切清华镜像）
+ *     r/R-4.6.1/          静默安装的 R（官方 CRAN 安装器，失败自动切清华镜像）
  *     r-lib/              私有 R 包库（BiocManager 安装核心包集，官方→清华镜像）
  *
- * 固定版本对：R 4.6.0 ↔ Bioconductor 3.23（见 THIRD_PARTY_NOTICES.md）。
+ * 固定版本对：R 4.6.1 ↔ Bioconductor 3.23（见 THIRD_PARTY_NOTICES.md）。
  * 许可模型：所有 R/CRAN/Bioc 软件均运行时从官方仓库下载安装到用户私有目录，
  * 插件仓库只分发包名清单与原创 R 脚本（MIT）——不复制不分发任何第三方源码。
  *
@@ -27,8 +27,8 @@ import os from 'node:os'
 /** 插件随包分发的 R payload 目录（r_bridge.R / install_packages.R / requirements-r.txt）。 */
 export const PLUGIN_R_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'r')
 
-/** 固定 R 版本（Bioconductor 3.23 配套 R 4.6，锁定不漂移）。 */
-export const R_VERSION = '4.6.0'
+/** 固定 R 版本（Bioconductor 3.23 配套 R 4.6.1，锁定不漂移）。 */
+export const R_VERSION = '4.6.1'
 
 const CRAN_OFFICIAL = 'https://cran.r-project.org'
 const CRAN_MIRROR = 'https://mirrors.tuna.tsinghua.edu.cn/CRAN'
@@ -51,11 +51,62 @@ export function rInstallDir() {
   return join(rRoot(), 'r')
 }
 
-/** Rscript 路径：用户显式配置优先，否则插件私有安装。
+/** Rscript 路径：用户显式配置优先 → 插件私有安装 → 系统 R 检测 → 引导安装。
  *  实测注意：R 安装器直接解压到 /DIR 根（无 R-<ver> 子目录）→ r/bin/Rscript.exe。 */
 export function rscriptPath(config = {}) {
   if (config.rscriptPath) return resolve(config.rscriptPath)
-  return join(rInstallDir(), 'bin', 'Rscript.exe')
+  // 插件私有安装优先
+  const privateR = join(rInstallDir(), 'bin', 'Rscript.exe')
+  if (existsSync(privateR)) return privateR
+  // 检测系统 R
+  const systemR = detectSystemR()
+  if (systemR) return systemR
+  // 返回默认路径（引导时会创建）
+  return privateR
+}
+
+/** 检测系统已安装的 R（Windows 常见路径）。
+ *  返回 Rscript.exe 路径或 null。
+ *  优先级：环境变量 R_HOME > PATH > 常见安装路径。 */
+export function detectSystemR() {
+  if (process.platform !== 'win32') return null
+  
+  // 1. 环境变量 R_HOME
+  const rHome = process.env.R_HOME
+  if (rHome) {
+    const script = join(rHome, 'bin', 'x64', 'Rscript.exe')
+    if (existsSync(script)) return script
+    const script32 = join(rHome, 'bin', 'Rscript.exe')
+    if (existsSync(script32)) return script32
+  }
+  
+  // 2. PATH 中的 Rscript
+  const pathVar = process.env.PATH || ''
+  for (const dir of pathVar.split(';')) {
+    const script = join(dir, 'Rscript.exe')
+    if (existsSync(script)) return script
+  }
+  
+  // 3. 常见安装路径（只检查最常见位置，不递归扫描）
+  const commonPaths = [
+    'C:/Program Files/R',
+    'C:/Program Files (x86)/R',
+    join(os.homedir(), 'AppData', 'Local', 'Programs', 'R'),
+  ]
+  
+  for (const basePath of commonPaths) {
+    try {
+      // 只检查 R-4.x.x 格式的目录
+      const dirs = readdirSync(basePath).filter((d) => /^R-\d+\.\d+\.\d+$/.test(d))
+      // 取第一个匹配（通常是最新安装）
+      if (dirs.length > 0) {
+        const script = join(basePath, dirs[0], 'bin', 'x64', 'Rscript.exe')
+        if (existsSync(script)) return script
+      }
+    } catch { /* 目录不存在或无权限 */ }
+  }
+  
+  return null
 }
 
 /** 私有 R 包库目录。 */
@@ -245,11 +296,10 @@ let rBootstrapLock = Promise.resolve()
 let rCachedMeta = null
 let rCachedKey = null
 
-/**
- * 确保 R 环境就绪（幂等）。
+/** 确保 R 环境就绪（幂等）。
  * @param {object} config 插件配置（rscriptPath / rLibDir 可覆盖默认私有路径）
  * @param {{force?: boolean}} [opts] force=true 时重新探测/引导
- * @returns {Promise<object>} {ready, rscript, rVersion, bioc, packages, libDir, bootstrapped, error?, logs?}
+ * @returns {Promise<object>} {ready, rscript, rVersion, bioc, packages, libDir, bootstrapped, source?, error?, logs?}
  */
 export async function ensureREnvironment(config = {}, { force = false } = {}) {
   const rscript = rscriptPath(config)
@@ -261,6 +311,8 @@ export async function ensureREnvironment(config = {}, { force = false } = {}) {
       return { ...rCachedMeta, bootstrapped: false, cached: true }
     }
     if (existsSync(rscript)) {
+      // 检测 R 来源（系统 R vs 插件私有）
+      const isSystemR = rscript !== join(rInstallDir(), 'bin', 'Rscript.exe')
       // force=true：强制重装核心包集（R 本体不重装；包级幂等安装器）
       if (force) {
         try { installCorePackages(config) } catch { /* 失败不影响下方探测 */ }
@@ -272,6 +324,7 @@ export async function ensureREnvironment(config = {}, { force = false } = {}) {
           const out = {
             ready: true, rscript, rVersion: meta.r, bioc: meta.bioc,
             packages: meta.packages, libDir: lib, bootstrapped: false,
+            source: isSystemR ? 'system' : 'private',
           }
           rCachedMeta = out
           rCachedKey = key
@@ -286,6 +339,7 @@ export async function ensureREnvironment(config = {}, { force = false } = {}) {
             const out = {
               ready: true, rscript, rVersion: meta2.r, bioc: meta2.bioc,
               packages: meta2.packages, libDir: lib, bootstrapped: false,
+              source: isSystemR ? 'system' : 'private',
             }
             rCachedMeta = out
             rCachedKey = key
@@ -310,6 +364,7 @@ export async function ensureREnvironment(config = {}, { force = false } = {}) {
         const out = {
           ready: true, rscript, rVersion: meta.r, bioc: meta.bioc,
           packages: meta.packages, libDir: lib, bootstrapped: true,
+          source: 'bootstrap',
           logs: logs.join(String.fromCharCode(10)),
         }
         rCachedMeta = out

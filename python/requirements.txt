@@ -26,3 +26,10 @@ pandas>=2.0
 scipy>=1.10
 seaborn>=0.13
 Pillow>=10.0
+# 代谢通路设计（2026-08-22 新增，支持代谢网络建模与通量平衡分析）：
+#  - cobra:    代谢网络约束基础建模（FBA/FVA/基因敲除分析）
+#  - libsbml:  SBML 格式支持（cobra 依赖）
+#  - requests: HTTP 请求（KEGG/MetaCyc API 查询）
+cobra>=0.32.0
+libsbml>=5.20
+requests>=2.28

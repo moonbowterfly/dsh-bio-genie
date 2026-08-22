@@ -158,13 +158,13 @@ This plugin also ships a **dsh agent preset** — `bio-genie` — that turns the
 
 ### What it is
 
-- **Persona files** (`preset/bio-genie/preset.yml` + `agent.cordis.yml`) — override the base persona, telling AI: "you have 21 tools + 33 skills + two engines at hand".
+- **Persona files** (`preset/bio-genie/preset.yml` + `agent.cordis.yml`) — override the base persona, telling AI: "you have 23 tools + 51 skills + two engines at hand".
 - **Onboarding mantra** (`skills/dsh-bio-genie-expert.md`) — a meta-skill: "1. Inspect workspace → 2. Pick tool / `bio_python` / `bio_r` → 3. Fail by ACR three-layer repair → 4. Report with traceable chain".
 - **One-shot install**: `pnpm install` runs postinstall hook to copy the preset to `~/.dsh/.agent-presets/bio-genie/`; no manual steps.
 
 ### What it is **not**
 
-- ❌ **Does NOT own the 21 tools** — every `bio_*` tool is still injected by the plugin's `cordis.patch.yml`; the preset **does not redeclare** any tool to avoid conflicts.
+- ❌ **Does NOT own the 23 tools** — every `bio_*` tool is still injected by the plugin's `cordis.patch.yml`; the preset **does not redeclare** any tool to avoid conflicts.
 - ❌ **Does NOT change the default persona** — after postinstall, "生物基因精灵" appears in dsh's preset selector; users **actively pick** it to activate. `agent-presets.default` is **not** changed to `bio-genie`.
 - ❌ **Does NOT break other plugins** — presets and plugins are two independent seams in dsh; they coexist without conflict.
 

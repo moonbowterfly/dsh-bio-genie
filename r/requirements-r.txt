@@ -26,3 +26,6 @@ fgsea
 phyloseq
 ggtree
 ComplexHeatmap
+# ---- Tier 1 轻量增强包（2026-08-18 新增，CRAN 二进制安全）----
+msigdbr
+Rtsne

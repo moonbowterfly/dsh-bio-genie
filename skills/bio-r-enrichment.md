@@ -2,9 +2,9 @@
 language: r
 ---
 
-# R 富集与 GSEA（fgsea）
+# R 富集与 GSEA（fgsea + msigdbr）
 
-> 来源：fgsea 官方 vignette（原创整理）。**分工原则**：基因列表（阈值截断）→ 用 Python `bio_enrichr`（更快、已内置限流缓存）；**排序数据（全基因组 log2FC 等）→ 用本 skill 的 fgsea**——GSEA 不丢信息、能检出整体弱趋势，是 Python 侧缺失的能力。
+> 来源：fgsea 官方 vignette + msigdbr 官方 vignette（原创整理）。**分工原则**：基因列表（阈值截断）→ 用 Python `bio_enrichr`（更快、已内置限流缓存）；**排序数据（全基因组 log2FC 等）→ 用本 skill 的 fgsea**——GSEA 不丢信息、能检出整体弱趋势，是 Python 侧缺失的能力。
 
 ## 边界（诚实告知）
 
@@ -12,8 +12,9 @@ language: r
   Windows 下装不上（enrichGO/gseGO 一并不可用）。R 侧富集引擎 = **fgsea**（排序 GSEA）；
   基因列表 ORA 一律走 Python `bio_enrichr`（内置 GO/KEGG/Reactome 库，更快）。
 - 核心包集也**不含** org.Hs.eg.db / org.Mm.eg.db（物种注释库，体积大）。
-- fgsea 需要**用户提供基因集**（GMT 风格 data.frame 或 MSigDB GMT 文件）——MSigDB 的
-  GMT 文件可从官网下载到工作区后读入。
+- ~~fgsea 需要**用户提供基因集**（GMT 风格 data.frame 或 MSigDB GMT 文件）~~
+  **已解决**：`msigdbr` 包（v26.1.0）内置 MSigDB 全部基因集，按物种/分类即时查询，
+  无需手动下载 GMT。详见 `bio-r-genesets` skill。
 
 ## fgsea 标准管道（排序 GSEA）
 

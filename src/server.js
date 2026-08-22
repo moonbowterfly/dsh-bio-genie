@@ -22,12 +22,113 @@
  * @module dsh-bio-genie/server
  */
 import { spawn } from 'node:child_process'
+import { join as pathJoin } from 'node:path'
 import { venvPython, resolveEnvDir, bioEnvExists } from './runtime.js'
 import { rscriptPath as rscriptPathFn, rLibDir as rLibDirFn, rSpawnEnv } from './r-runtime.js'
 import { listSkillsForPanel } from './skills.js'
 
 /** 路由前缀（与 @linxin666/dsh-client-ui-web-ui-settings 同风格）。 */
 const ROUTE_PREFIX = '/api/dsh-bio-genie'
+/** 工具调试面板的参数 schema（与 client.js 共用）。 */
+const TOOL_SCHEMAS = [
+  { name: 'seq_analyze', label: '序列分析', engine: 'python', params: [
+    { key: 'sequence', type: 'text', required: true, placeholder: 'ATGCGATCGATCG...', desc: '核酸或蛋白质序列' },
+    { key: 'seq_type', type: 'select', options: ['auto','dna','rna','protein'], default: 'auto', desc: '序列类型' },
+  ]},
+  { name: 'seq_translate', label: '序列翻译', engine: 'python', params: [
+    { key: 'sequence', type: 'text', required: true, placeholder: 'ATGCGATCG...', desc: 'DNA/RNA 序列' },
+    { key: 'table', type: 'number', default: 1, desc: '遗传密码表编号' },
+    { key: 'to_stop', type: 'boolean', default: false, desc: '遇到终止密码子停止' },
+  ]},
+  { name: 'seq_gc_skew', label: 'GC Skew', engine: 'python', params: [
+    { key: 'sequence', type: 'text', required: true, placeholder: 'ATGCGATCG...', desc: 'DNA 序列' },
+    { key: 'window', type: 'number', default: 100, desc: '窗口大小' },
+  ]},
+  { name: 'seq_find_orf', label: 'ORF 查找', engine: 'python', params: [
+    { key: 'sequence', type: 'text', required: true, placeholder: 'ATGCGATCG...', desc: 'DNA 序列' },
+    { key: 'min_len', type: 'number', default: 30, desc: '最小 ORF 长度' },
+  ]},
+  { name: 'seq_kmer', label: 'K-mer 统计', engine: 'python', params: [
+    { key: 'sequence', type: 'text', required: true, placeholder: 'ATGCGATCG...', desc: '核酸序列' },
+    { key: 'k', type: 'number', default: 3, desc: 'k 值' },
+    { key: 'top', type: 'number', default: 10, desc: '返回前 N 个' },
+  ]},
+  { name: 'seq_restriction', label: '限制酶切', engine: 'python', params: [
+    { key: 'sequence', type: 'text', required: true, placeholder: 'ATGCGAATTCGATCG...', desc: 'DNA 序列' },
+    { key: 'enzymes', type: 'text', placeholder: 'EcoRI,BamHI', desc: '酶名列表（逗号分隔）' },
+    { key: 'linear', type: 'boolean', default: true, desc: '线性分子' },
+  ]},
+  { name: 'entrez_search', label: 'NCBI 检索', engine: 'python', params: [
+    { key: 'term', type: 'text', required: true, placeholder: 'TP53[Gene Name] AND human[Organism]', desc: '检索式' },
+    { key: 'db', type: 'select', options: ['nucleotide','gene','protein'], default: 'nucleotide', desc: '数据库' },
+    { key: 'retmax', type: 'number', default: 5, desc: '最大返回数' },
+  ]},
+  { name: 'enrichr', label: 'Enrichr 富集', engine: 'python', params: [
+    { key: 'genes', type: 'text', required: true, placeholder: 'TP53,BRCA1,EGFR', desc: '基因列表（逗号分隔）' },
+    { key: 'library', type: 'text', default: 'GO_Biological_Process_2023', desc: '富集库' },
+    { key: 'top', type: 'number', default: 10, desc: '返回前 N 条' },
+  ]},
+  { name: 'pubmed_search', label: 'PubMed 检索', engine: 'python', params: [
+    { key: 'term', type: 'text', required: true, placeholder: 'CRISPR gene editing', desc: '检索式' },
+    { key: 'retmax', type: 'number', default: 10, desc: '最大返回数' },
+  ]},
+  { name: 'metabolic_model', label: '代谢模型', engine: 'python', params: [
+    { key: 'action', type: 'select', options: ['list','load','info'], default: 'list', desc: '操作类型' },
+    { key: 'model_id', type: 'text', default: 'textbook', desc: '模型 ID' },
+  ]},
+  { name: 'fba', label: 'FBA 分析', engine: 'python', params: [
+    { key: 'model_id', type: 'text', default: 'textbook', desc: '模型 ID' },
+    { key: 'objective', type: 'text', placeholder: 'Biomass_Ecoli_core', desc: '目标函数（可选）' },
+  ]},
+  { name: 'gene_knockout', label: '基因敲除', engine: 'python', params: [
+    { key: 'model_id', type: 'text', default: 'textbook', desc: '模型 ID' },
+    { key: 'gene', type: 'text', required: true, placeholder: 'b2779', desc: '基因 ID' },
+  ]},
+  { name: 'pathway_search', label: '通路搜索', engine: 'python', params: [
+    { key: 'target_metabolite', type: 'text', required: true, placeholder: 'glycolysis', desc: '目标代谢物/关键词' },
+    { key: 'organism', type: 'text', default: 'eco', desc: '生物代码' },
+    { key: 'limit', type: 'number', default: 10, desc: '返回数量' },
+  ]},
+  { name: 'pathway_design', label: '通路设计', engine: 'python', params: [
+    { key: 'target_product', type: 'text', required: true, placeholder: 'ethanol', desc: '目标产物' },
+    { key: 'host_organism', type: 'text', default: 'eco', desc: '宿主生物' },
+    { key: 'strategy', type: 'select', options: ['shortest','max_yield','fewest_steps'], default: 'shortest', desc: '设计策略' },
+  ]},
+  { name: 'seq_io_read', label: '读取序列文件', engine: 'python', params: [
+    { key: 'path', type: 'text', required: true, placeholder: '/path/to/sequences.fasta', desc: '序列文件路径' },
+    { key: 'format', type: 'select', options: ['fasta','genbank'], default: 'fasta', desc: '文件格式' },
+    { key: 'limit', type: 'number', default: 50, desc: '最多返回记录数' },
+  ]},
+  { name: 'entrez_fetch', label: 'Entrez 下载', engine: 'python', params: [
+    { key: 'ids', type: 'text', required: true, placeholder: 'NM_007294', desc: 'NCBI ID（逗号分隔）' },
+    { key: 'db', type: 'select', options: ['nucleotide','gene','protein'], default: 'nucleotide', desc: '数据库' },
+    { key: 'rettype', type: 'select', options: ['fasta','gb'], default: 'fasta', desc: '返回格式' },
+  ]},
+  { name: 'pubmed_abstract', label: 'PubMed 摘要', engine: 'python', params: [
+    { key: 'ids', type: 'text', required: true, placeholder: '42603971', desc: 'PMID（逗号分隔）' },
+  ]},
+  { name: 'ref_genome', label: '参考基因组', engine: 'python', params: [
+    { key: 'species', type: 'text', required: true, placeholder: 'human', desc: '物种名' },
+  ]},
+  { name: 'fig_profile', label: '数据剖析', engine: 'python', params: [
+    { key: 'path', type: 'text', required: true, placeholder: '/path/to/data.csv', desc: '数据文件路径' },
+    { key: 'group_cols', type: 'text', placeholder: 'group,condition', desc: '分组列（逗号分隔）' },
+  ]},
+  { name: 'fig_export', label: '图文件审计', engine: 'python', params: [
+    { key: 'paths', type: 'text', required: true, placeholder: 'fig1.pdf,fig1.png', desc: '图文件路径（逗号分隔）' },
+    { key: 'min_dpi', type: 'number', default: 300, desc: '最低 DPI' },
+    { key: 'preview', type: 'boolean', default: false, desc: '生成 PNG 预览' },
+  ]},
+  { name: 'fig_qa', label: '绘图环境检查', engine: 'python', params: [
+    { key: 'lang', type: 'select', options: ['zh','en'], default: 'zh', desc: '目标语言' },
+    { key: 'journal', type: 'select', options: ['nature','science','ieee','general'], default: 'nature', desc: '期刊预设' },
+  ]},
+  { name: 'env_status', label: 'Python 环境', engine: 'python', params: [] },
+  { name: 'bio_r_env', label: 'R 环境检查', engine: 'python', params: [
+    { key: 'action', type: 'select', options: ['status','install','reinstall'], default: 'status', desc: '操作类型' },
+  ]},
+]
+
 
 /** 单端点执行上限（ms）。pip freeze 在冷启动 venv 内通常 <2s，留 10x 余量。 */
 const HARD_TIMEOUT_MS = 20_000
@@ -102,13 +203,15 @@ async function readJsonBody(req) {
 /**
  * 通用子进程执行器：spawn(cmd, args, env) 收集 stdout/stderr；
  * 超时或非 0 退出码视为失败。Windows 上 windowsHide + 不创建控制台窗口。
+ * options.stdin：可选，写入子进程 stdin 的字符串数据。
  */
 function runSubprocess(cmd, args, options = {}) {
   return new Promise((resolve) => {
+    const useStdin = typeof options.stdin === 'string'
     const child = spawn(cmd, args, {
       ...options,
       windowsHide: true,
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: [useStdin ? 'pipe' : 'ignore', 'pipe', 'pipe'],
     })
     let stdout = ''
     let stderr = ''
@@ -121,6 +224,11 @@ function runSubprocess(cmd, args, options = {}) {
     }, HARD_TIMEOUT_MS)
     child.stdout?.on('data', (b) => { stdout += b.toString('utf8') })
     child.stderr?.on('data', (b) => { stderr += b.toString('utf8') })
+    // 写入 stdin 数据（用于 bio_ops.py 等通过 stdin 接收 JSON 的工具）
+    if (useStdin && child.stdin) {
+      child.stdin.write(options.stdin)
+      child.stdin.end()
+    }
     child.on('error', (err) => {
       if (settled) return
       settled = true
@@ -264,6 +372,84 @@ async function handleSkills(req, res) {
   writeJson(res, 200, { ok: true, value: listSkillsForPanel() })
 }
 
+/** 工具 schema 端点：返回所有可调试工具的参数定义。 */
+async function handleToolSchemas(req, res) {
+  writeJson(res, 200, { ok: true, value: TOOL_SCHEMAS })
+}
+
+/**
+ * 工具执行端点（POST）：接收 { op, args }，通过子进程调用 bio_ops.py（Python）
+ * 或 r_bridge.R（R），返回 { ok, result | error }。
+ *
+ * 执行超时 60s（代谢通路设计等网络操作可能较慢）。
+ */
+async function handleExecuteTool(req, res, config) {
+  const body = req.body
+  if (!body || typeof body.op !== 'string') {
+    return writeJson(res, 400, { ok: false, code: 'bad-request', message: '缺少 op 字段' })
+  }
+  const op = body.op
+  const args = body.args || {}
+  const isROp = typeof op === 'string' && op.startsWith('r:')
+
+  if (isROp) {
+    // R 操作：通过 r_bridge.R 执行
+    const rscript = rscriptPathFn(config)
+    const rlib = rLibDirFn(config)
+    if (!rscript) {
+      return writeJson(res, 200, { ok: false, code: 'env-not-ready', message: 'R 环境未就绪' })
+    }
+    const os = await import('node:os')
+    const fs = await import('node:fs')
+    const realOp = op.slice(2) // 去掉 'r:' 前缀
+    const tmp = pathJoin(os.tmpdir(), `dsh-bio-genie-tool-${process.pid}-${Date.now()}.R`)
+    const rCode = `result <- tryCatch({ library(jsonlite); source(file.path(Sys.getenv("DSH_BIO_RLIB"), "..", "..", "dsh-bio-genie", "r", "r_bridge.R")); cat(toJSON(r_bridge_execute(list(op="${realOp}", args=toJSON(args))), auto_unbox=TRUE), "\\n") }, error=function(e) cat(jsonlite::toJSON(list(ok=FALSE, error=conditionMessage(e)), auto_unbox=TRUE), "\\n"))\\n`
+    // 简化：直接通过 stdin JSON 调用 r_bridge.R
+    const rBridgePath = pathJoin(process.env.HOME || process.env.USERPROFILE, '.dsh', 'dsh-bio-genie', 'r', 'r_bridge.R')
+    const bridgeExists = fs.existsSync(rBridgePath)
+    if (!bridgeExists) {
+      return writeJson(res, 200, { ok: false, code: 'r-bridge-not-found', message: `R bridge 不存在: ${rBridgePath}` })
+    }
+    // 写临时输入 JSON
+    const inputJson = JSON.stringify({ op: realOp, args })
+    const inputTmp = pathJoin(os.tmpdir(), `dsh-bio-genie-tool-input-${process.pid}-${Date.now()}.json`)
+    fs.writeFileSync(inputTmp, inputJson, 'utf8')
+    const env = { ...rSpawnEnv(rlib), DSH_BIO_RLIB: rlib }
+    const result = await runSubprocess(rscript, ['--vanilla', '--file', rBridgePath], { env })
+    try { fs.unlinkSync(inputTmp) } catch { /* ignore */ }
+    if (!result.ok) {
+      return writeJson(res, 200, { ok: false, code: result.code, message: `R 执行失败: ${result.stderr.slice(0, 500)}` })
+    }
+    const lastLine = result.stdout.trim().split(/\r?\n/).pop() || ''
+    try {
+      const parsed = JSON.parse(lastLine)
+      writeJson(res, 200, parsed)
+    } catch (err) {
+      writeJson(res, 200, { ok: false, code: 'parse-failed', message: `R 输出解析失败: ${err.message}`, stdout: result.stdout.slice(-500) })
+    }
+    return
+  }
+
+  // Python 操作：通过 bio_ops.py 执行
+  const envDir = resolveEnvDir(config.pythonEnvDir)
+  const py = venvPython(envDir)
+  if (!bioEnvExists(config)) {
+    return writeJson(res, 200, { ok: false, code: 'env-not-ready', message: 'Python 环境未就绪' })
+  }
+  const opsPath = pathJoin(process.env.HOME || process.env.USERPROFILE, '.dsh', 'profiles', 'web', 'node_modules', '@dsh-bio', 'dsh-bio-genie', 'python', 'bio_ops.py')
+  const payload = JSON.stringify({ op, args })
+  const result = await runSubprocess(py, ['-I', opsPath], { stdin: payload })
+  if (!result.ok) {
+    return writeJson(res, 200, { ok: false, code: result.code, message: `Python 执行失败: ${result.stderr.slice(0, 500)}` })
+  }
+  try {
+    const parsed = JSON.parse(result.stdout.trim())
+    writeJson(res, 200, parsed)
+  } catch (err) {
+    writeJson(res, 200, { ok: false, code: 'parse-failed', message: `Python 输出解析失败: ${err.message}`, stdout: result.stdout.slice(-500) })
+  }
+}
+
 /**
  * 路由注册入口：被 src/index.js 的 apply() 在 cordis ctx.webServer 可用时调用。
  * 路由 kind: 'exact'（精确路径匹配，模仿 web-ui-settings 的做法）。
@@ -294,6 +480,8 @@ export function registerApiRoutes(ctx, config = {}) {
     { kind: 'exact', path: `${ROUTE_PREFIX}/python-packages`, handler: guard((req, res) => handlePythonPackages(req, res, config)) },
     { kind: 'exact', path: `${ROUTE_PREFIX}/r-packages`,      handler: guard((req, res) => handleRPackages(req, res, config)) },
     { kind: 'exact', path: `${ROUTE_PREFIX}/skills`,          handler: guard((req, res) => handleSkills(req, res)) },
+    { kind: 'exact', path: `${ROUTE_PREFIX}/tool-schemas`,    handler: guard((req, res) => handleToolSchemas(req, res)) },
+    { kind: 'exact', path: `${ROUTE_PREFIX}/execute-tool`,    handler: guard((req, res) => handleExecuteTool(req, res, config)) },
   ]) {
     disposers.push(ctx.webServer.register(route))
   }

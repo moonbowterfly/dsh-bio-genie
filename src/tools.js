@@ -38,11 +38,11 @@ async function requireEnv(config) {
   return env.python
 }
 
-/** 确保 R 环境就绪；失败抛错（首次引导下载 R + 核心包，约 5-20 分钟）。 */
+/** 确保 R 环境就绪；失败抛错（用户需先运行 bio_r_env action=install 安装 R）。 */
 async function requireREnv(config) {
   const env = await ensureREnvironment(config)
   if (!env.ready || !env.rscript) {
-    throw new Error(`dsh-bio R 环境引导失败: ${env.error ?? 'unknown'}（可运行 bio_r_env 查看详情；首次引导约 5-20 分钟）`)
+    throw new Error(`dsh-bio R 环境未就绪: ${env.error ?? 'unknown'}（请先运行 bio_r_env action=install 安装 R 语言）`)
   }
   return env
 }
@@ -205,13 +205,15 @@ export function registerTools(ctx, config) {
   disposers.push(ctx.tools.register(defineTool({
     name: 'bio_r',
     description:
-      '运行一段 R 程序，使用插件内置的 R 4.6 + Bioconductor 3.23 环境完成统计分析。' +
-      '可用包：DESeq2/edgeR/limma（差异表达）、fgsea（GSEA 排序富集）、' +
+      '运行一段 R 程序，使用内置 R 4.6 + Bioconductor 3.23 环境完成统计分析。' +
+      '⚠️ 首次使用需先运行 bio_r_env action=install 安装 R 语言（约 5-10 分钟）。' +
+      '可用包：DESeq2/edgeR/limma（差异表达）、fgsea+msigdbr（GSEA 排序富集 + MSigDB 基因集，免手动 GMT）、' +
       'phyloseq（微生物组）、Biostrings/GenomicRanges/SummarizedExperiment、' +
+      'Rtsne（t-SNE 降维聚类）、' +
       'ggplot2/ggtree/ComplexHeatmap（可视化）、dplyr/tibble/readr（数据处理）。' +
       '把完整 R 程序写在 code 参数；print/cat 输出返回在 stdout；给顶层变量 result 赋一个 JSON 可序列化值可结构化返回。' +
       '工作目录为会话工作区（workdir 可覆盖）。适合差异表达、GSEA、微生物组多样性、R 生态绘图等（与 bio_python 分工见 dsh-bio-genie 主 skill）。' +
-      '触发词：DESeq2、edgeR、limma、差异表达、GSEA、fgsea、phyloseq、ggplot2、ggtree、ComplexHeatmap、R语言。',
+      '触发词：DESeq2、edgeR、limma、差异表达、GSEA、fgsea、msigdbr、MSigDB、基因集、phyloseq、Rtsne、t-SNE、降维、聚类、ggplot2、ggtree、ComplexHeatmap、R语言。',
     parameters: {
       code: { type: 'string', required: true, description: '完整 R 源码。' },
       workdir: { type: 'string', description: '工作目录（绝对路径，或相对默认工作区的相对路径）。默认：会话工作区。' },
@@ -333,11 +335,11 @@ export function registerTools(ctx, config) {
   disposers.push(ctx.tools.register(defineTool({
     name: 'bio_r_env',
     description:
-      '检查内置 R 环境：R 版本、Bioconductor 版本、核心包版本（DESeq2/fgsea/phyloseq/ggplot2 等）与私有库目录。' +
-      '用于诊断 R 包 import/加载失败。reinstall=true 时重新安装核心包集（R 本体不重装）。' +
-      '触发词：R环境、R版本、Bioconductor版本、R包缺失。',
+      '检查/安装内置 R 环境：R 版本、Bioconductor 版本、核心包版本（DESeq2/fgsea/phyloseq/ggplot2 等）与私有库目录。' +
+      'action=status 快速检查（不等待包探测）；action=install 安装 R 语言（首次约 5-10 分钟）；action=reinstall 重建核心包集。' +
+      '触发词：R环境、R版本、Bioconductor版本、R包缺失、安装R。',
     parameters: {
-      reinstall: { type: 'boolean', description: '重新安装核心包集（默认 false；R 本体不重装）' },
+      action: { type: 'string', enum: ['status', 'install', 'reinstall'], description: 'status=快速检查（默认）；install=安装 R 语言；reinstall=重建核心包集' },
     },
     output: {
       schema: {
@@ -351,25 +353,49 @@ export function registerTools(ctx, config) {
           packages: { type: 'object', additionalProperties: true },
           libDir: { type: 'string', required: true },
           bootstrapped: { type: 'boolean', required: true },
+          source: { type: 'string', description: 'R 来源：system=系统 R / private=插件私有 / bootstrap=引导安装' },
         },
       },
       render: (_args, value) => [{
         type: 'text',
         text: value.ready
-          ? `R 环境就绪（R ${value.rVersion ?? '?'} / Bioconductor ${value.bioc ?? '?'}）：${value.rscript}`
-          : 'R 环境未就绪：请检查网络后重试，或运行 bio_r_env reinstall=true 重建核心包集。',
+          ? `R 环境就绪（R ${value.rVersion ?? '?'} / Bioconductor ${value.bioc ?? '?'}，来源: ${value.source ?? 'unknown'}）：${value.rscript}`
+          : 'R 环境未就绪：请运行 bio_r_env action=install 安装 R 语言。',
       }],
     },
     async execute(args) {
-      const env = await ensureREnvironment(config, { force: args.reinstall === true })
+      const action = args.action ?? 'status'
+      
+      if (action === 'install' || action === 'reinstall') {
+        // 显式安装：调用 ensureREnvironment 触发完整引导
+        const env = await ensureREnvironment(config, { force: true })
+        return {
+          ready: env.ready === true,
+          rscript: env.rscript ?? null,
+          rVersion: env.rVersion ?? null,
+          bioc: env.bioc ?? null,
+          packages: env.packages ?? null,
+          libDir: env.libDir,
+          bootstrapped: env.bootstrapped === true,
+          source: env.source ?? null,
+        }
+      }
+      
+      // status：快速检查（不等待包探测）
+      const rscript = rscriptPath(config)
+      const lib = rLibDir(config)
+      const exists = existsSync(rscript)
+      const isSystemR = exists && rscript !== join(rInstallDir(), 'bin', 'Rscript.exe')
+      
       return {
-        ready: env.ready === true,
-        rscript: env.rscript ?? null,
-        rVersion: env.rVersion ?? null,
-        bioc: env.bioc ?? null,
-        packages: env.packages ?? null,
-        libDir: env.libDir,
-        bootstrapped: env.bootstrapped === true,
+        ready: exists,
+        rscript: exists ? rscript : null,
+        rVersion: null,  // 不等待探测
+        bioc: null,
+        packages: null,
+        libDir: lib,
+        bootstrapped: false,
+        source: isSystemR ? 'system' : (exists ? 'private' : null),
       }
     },
   })))
@@ -695,6 +721,76 @@ function semanticTools(config) {
         journal: { type: 'string', enum: ['nature', 'science', 'ieee', 'general'], description: '目标期刊预设，默认 nature' },
       },
       op: 'fig_qa',
+      timeoutMs: 120_000,
+    }),
+    // ---- 代谢通路设计（2026-08-22 新增，支持代谢网络建模与通量平衡分析）----
+    bioTool(config, {
+      name: 'bio_metabolic_model',
+      description:
+        '代谢模型管理：加载、查看、列出可用模型。action=list 列出可用模型，' +
+        'action=load 加载指定模型（默认 textbook，COBRApy 内置 E. coli core），action=info 显示模型详细信息。' +
+        '触发词：代谢模型、SBML、代谢网络、模型加载。',
+      parameters: {
+        action: { type: 'string', enum: ['list', 'load', 'info'], description: '操作类型，默认 list' },
+        model_id: { type: 'string', description: '模型标识，默认 textbook（COBRApy 内置）' },
+        file_path: { type: 'string', description: '自定义模型文件路径（可选）' },
+      },
+      op: 'metabolic_model',
+      timeoutMs: 120_000,
+    }),
+    bioTool(config, {
+      name: 'bio_fba',
+      description:
+        '通量平衡分析（FBA）：预测代谢通量分布。返回最优生长速率、主要反应通量、代谢物影子价格。' +
+        'model_id 指定模型（默认 textbook，COBRApy 内置 E. coli core），objective 可指定目标函数反应。' +
+        '触发词：FBA、通量平衡、代谢通量、生长速率预测。',
+      parameters: {
+        model_id: { type: 'string', description: '模型标识，默认 textbook（COBRApy 内置）' },
+        objective: { type: 'string', description: '目标函数反应 ID（可选，默认使用模型目标）' },
+      },
+      op: 'fba',
+      timeoutMs: 120_000,
+    }),
+    bioTool(config, {
+      name: 'bio_gene_knockout',
+      description:
+        '基因敲除分析：预测基因敲除对生长的影响。返回敲除后生长速率、变化百分比、必需性判断。' +
+        'model_id 默认 textbook（COBRApy 内置 E. coli core），gene 为基因 ID（如 b0002）。' +
+        '触发词：基因敲除、敲除分析、必需基因、基因必需性。',
+      parameters: {
+        model_id: { type: 'string', description: '模型标识，默认 textbook（COBRApy 内置）' },
+        gene: { type: 'string', required: true, description: '基因 ID，如 b0002' },
+      },
+      op: 'gene_knockout',
+      timeoutMs: 120_000,
+    }),
+    // ---- 代谢通路设计（2026-08-22 新增，基于KEGG数据库）----
+    bioTool(config, {
+      name: 'bio_pathway_search',
+      description:
+        '代谢通路搜索：在KEGG数据库中搜索代谢通路。target_metabolite 为目标代谢物，' +
+        'organism 为生物代码（默认 eco=E. coli），limit 为返回数量。' +
+        '触发词：代谢通路、通路搜索、KEGG通路、代谢途径。',
+      parameters: {
+        target_metabolite: { type: 'string', required: true, description: '目标代谢物，如 glucose' },
+        organism: { type: 'string', description: '生物代码，默认 eco（E. coli）' },
+        limit: { type: 'number', description: '返回通路数量，默认 10' },
+      },
+      op: 'pathway_search',
+      timeoutMs: 120_000,
+    }),
+    bioTool(config, {
+      name: 'bio_pathway_design',
+      description:
+        '代谢通路设计：设计异源代谢通路。target_product 为目标产物，' +
+        'host_organism 为宿主生物（默认 eco=E. coli），strategy 为设计策略。' +
+        '触发词：通路设计、代谢工程、异源通路、途径设计。',
+      parameters: {
+        target_product: { type: 'string', required: true, description: '目标产物，如 ethanol' },
+        host_organism: { type: 'string', description: '宿主生物，默认 eco（E. coli）' },
+        strategy: { type: 'string', enum: ['shortest', 'max_yield', 'fewest_steps'], description: '设计策略，默认 shortest' },
+      },
+      op: 'pathway_design',
       timeoutMs: 120_000,
     }),
   ]
