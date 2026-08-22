@@ -30,6 +30,7 @@ from ml_tools_3 import op_stats_test
 from dna_design import op_primer_design, op_seq_optimize
 from dna_design_2 import op_assembly_design, op_plasmid_map
 socket.setdefaulttimeout(20)
+from retry_utils import retry_on_network_error
 
 
 def _entrez():
@@ -286,6 +287,7 @@ def op_seq_kmer(args):
     }
 
 
+@retry_on_network_error(max_retries=2, delay=3)
 def op_entrez_search(args):
     """NCBI Entrez 检索：esearch + efetch 摘要。"""
     Entrez = _entrez()
@@ -355,6 +357,7 @@ def op_entrez_fetch(args):
     return {'db': db, 'rettype': rettype, 'data': text[:50000]}
 
 
+@retry_on_network_error(max_retries=2, delay=3)
 def op_enrichr(args):
     """Enrichr 通路/功能富集分析（maayanlab REST，两步：addList → enrich）。
 
@@ -427,6 +430,7 @@ def op_enrichr(args):
     }
 
 
+@retry_on_network_error(max_retries=2, delay=3)
 def op_pubmed_search(args):
     """PubMed 检索：esearch + esummary，返回 PMID/标题/年份/期刊/作者/DOI。"""
     Entrez = _entrez()
@@ -1040,6 +1044,21 @@ OPS = {
 }
 
 
+class SafeEncoder(json.JSONEncoder):
+    """自动处理 numpy/pandas 类型的 JSON 编码器，防止序列化崩溃。"""
+    def default(self, obj):
+        import numpy as np
+        if isinstance(obj, (np.integer,)):
+            return int(obj)
+        if isinstance(obj, (np.floating,)):
+            return float(obj)
+        if isinstance(obj, (np.bool_,)):
+            return bool(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super().default(obj)
+
+
 def main():
     try:
         # binary 读取 + 容错解码：任何输入字节都不会崩溃（与 bridge.py 一致）
@@ -1054,7 +1073,7 @@ def main():
             print(json.dumps({'ok': False, 'error': f'unknown op: {op}'}))
             return
         result = OPS[op](args)
-        print(json.dumps({'ok': True, 'result': result}, ensure_ascii=False))
+        print(json.dumps({'ok': True, 'result': result}, ensure_ascii=False, cls=SafeEncoder))
     except Exception as e:
         traceback.print_exc(file=sys.stderr)
         print(json.dumps({'ok': False, 'error': f'{type(e).__name__}: {e}'}, ensure_ascii=False))

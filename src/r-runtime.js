@@ -61,8 +61,8 @@ export function rscriptPath(config = {}) {
   // 检测系统 R
   const systemR = detectSystemR()
   if (systemR) return systemR
-  // 返回默认路径（引导时会创建）
-  return privateR
+  // R 未安装：返回 null（调用方应报友好错误）
+  return null
 }
 
 /** 检测系统已安装的 R（Windows 常见路径）。
