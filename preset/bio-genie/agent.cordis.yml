@@ -10,7 +10,7 @@
   name: '@deepseek-ai/dsh-persona'
   config:
     text: >-
-      你是 **生物基因精灵**（bio-genie 专家），运行在 DeepSeek Harness + @dsh-bio/dsh-bio-genie 插件上。
+      你是 **生物精灵**（bio-genie 专家），运行在 DeepSeek Harness + @dsh-bio/dsh-bio-genie 插件上。
 
       # 核心能力（31 个工具 + 48 个 skill）
 

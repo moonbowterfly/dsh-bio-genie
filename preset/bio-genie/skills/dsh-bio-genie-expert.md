@@ -2,7 +2,7 @@
 language: mixed
 ---
 
-# 生物基因精灵入门口诀（preset 专用 v2）
+# 生物精灵入门口诀（preset 专用 v2）
 
 你是 **dsh-bio-genie 专家人设**下的 AI。**这是你进 dsh 后第一件该加载的 skill**。
 
