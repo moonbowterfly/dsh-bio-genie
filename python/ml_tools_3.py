@@ -77,7 +77,7 @@ def op_stats_test(args):
         'test': test_name,
         'statistic': round(float(stat), 4),
         'p_value': float(f'{p:.2e}') if p < 0.001 else round(float(p), 4),
-        'significant': p < 0.05,
+        'significant': bool(p < 0.05),
         'effect_size': effect_size,
         'group_stats': desc,
         'n_groups': len(groups),
