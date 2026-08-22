@@ -89,3 +89,41 @@ language: none
 - 所有分析在本地进行（除显式网络查询）；产出文件写在工作区，报告绝对路径。
 - 插件运行数据在 `~/.dsh/dsh-bio-genie/`（环境/日志/记忆）——不要当作用户数据目录。
 - 日志可回溯：`bio_log action=search query=<错误信息>`。
+
+## 6. 新工具常见问题（ML/DNA/代谢）
+
+### ML 工具
+
+| 现象 | 原因 | 处理 |
+|---|---|---|
+| `bio_ml_pipeline` 报 "no numeric features" | CSV 中所有列都是字符串 | 检查 CSV 内容，确保目标列以外有数值列 |
+| `bio_ml_pipeline` accuracy=0.5 | 二分类随机猜测水平 | 数据可能无预测力；尝试 bio_ml_feature 看特征重要性 |
+| `bio_stats_test` 报 NaN | 数据有缺失值 | 先用 bio_fig_profile 检查缺失比例 |
+| CSV 路径报错 | 路径格式问题 | 用绝对路径；Windows 路径用 `/` 而非 `\` |
+
+### DNA 设计工具
+
+| 现象 | 原因 | 处理 |
+|---|---|---|
+| `bio_primer_design` candidates=0 | 模板太短（<产品大小） | 提供更长模板，或减小 product_size |
+| `bio_primer_design` Tm 偏差大 | 正反向引物 Tm 差 >5°C | 选择评分更高的引物对 |
+| `bio_assembly_design` 选了 restriction | 片段太长/太多 | 指定 method="gibson" 或 "golden_gate" |
+| `bio_plasmid_map` 报错 | features JSON 格式错误 | 确保每个特征有 name/start/end/type |
+
+### 代谢工具
+
+| 现象 | 原因 | 处理 |
+|---|---|---|
+| `bio_fba` 报 "infeasible" | 模型无解（约束矛盾） | 检查培养基条件；用 textbook 模型测试 |
+| `bio_gene_knockout` KeyError | 基因 ID 不存在 | 先 `bio_metabolic_model action=info` 查看可用基因 |
+| `bio_pathway_search` 结果为空 | KEGG 无匹配通路 | 换关键词；检查 organism 代码 |
+| `bio_metabolic_model` 报错 | SBML 格式问题 | 用 textbook 内置模型；自定义模型确保格式正确 |
+
+## 7. 序列分析常见错误
+
+| stderr 签名 | 根因 | 修法 |
+|---|---|---|
+| `TranslationError` | 含终止密码子或模糊密码子 | 翻译前 `seq.replace('X','N').replace('-','N')` |
+| `gc_fraction` 返回 NaN | 序列为空或全 N | 检查输入序列 |
+| `bio_seq_io_read` 格式错误 | format 参数与文件不匹配 | 设 `format="fasta"` 显式指定 |
+| `bio_entrez_search` 无结果 | 检索式语法错误 | 检查字段名拼写；用 `[Gene Name]` 等限定符 |
