@@ -2,7 +2,7 @@
 language: none
 ---
 
-# 工具全参考（22 个）
+# 工具全参考（31 个）
 
 > 每个工具：功能 → 参数（★=必填）→ 返回关键字段 → 典型触发词。**选工具第一优先，双引擎执行器（bio_python/bio_r）第二优先**——先按任务选引擎（见 dsh-bio-genie 主 skill 的双引擎路由表），再选工具。
 
@@ -161,3 +161,21 @@ language: none
 **bio_pathway_search** — 代谢通路搜索（KEGG）：`target_metabolite`★（目标代谢物/关键词）、`organism`（默认 `eco`）、`limit`（默认 10）。触发词：代谢通路、KEGG 通路。
 
 **bio_pathway_design** — 代谢通路设计：`target_product`★（目标产物）、`host_organism`（默认 `eco`）、`strategy`（`shortest`/`max_yield`/`fewest_steps`）。触发词：通路设计、代谢工程。
+
+**bio_ml_pipeline** — 通用 ML 管道：`path`★（CSV 文件）、`target`★（目标列）、`task`（classification/regression）、`model`（random_forest/svm/logistic/linear）。返回评估指标 + 特征重要性。触发词：机器学习、训练、分类、回归。
+
+**bio_ml_reduce** — 降维分析：`path`★（CSV）、`method`（pca/tsne）、`n_components`（默认 2）。返回降维坐标 + 方差解释率。触发词：PCA、t-SNE、降维。
+
+**bio_ml_cluster** — 聚类分析：`path`★（CSV）、`method`（kmeans/hierarchical）、`n_clusters`（默认 3）。返回聚类标签 + 轮廓系数。触发词：聚类、K-Means。
+
+**bio_ml_feature** — 特征重要性：`path`★（CSV）、`target`★（目标列）、`top`（默认 10）。返回特征排序 + 相关性矩阵。触发词：特征选择、变量筛选。
+
+**bio_stats_test** — 统计检验：`path`★（CSV）、`group_col`★、`value_col`★、`test_type`（auto/ttest/mannwhitney/anova/chi2）。返回 p 值 + 效应量。触发词：t 检验、ANOVA、显著性。
+
+**bio_primer_design** — PCR 引物设计：`sequence`★（模板序列）、`product_size`（默认 500）、`tm_target`（默认 60）。返回正/反向引物对。触发词：引物、PCR、Tm。
+
+**bio_seq_optimize** — 密码子优化：`sequence`★（CDS）、`organism`（ecoli/human/yeast）。返回优化序列 + GC%。触发词：密码子优化、表达优化。
+
+**bio_assembly_design** — 组装策略：`fragments`★（DNA 片段列表）、`method`（auto/gibson/golden_gate/restriction）。返回组装方案 + 接头设计。触发词：组装、Gibson、Golden Gate。
+
+**bio_plasmid_map** — 质粒图谱：`name`（质粒名）、`size`（总大小）、`features`★（特征列表）。返回文本质粒注释图。触发词：质粒图、载体图谱。
