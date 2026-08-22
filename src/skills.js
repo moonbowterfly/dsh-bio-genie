@@ -115,6 +115,13 @@ export const SKILL_MANIFEST = [
     description: '生物数据机器学习：分类/回归/降维/聚类/特征分析/统计检验（scikit-learn + scipy）。',
     file: 'bio-ml.md',
   },
+  {
+    name: 'bio-dna-design',
+    category: 'domain',
+    description: 'DNA/质粒设计：引物设计、密码子优化、组装策略（Gibson/Golden Gate）、质粒图谱生成。',
+    file: 'bio-dna-design.md',
+
+  },
   // ---- R/Bioconductor 领域（language: r，2026-08-17 起双引擎）----
   {
     name: 'bio-r-core',

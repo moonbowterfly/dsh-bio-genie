@@ -27,6 +27,8 @@ import socket
 from ml_tools import op_ml_pipeline
 from ml_tools_2 import op_ml_reduce, op_ml_feature, op_ml_cluster
 from ml_tools_3 import op_stats_test
+from dna_design import op_primer_design, op_seq_optimize
+from dna_design_2 import op_assembly_design, op_plasmid_map
 socket.setdefaulttimeout(20)
 
 
@@ -1031,6 +1033,10 @@ OPS = {
     'ml_feature': op_ml_feature,
     'ml_cluster': op_ml_cluster,
     'stats_test': op_stats_test,
+    'primer_design': op_primer_design,
+    'seq_optimize': op_seq_optimize,
+    'assembly_design': op_assembly_design,
+    'plasmid_map': op_plasmid_map,
 }
 
 

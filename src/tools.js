@@ -866,6 +866,57 @@ function semanticTools(config) {
       op: 'stats_test',
       timeoutMs: 120_000,
     }),
+    // ---- DNA/质粒设计（2026-08-22 新增）----
+    bioTool(config, {
+      name: 'bio_primer_design',
+      description:
+        'PCR 引物设计：输入模板序列，返回正/反向引物对（Tm、GC%、长度、位置、评分）。' +
+        '支持自定义产物大小、引物长度范围、目标 Tm。触发词：引物、PCR、Tm、引物设计。',
+      parameters: {
+        sequence: { type: 'string', required: true, description: '模板 DNA 序列' },
+        product_size: { type: 'number', description: '期望产物大小（bp），默认 500' },
+        tm_target: { type: 'number', description: '目标 Tm（°C），默认 60' },
+      },
+      op: 'primer_design',
+      timeoutMs: 60_000,
+    }),
+    bioTool(config, {
+      name: 'bio_seq_optimize',
+      description:
+        '密码子优化：按目标宿主的密码子使用频率优化编码序列。返回优化序列、GC%、变更率。' +
+        '支持 ecoli/human/yeast。触发词：密码子优化、表达优化、密码子偏好。',
+      parameters: {
+        sequence: { type: 'string', required: true, description: '编码序列（CDS）' },
+        organism: { type: 'string', enum: ['ecoli', 'human', 'yeast'], description: '宿主生物，默认 ecoli' },
+      },
+      op: 'seq_optimize',
+      timeoutMs: 60_000,
+    }),
+    bioTool(config, {
+      name: 'bio_assembly_design',
+      description:
+        '组装策略设计：输入 DNA 片段列表，推荐组装方法（Gibson/Golden Gate/限制酶）并设计接头。' +
+        '触发词：组装、Gibson、Golden Gate、DNA 组装。',
+      parameters: {
+        fragments: { type: 'array', required: true, description: 'DNA 片段序列列表', items: { type: 'string' } },
+        method: { type: 'string', enum: ['auto', 'gibson', 'golden_gate', 'restriction'], description: '组装方法，默认 auto' },
+      },
+      op: 'assembly_design',
+      timeoutMs: 60_000,
+    }),
+    bioTool(config, {
+      name: 'bio_plasmid_map',
+      description:
+        '质粒图谱：输入特征列表，生成文本格式的质粒注释图。支持 regulatory/cds/origin/marker 类型。' +
+        '触发词：质粒图、质粒图谱、载体图谱。',
+      parameters: {
+        name: { type: 'string', description: '质粒名称，默认 plasmid' },
+        size: { type: 'number', description: '总大小（bp），默认从特征推断' },
+        features: { type: 'array', required: true, description: '特征列表 [{name,start,end,type,direction}]', items: { type: 'object', additionalProperties: true } },
+      },
+      op: 'plasmid_map',
+      timeoutMs: 60_000,
+    }),
   ]
 }
 
@@ -889,4 +940,5 @@ function renderBioPython(_args, value) {
   if (value.timedOut) parts.push('[timed out]')
   return [{ type: 'text', text: parts.join('\n') || '(no output)' }]
 }
+
 
