@@ -1,4 +1,5 @@
 """KEGG API 客户端 - 代谢通路搜索与设计"""
+import sys
 import requests
 import json
 from typing import Dict, List, Optional
@@ -25,7 +26,7 @@ class KEGGClient:
             else:
                 return None
         except Exception as e:
-            print(f'KEGG API error: {e}')
+            print(f'KEGG API error: {e}', file=sys.stderr)
             return None
     
     def list_pathways(self, organism: str = 'eco') -> List[Dict]:
@@ -229,8 +230,8 @@ def design_pathway(target_product: str, host_organism: str = 'eco', strategy: st
         'strategy': strategy,
         'pathways': pathways,
         'best_pathway': best_pathway,
-        'enzymes_needed': len(best_pathway.get('genes', [])),
-        'estimated_steps': len(best_pathway.get('genes', [])),
+        'enzymes_needed': 'N/A (simplified estimate)',
+        'estimated_steps': 'N/A (simplified estimate)',
         'suggestion': f'Consider using pathway {best_pathway["id"]} for {target_product} production',
     }
 

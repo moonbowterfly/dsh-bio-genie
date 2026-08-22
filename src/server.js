@@ -23,7 +23,8 @@
  */
 import { spawn } from 'node:child_process'
 import { join as pathJoin } from 'node:path'
-import { venvPython, resolveEnvDir, bioEnvExists } from './runtime.js'
+import { venvPython, resolveEnvDir, bioEnvExists, PYTHON_DIR } from './runtime.js'
+
 import { rscriptPath as rscriptPathFn, rLibDir as rLibDirFn, rSpawnEnv } from './r-runtime.js'
 import { listSkillsForPanel } from './skills.js'
 
@@ -124,9 +125,6 @@ const TOOL_SCHEMAS = [
     { key: 'journal', type: 'select', options: ['nature','science','ieee','general'], default: 'nature', desc: '期刊预设' },
   ]},
   { name: 'env_status', label: 'Python 环境', engine: 'python', params: [] },
-  { name: 'bio_r_env', label: 'R 环境检查', engine: 'python', params: [
-    { key: 'action', type: 'select', options: ['status','install','reinstall'], default: 'status', desc: '操作类型' },
-  ]},
 ]
 
 
@@ -379,7 +377,7 @@ async function handleToolSchemas(req, res) {
 
 /**
  * 工具执行端点（POST）：接收 { op, args }，通过子进程调用 bio_ops.py（Python）
- * 或 r_bridge.R（R），返回 { ok, result | error }。
+ * 返回 { ok, result | error }。
  *
  * 执行超时 60s（代谢通路设计等网络操作可能较慢）。
  */
@@ -390,45 +388,6 @@ async function handleExecuteTool(req, res, config) {
   }
   const op = body.op
   const args = body.args || {}
-  const isROp = typeof op === 'string' && op.startsWith('r:')
-
-  if (isROp) {
-    // R 操作：通过 r_bridge.R 执行
-    const rscript = rscriptPathFn(config)
-    const rlib = rLibDirFn(config)
-    if (!rscript) {
-      return writeJson(res, 200, { ok: false, code: 'env-not-ready', message: 'R 环境未就绪' })
-    }
-    const os = await import('node:os')
-    const fs = await import('node:fs')
-    const realOp = op.slice(2) // 去掉 'r:' 前缀
-    const tmp = pathJoin(os.tmpdir(), `dsh-bio-genie-tool-${process.pid}-${Date.now()}.R`)
-    const rCode = `result <- tryCatch({ library(jsonlite); source(file.path(Sys.getenv("DSH_BIO_RLIB"), "..", "..", "dsh-bio-genie", "r", "r_bridge.R")); cat(toJSON(r_bridge_execute(list(op="${realOp}", args=toJSON(args))), auto_unbox=TRUE), "\\n") }, error=function(e) cat(jsonlite::toJSON(list(ok=FALSE, error=conditionMessage(e)), auto_unbox=TRUE), "\\n"))\\n`
-    // 简化：直接通过 stdin JSON 调用 r_bridge.R
-    const rBridgePath = pathJoin(process.env.HOME || process.env.USERPROFILE, '.dsh', 'dsh-bio-genie', 'r', 'r_bridge.R')
-    const bridgeExists = fs.existsSync(rBridgePath)
-    if (!bridgeExists) {
-      return writeJson(res, 200, { ok: false, code: 'r-bridge-not-found', message: `R bridge 不存在: ${rBridgePath}` })
-    }
-    // 写临时输入 JSON
-    const inputJson = JSON.stringify({ op: realOp, args })
-    const inputTmp = pathJoin(os.tmpdir(), `dsh-bio-genie-tool-input-${process.pid}-${Date.now()}.json`)
-    fs.writeFileSync(inputTmp, inputJson, 'utf8')
-    const env = { ...rSpawnEnv(rlib), DSH_BIO_RLIB: rlib }
-    const result = await runSubprocess(rscript, ['--vanilla', '--file', rBridgePath], { env })
-    try { fs.unlinkSync(inputTmp) } catch { /* ignore */ }
-    if (!result.ok) {
-      return writeJson(res, 200, { ok: false, code: result.code, message: `R 执行失败: ${result.stderr.slice(0, 500)}` })
-    }
-    const lastLine = result.stdout.trim().split(/\r?\n/).pop() || ''
-    try {
-      const parsed = JSON.parse(lastLine)
-      writeJson(res, 200, parsed)
-    } catch (err) {
-      writeJson(res, 200, { ok: false, code: 'parse-failed', message: `R 输出解析失败: ${err.message}`, stdout: result.stdout.slice(-500) })
-    }
-    return
-  }
 
   // Python 操作：通过 bio_ops.py 执行
   const envDir = resolveEnvDir(config.pythonEnvDir)
@@ -436,7 +395,7 @@ async function handleExecuteTool(req, res, config) {
   if (!bioEnvExists(config)) {
     return writeJson(res, 200, { ok: false, code: 'env-not-ready', message: 'Python 环境未就绪' })
   }
-  const opsPath = pathJoin(process.env.HOME || process.env.USERPROFILE, '.dsh', 'profiles', 'web', 'node_modules', '@dsh-bio', 'dsh-bio-genie', 'python', 'bio_ops.py')
+  const opsPath = pathJoin(PYTHON_DIR, 'bio_ops.py')
   const payload = JSON.stringify({ op, args })
   const result = await runSubprocess(py, ['-I', opsPath], { stdin: payload })
   if (!result.ok) {
