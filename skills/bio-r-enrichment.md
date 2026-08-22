@@ -4,66 +4,125 @@ language: r
 
 # R 富集与 GSEA（fgsea + msigdbr）
 
-> 来源：fgsea 官方 vignette + msigdbr 官方 vignette（原创整理）。**分工原则**：基因列表（阈值截断）→ 用 Python `bio_enrichr`（更快、已内置限流缓存）；**排序数据（全基因组 log2FC 等）→ 用本 skill 的 fgsea**——GSEA 不丢信息、能检出整体弱趋势，是 Python 侧缺失的能力。
+> fgsea 排序富集 + msigdbr 基因集（免手写 GMT），是 R 侧 GSEA 的权威实现。
 
-## 边界（诚实告知）
+## 核心优势
 
-- **clusterProfiler 不可用**：其依赖 GO.db 在 Bioc 3.23 无 Windows 二进制（上游缺口），
-  Windows 下装不上（enrichGO/gseGO 一并不可用）。R 侧富集引擎 = **fgsea**（排序 GSEA）；
-  基因列表 ORA 一律走 Python `bio_enrichr`（内置 GO/KEGG/Reactome 库，更快）。
-- 核心包集也**不含** org.Hs.eg.db / org.Mm.eg.db（物种注释库，体积大）。
-- ~~fgsea 需要**用户提供基因集**（GMT 风格 data.frame 或 MSigDB GMT 文件）~~
-  **已解决**：`msigdbr` 包（v26.1.0）内置 MSigDB 全部基因集，按物种/分类即时查询，
-  无需手动下载 GMT。详见 `bio-r-genesets` skill。
+- **msigdbr**：按物种/分类即时查询 MSigDB 基因集，免手动下载 GMT 文件。
+- **fgsea**：快速 GSEA 实现（prerank 方法），支持任意排序列表。
+- 与 Python `bio_enrichr`（ORA）互补：GSEA 用排序列表，ORA 用基因列表。
 
-## fgsea 标准管道（排序 GSEA）
+## 完整管道：RNA-seq → GSEA
 
 ```r
 suppressPackageStartupMessages({
-  library(fgsea)
-  library(dplyr)
-  library(readr)
+  library(fgsea); library(msigdbr); library(dplyr); library(readr)
 })
 
-# 输入 1：排序列表 rank.csv（gene, stat）——stat 用 log2FC 或 t 统计量（有方向！）
-rank_df <- read_csv("rank.csv", show_col_types = FALSE)
-ranks <- setNames(rank_df$stat, rank_df$gene)
-ranks <- sort(ranks, decreasing = TRUE)          # 降序，去掉 NA/重复
-ranks <- ranks[!is.na(ranks)]
+# 1. 读取 DESeq2 结果（来自 bio_r 的 de_results.csv）
+de <- read_csv("de_results.csv", show_col_types = FALSE)
 
-# 输入 2：基因集 GMT 文件（MSigDB 官方下载）
-pathways <- fgsea::gmtPathways("h.all.v2024.1.Hs.symbols.gmt")
+# 2. 构建排序列表（log2FC，命名为基因 symbol）
+stats <- de %>%
+  filter(!is.na(padj), !is.na(log2FoldChange)) %>%
+  arrange(desc(log2FoldChange)) %>%
+  { setNames(.$log2FoldChange, .$gene) }
 
-# 核心步骤
-fgsea_res <- fgsea(pathways = pathways, stats = ranks,
-                   minSize = 15, maxSize = 500, nPermSimple = 10000)
-fgsea_res <- arrange(fgsea_res, pval)
-result <- list(n_pathways = nrow(fgsea_res),
-               top = head(select(fgsea_res, pathway, pval, padj, NES, size, leadingEdge), 8))
+# 3. 查询 MSigDB 基因集（人类 Hallmark 通路）
+genesets <- msigdbr(species = "Homo sapiens", category = "H") %>%
+  dplyr::select(gs_name, ensembl_gene) %>%
+  as.data.frame()
 
-# 显著结果落盘
-sig <- filter(fgsea_res, padj < 0.25)            # GSEA 惯例：padj<0.25 即可报告
-write_csv(as.data.frame(sig), "gsea_results.csv")
+# 4. 运行 fgsea
+gsea_res <- fgsea(
+  pathways = split(genesets$ensembl_gene, genesets$gs_name),
+  stats = stats,
+  minSize = 15,
+  maxSize = 500,
+  nPermSimple = 1000
+)
+
+# 5. 整理结果
+gsea_res <- gsea_res %>%
+  arrange(pval) %>%
+  dplyr::select(pathway, padj, ES, NES, size) %>%
+  mutate(direction = ifelse(NES > 0, "Up", "Down"))
+
+readr::write_csv(gsea_res, "gsea_results.csv")
+
+result <- list(
+  n_pathways = nrow(gsea_res),
+  n_sig = sum(gsea_res$padj < 0.25, na.rm = TRUE),
+  top = head(gsea_res, 10),
+  out_file = "gsea_results.csv")
 ```
 
-## 结果解读纪律
+## msigdbr 基因集分类速查
 
-- **NES**（normalized enrichment score）：正 = 上调富集，负 = 下调富集；|NES| 大小与显著性分开看。
-- GSEA 惯例阈值 **padj < 0.25**（不同于 ORA 的 0.05）——报告时说明用的是 GSEA 阈值。
-- `leadingEdge`：核心贡献基因——写解读时点名这些基因让结论可验证。
-- minSize/maxSize 过滤过小/过大的基因集（默认 15/500 合理）。
-- 重复基因名、NA stat 必须先清（`ranks[!duplicated(names(ranks))]`）。
+| category | 含义 | 示例 |
+|---|---|---|
+| H | Hallmark（精炼通路） | HALLMARK_OXIDATIVE_PHOSPHORYLATION |
+| C1 | 位置（染色体区域） | CP:chr1q21 |
+| C2 | 患者/实验保守基因集 | CGP:chemical_and_genetic_perturbations |
+| C3 | 调控靶标（miRNA/TF） | MIR:hsa-miR-21-5p |
+| C4 | 癌症相关 | CGN:cellular_modules |
+| C5 | GO（BP/MF/CC） | GOBP_RESPONSE_TO_STRESS |
+| C6 | 癌症特征 | C6:ONCOGENE_SIGNATURE |
+| C7 | 免疫签名 | C7:IMMUNESIGDB |
+| C8 | 细胞类型特征 | C8:CELL_TYPE_SIGNATURES |
 
-## 边界内替代：ORA 一律走 Python bio_enrichr（clusterProfiler 不可用）
+## 按物种查询
 
-列表型富集不写 R 代码——直接用 `bio_enrichr genes=[...]`（GO/KEGG/Reactome 库已内置、
-插件限流缓存，比 R 侧更快）。排序型 GSEA 用上文 fgsea 管道。两侧结果交叉验证即可。
+```r
+# 人类
+msigdbr(species = "Homo sapiens", category = "H")
+# 小鼠
+msigdbr(species = "Mus musculus", category = "H")
+# 斑马鱼
+msigdbr(species = "Danio rerio", category = "H")
+# 查看支持的物种
+msigdbr_species()
+```
 
-## 与 Python 侧的协作模式
+## 按子分类查询
 
-| 数据形态 | 路线 |
-|---|---|
-| 显著基因列表（几十~几百个） | `bio_enrichr`（GO/KEGG/Reactome，内置库）——R 侧无 ORA 引擎 |
-| 全基因组排序（log2FC） | 本 skill：fgsea + 用户 GMT |
-| 两者都要 + 交叉验证 | 列表→bio_enrichr；排序→fgsea；结论互相印证 |
-| 富集结果解读/冗余消除 | bio-proto-enrichment-workflow（Python 协议，语言无关方法论） |
+```r
+# GO Biological Process
+msigdbr(species = "Homo sapiens", category = "C5", subcategory = "GO:BP")
+# KEGG 通路
+msigdbr(species = "Homo sapiens", category = "C2", subcategory = "CP:KEGG")
+# Reactome 通路
+msigdbr(species = "Homo sapiens", category = "C2", subcategory = "CP:REACTOME")
+```
+
+## GSEA 可视化（barplot）
+
+```r
+library(ggplot2)
+top_n <- head(gsea_res, 20)
+ggplot(top_n, aes(reorder(pathway, NES), NES, fill = direction)) +
+  geom_col() +
+  coord_flip() +
+  scale_fill_manual(values = c("Up" = "#e74c3c", "Down" = "#3498db")) +
+  labs(x = NULL, y = "Normalized Enrichment Score", title = "GSEA Top Pathways") +
+  theme_minimal()
+ggsave("gsea_barplot.pdf", width = 8, height = 6)
+```
+
+## 与 bio_enrichr 的分工
+
+| | fgsea (R) | bio_enrichr (Python) |
+|---|---|---|
+| 输入 | 排序列表（log2FC） | 基因列表（symbol） |
+| 方法 | GSEA（排序富集） | ORA（过表示分析） |
+| 基因集 | msigdbr（即时查询） | Enrichr API（网络） |
+| 适用场景 | 全基因组排序分析 | 候选基因集富集 |
+| 离线可用 | ✅ | ❌（需网络） |
+
+## 高频坑
+
+- `stats` 必须是**命名向量**（names = 基因 ID，values = 排序值）；缺失/重复名会报错。
+- fgsea 的 `padj` 用 BH 校正；阈值建议 **padj < 0.25**（宽松阈值，GSEA 的常规做法）。
+- msigdbr 返回的是 `ensembl_gene`，如果用户的基因列表是 symbol，需要先转换（`msigdbr` 也返回 `gs_name` 可直接用）。
+- 基因集太小（<15）或太大（>500）会被 fgsea 自动过滤。
+- 首次调用 msigdbr 可能需要下载数据（~42MB），需代理环境。
