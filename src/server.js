@@ -125,6 +125,34 @@ const TOOL_SCHEMAS = [
     { key: 'journal', type: 'select', options: ['nature','science','ieee','general'], default: 'nature', desc: '期刊预设' },
   ]},
   { name: 'env_status', label: 'Python 环境', engine: 'python', params: [] },
+  { name: 'ml_pipeline', label: 'ML 管道', engine: 'python', params: [
+    { key: 'path', type: 'text', required: true, placeholder: '/path/to/data.csv', desc: 'CSV 文件路径' },
+    { key: 'target', type: 'text', required: true, placeholder: 'label', desc: '目标列名' },
+    { key: 'task', type: 'select', options: ['classification','regression'], default: 'classification', desc: '任务类型' },
+    { key: 'model', type: 'select', options: ['random_forest','svm','logistic','linear'], default: 'random_forest', desc: '模型' },
+  ]},
+  { name: 'ml_reduce', label: '降维分析', engine: 'python', params: [
+    { key: 'path', type: 'text', required: true, placeholder: '/path/to/data.csv', desc: 'CSV 文件路径' },
+    { key: 'method', type: 'select', options: ['pca','tsne'], default: 'pca', desc: '降维方法' },
+    { key: 'n_components', type: 'number', default: 2, desc: '目标维度' },
+  ]},
+  { name: 'ml_cluster', label: '聚类分析', engine: 'python', params: [
+    { key: 'path', type: 'text', required: true, placeholder: '/path/to/data.csv', desc: 'CSV 文件路径' },
+    { key: 'method', type: 'select', options: ['kmeans','hierarchical'], default: 'kmeans', desc: '聚类方法' },
+    { key: 'n_clusters', type: 'number', default: 3, desc: '簇数' },
+  ]},
+  { name: 'ml_feature', label: '特征重要性', engine: 'python', params: [
+    { key: 'path', type: 'text', required: true, placeholder: '/path/to/data.csv', desc: 'CSV 文件路径' },
+    { key: 'target', type: 'text', required: true, placeholder: 'label', desc: '目标列名' },
+    { key: 'top', type: 'number', default: 10, desc: '返回前 N 个特征' },
+  ]},
+  { name: 'stats_test', label: '统计检验', engine: 'python', params: [
+    { key: 'path', type: 'text', required: true, placeholder: '/path/to/data.csv', desc: 'CSV 文件路径' },
+    { key: 'group_col', type: 'text', required: true, placeholder: 'group', desc: '分组列名' },
+    { key: 'value_col', type: 'text', required: true, placeholder: 'value', desc: '数值列名' },
+    { key: 'test_type', type: 'select', options: ['auto','ttest','mannwhitney','anova','chi2'], default: 'auto', desc: '检验类型' },
+  ]},
+
 ]
 
 

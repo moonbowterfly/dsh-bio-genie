@@ -793,6 +793,79 @@ function semanticTools(config) {
       op: 'pathway_design',
       timeoutMs: 120_000,
     }),
+    // ---- 数据科学与机器学习（2026-08-22 新增）----
+    bioTool(config, {
+      name: 'bio_ml_pipeline',
+      description:
+        '通用 ML 管道：读 CSV → 训练模型 → 评估。支持分类（accuracy/cv）和回归（r2/rmse）。' +
+        'model 可选 random_forest/svm/logistic/linear。返回评估指标和特征重要性。' +
+        '触发词：机器学习、训练模型、分类、回归、预测。',
+      parameters: {
+        path: { type: 'string', required: true, description: 'CSV 文件路径' },
+        target: { type: 'string', required: true, description: '目标列名' },
+        task: { type: 'string', enum: ['classification', 'regression'], description: '任务类型，默认 classification' },
+        model: { type: 'string', enum: ['random_forest', 'svm', 'logistic', 'linear'], description: '模型类型，默认 random_forest' },
+        test_size: { type: 'number', description: '测试集比例，默认 0.2' },
+        cv: { type: 'number', description: '交叉验证折数，默认 5' },
+      },
+      op: 'ml_pipeline',
+      timeoutMs: 120_000,
+    }),
+    bioTool(config, {
+      name: 'bio_ml_reduce',
+      description:
+        '降维分析：PCA 或 t-SNE，返回降维坐标和方差解释率。适合高维数据可视化。' +
+        '触发词：PCA、t-SNE、降维、可视化。',
+      parameters: {
+        path: { type: 'string', required: true, description: 'CSV 文件路径' },
+        method: { type: 'string', enum: ['pca', 'tsne'], description: '降维方法，默认 pca' },
+        n_components: { type: 'number', description: '目标维度，默认 2' },
+        perplexity: { type: 'number', description: 't-SNE 困惑度，默认 30' },
+      },
+      op: 'ml_reduce',
+      timeoutMs: 120_000,
+    }),
+    bioTool(config, {
+      name: 'bio_ml_feature',
+      description:
+        '特征重要性分析：随机森林特征排序 + 相关性矩阵。返回 top N 重要特征。' +
+        '触发词：特征选择、特征重要性、变量筛选。',
+      parameters: {
+        path: { type: 'string', required: true, description: 'CSV 文件路径' },
+        target: { type: 'string', required: true, description: '目标列名' },
+        task: { type: 'string', enum: ['classification', 'regression'], description: '任务类型' },
+        top: { type: 'number', description: '返回前 N 个特征，默认 10' },
+      },
+      op: 'ml_feature',
+      timeoutMs: 120_000,
+    }),
+    bioTool(config, {
+      name: 'bio_ml_cluster',
+      description:
+        '聚类分析：K-Means 或层次聚类，返回聚类标签、轮廓系数和簇统计。' +
+        '触发词：聚类、分群、K-Means、层次聚类。',
+      parameters: {
+        path: { type: 'string', required: true, description: 'CSV 文件路径' },
+        method: { type: 'string', enum: ['kmeans', 'hierarchical'], description: '聚类方法，默认 kmeans' },
+        n_clusters: { type: 'number', description: '簇数，默认 3' },
+      },
+      op: 'ml_cluster',
+      timeoutMs: 120_000,
+    }),
+    bioTool(config, {
+      name: 'bio_stats_test',
+      description:
+        '统计检验：自动选择 t-test / Mann-Whitney / ANOVA / 卡方检验。返回 p 值、效应量、各组描述统计。' +
+        '触发词：t 检验、ANOVA、统计检验、显著性、p 值。',
+      parameters: {
+        path: { type: 'string', required: true, description: 'CSV 文件路径' },
+        group_col: { type: 'string', required: true, description: '分组列名' },
+        value_col: { type: 'string', required: true, description: '数值列名' },
+        test_type: { type: 'string', enum: ['auto', 'ttest', 'mannwhitney', 'anova', 'chi2'], description: '检验类型，默认 auto' },
+      },
+      op: 'stats_test',
+      timeoutMs: 120_000,
+    }),
   ]
 }
 
@@ -816,3 +889,4 @@ function renderBioPython(_args, value) {
   if (value.timedOut) parts.push('[timed out]')
   return [{ type: 'text', text: parts.join('\n') || '(no output)' }]
 }
+

@@ -23,6 +23,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # 网络 op 统一 20s 单请求上限：慢网络（如中国直连 NCBI）下防无限挂起。
 # 带显式 timeout 参数的请求（enrichr/ref_genome）以各自参数为准。
 import socket
+# ---- ML 工具 ----
+from ml_tools import op_ml_pipeline
+from ml_tools_2 import op_ml_reduce, op_ml_feature, op_ml_cluster
+from ml_tools_3 import op_stats_test
 socket.setdefaulttimeout(20)
 
 
@@ -1022,6 +1026,11 @@ OPS = {
     'gene_knockout': op_gene_knockout,
     'pathway_search': op_pathway_search,
     'pathway_design': op_pathway_design,
+    'ml_pipeline': op_ml_pipeline,
+    'ml_reduce': op_ml_reduce,
+    'ml_feature': op_ml_feature,
+    'ml_cluster': op_ml_cluster,
+    'stats_test': op_stats_test,
 }
 
 

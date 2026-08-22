@@ -109,6 +109,12 @@ export const SKILL_MANIFEST = [
     description: '出版级科研绘图顾问（吸收 scipilot-figure-skill）：8 步思考-绘制工作流、图型决策速查表、18 条画图陷阱、期刊规格、中文 CJK 支持。任何画图/数据可视化需求先加载本 skill。',
     file: 'bio-figure.md',
   },
+  {
+    name: 'bio-ml',
+    category: 'domain',
+    description: '生物数据机器学习：分类/回归/降维/聚类/特征分析/统计检验（scikit-learn + scipy）。',
+    file: 'bio-ml.md',
+  },
   // ---- R/Bioconductor 领域（language: r，2026-08-17 起双引擎）----
   {
     name: 'bio-r-core',
