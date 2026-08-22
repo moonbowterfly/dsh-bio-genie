@@ -123,6 +123,9 @@ export function rCorePackages() {
 
 /** R 子进程环境：包库隔离（不读用户 .Rprofile/环境文件，不泄漏宿主库）。 */
 export function rSpawnEnv(lib) {
+  // Windows: R.dll 在 bin/x64/ 目录，Rscript.exe 需要从该目录或 PATH 中找到它
+  const rBinDir = join(rInstallDir(), "bin", "x64")
+  const pathExt = process.platform === "win32" ? rBinDir + ";" : ""
   return {
     ...process.env,
     R_LIBS: lib,
@@ -130,6 +133,7 @@ export function rSpawnEnv(lib) {
     R_LIBS_SITE: '',
     R_ENVIRON_USER: '',
     R_PROFILE_USER: '',
+    PATH: pathExt + (process.env.PATH || ''),
     PYTHONPATH: '',
   }
 }
