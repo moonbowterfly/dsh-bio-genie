@@ -13,7 +13,7 @@ language: python
 | `bio_ml_pipeline` | 端到端 ML | path★, target★, task, model |
 | `bio_ml_reduce` | PCA/t-SNE | path★, method, n_components |
 | `bio_ml_feature` | 特征重要性 | path★, target★, top |
-| `bio_ml_cluster` | K-Means/层次 | path★, method, n_clusters |
+| `bio_ml_cluster` | **聚类**（K-Means/层次）——用户说「聚类」「分群」「cluster」时**必须**用此工具，不要用 bio_python | path★, method, n_clusters |
 | `bio_stats_test` | 统计检验 | path★, group_col★, value_col★, test_type |
 
 ## 典型工作流
