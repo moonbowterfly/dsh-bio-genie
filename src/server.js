@@ -27,6 +27,7 @@ import { venvPython, resolveEnvDir, bioEnvExists, PYTHON_DIR } from './runtime.j
 
 import { rscriptPath as rscriptPathFn, rLibDir as rLibDirFn, rSpawnEnv } from './r-runtime.js'
 import { listSkillsForPanel } from './skills.js'
+import { handleConfig } from './config_handler.js'
 
 /** 路由前缀（与 @linxin666/dsh-client-ui-web-ui-settings 同风格）。 */
 const ROUTE_PREFIX = '/api/dsh-bio-genie'
@@ -486,6 +487,7 @@ export function registerApiRoutes(ctx, config = {}) {
     { kind: 'exact', path: `${ROUTE_PREFIX}/python-packages`, handler: guard((req, res) => handlePythonPackages(req, res, config)) },
     { kind: 'exact', path: `${ROUTE_PREFIX}/r-packages`,      handler: guard((req, res) => handleRPackages(req, res, config)) },
     { kind: 'exact', path: `${ROUTE_PREFIX}/skills`,          handler: guard((req, res) => handleSkills(req, res)) },
+    { kind: 'exact', path: `${ROUTE_PREFIX}/config`,         handler: guard((req, res) => handleConfig(req, res, config)) },
     { kind: 'exact', path: `${ROUTE_PREFIX}/tool-schemas`,    handler: guard((req, res) => handleToolSchemas(req, res)) },
     { kind: 'exact', path: `${ROUTE_PREFIX}/execute-tool`,    handler: guard((req, res) => handleExecuteTool(req, res, config)) },
   ]) {
