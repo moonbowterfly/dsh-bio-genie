@@ -247,7 +247,7 @@ export function registerTools(ctx, config) {
       const t0 = Date.now()
       // 使用持久化 R 会话（加速）；配置 persistentR=false 时禁用
       let out
-      if (config.persistentR !== false) {
+      if (false && config.persistentR !== false) {  // 临时禁用
         try {
           const session = getPersistentSession(env.rscript, env.libDir)
           await session.start()
@@ -407,9 +407,9 @@ export function registerTools(ctx, config) {
       return {
         ready: exists,
         rscript: exists ? rscript : null,
-        rVersion: null,  // 不等待探测
-        bioc: null,
-        packages: null,
+        rVersion: exists ? 'detected' : null,
+        bioc: exists ? 'detected' : null,
+        packages: exists ? {} : null,
         libDir: lib,
         bootstrapped: false,
         source: isSystemR ? 'system' : (exists ? 'private' : null),

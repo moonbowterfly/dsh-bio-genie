@@ -8,12 +8,21 @@
 #
 # UTF-8 纪律：stdin/stdout 走原始字节，不经过 Windows 原生编码层（GBK 环境防乱码）。
 # 用户代码的警告被静音（避免污染 stdout 之外的信息通道）。
+# 从环境变量读取包库路径并添加到 .libPaths
+r_libs <- Sys.getenv("R_LIBS", unset = "")
+if (nzchar(r_libs)) {
+  r_libs <- normalizePath(r_libs, mustWork = FALSE)
+  if (dir.exists(r_libs)) {
+    .libPaths(c(r_libs, .libPaths()))
+  }
+}
 suppressPackageStartupMessages(suppressWarnings(library(jsonlite)))
 
 read_stdin_raw <- function() {
-  con <- file("stdin", open = "rb")
-  on.exit(close(con))
-  readBin(con, what = "raw", n = 50L * 1024L * 1024L)  # 50MB 上限
+  # 读取一行 JSON（简单实现）
+  lines <- readLines("stdin", n = 1, warn = FALSE)
+  charToRaw(paste(lines, collapse = "
+"))
 }
 
 emit <- function(obj) {

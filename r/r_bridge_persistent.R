@@ -2,6 +2,15 @@
 # 保持 R 进程常驻，通过 stdin 接收代码，stdout 返回结果
 # 协议：发送 JSON {code, id}，接收 JSON {ok, stdout, stderr, result, id}
 
+# 从环境变量读取包库路径并添加到 .libPaths
+r_libs <- Sys.getenv("R_LIBS", unset = "")
+if (nzchar(r_libs)) {
+  # 规范化路径（处理 ~ 和 /c/ 格式）
+  r_libs <- normalizePath(r_libs, mustWork = FALSE)
+  if (dir.exists(r_libs)) {
+    .libPaths(c(r_libs, .libPaths()))
+  }
+}
 suppressPackageStartupMessages(suppressWarnings(library(jsonlite)))
 
 read_stdin_raw <- function() {
