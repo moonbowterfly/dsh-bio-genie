@@ -14,6 +14,7 @@ import { runBridge, callBio } from './python.js'
 import { join } from 'node:path'
 import { existsSync } from 'node:fs'
 import { ensureREnvironment, runRBridge, rscriptPath, rLibDir, rInstallDir } from './r-runtime.js'
+import { getPersistentSession } from './r-persistent.js'
 import { resolveWorkdir, fallbackWorkspace } from './workdir.js'
 import { cacheGet, cacheSet, throttle } from './throttle.js'
 import { appendLog, codeHash, readLogs } from './log.js'
@@ -244,7 +245,17 @@ export function registerTools(ctx, config) {
       const timeoutMs = args.timeoutMs ?? config.rDefaultTimeoutMs ?? 120_000
       const cwd = resolveWorkdir(exec, args.workdir)
       const t0 = Date.now()
-      const out = await runRBridge(env.rscript, env.libDir, args.code, { cwd, timeoutMs, signal: exec.signal })
+      // 使用持久化 R 会话（加速）；失败时回退到传统方式
+      let out
+      try {
+        const session = getPersistentSession(env.rscript, env.libDir)
+        await session.start()
+        const result = await session.execute(args.code, timeoutMs)
+        out = { ok: result.ok, stdout: result.stdout, stderr: result.stderr, result: result.result }
+      } catch (sessionErr) {
+        // 持久化会话失败，回退到传统方式
+        out = await runRBridge(env.rscript, env.libDir, args.code, { cwd, timeoutMs, signal: exec.signal })
+      }
       const canonical = { ...out }
       if (canonical.result === null || canonical.result === undefined) delete canonical.result
       // R 代码级失败判定：stderr 含 "Error ..." 或 "Execution halted"（r_bridge 恒返回 ok:true + 错误文本）

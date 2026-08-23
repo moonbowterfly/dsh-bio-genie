@@ -90,3 +90,22 @@ result <- list(
 - 中文标签绘图：**优先用 Python figurelib**（CJK 已解决），R 绘图默认英文标签。
 - 打印大对象截断：用 `head()` / `slice_head(n=10)`；输出全表写 CSV。
 - S4 对象（DESeqDataSet 等）不要放进 `result`——JSON 无法序列化。
+
+## 快速决策：用 R 还是 Python？
+
+**看到这些关键词，直接用 bio_r（不用想）**：
+- DESeq2、edgeR、limma → 差异表达
+- fgsea、GSEA、基因集 → 富集分析
+- phyloseq、微生物组 → 微生物组分析
+- Rtsne、t-SNE → 降维
+- ggplot2、ggtree → R 可视化
+- pheatmap、ComplexHeatmap → R 热图
+
+**看到这些关键词，直接用 bio_python**：
+- BLAST、比对、PDB → Biopython
+- 序列 I/O、FASTA/GenBank → Biopython
+- Entrez、PubMed → Python
+
+**不确定时**：先加载 bio-r-core skill 看分工表。
+
+**⚠️ R 首次调用较慢**（2-3s 启动），后续调用很快。告诉用户「R 正在启动，稍等」。

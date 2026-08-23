@@ -41,7 +41,7 @@ const DEFAULT_CONFIG = {
   warmUp: true,
   // R 环境体积大（R 安装器 + 核心包集数百 MB），默认不随插件加载预热——
   // 首次 bio_r 调用时惰性引导（与 Python 一致的"零手动安装"，但按需触发）。
-  warmUpR: false,
+  warmUpR: true,
   enableLog: true,
   enableMemory: true,
   pythonEnvDir: undefined,
