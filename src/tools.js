@@ -13,8 +13,6 @@ import { ensureEnvironment, venvPython, resolveEnvDir } from './runtime.js'
 import { runBridge, callBio } from './python.js'
 import { join } from 'node:path'
 import { existsSync } from 'node:fs'
-import { ensureREnvironment, runRBridge, rscriptPath, rLibDir, rInstallDir } from './r-runtime.js'
-import { getPersistentSession } from './r-persistent.js'
 import { resolveWorkdir, fallbackWorkspace } from './workdir.js'
 import { cacheGet, cacheSet, throttle } from './throttle.js'
 import { appendLog, codeHash, readLogs } from './log.js'
@@ -204,106 +202,6 @@ export function registerTools(ctx, config) {
     },
   })))
 
-  // ============ R 执行器（2026-08-17 起：与 bio_python 对称的 R/Bioconductor 生态入口） ============
-  disposers.push(ctx.tools.register(defineTool({
-    name: 'bio_r',
-    description:
-      '运行一段 R 程序，使用内置 R 4.6 + Bioconductor 3.23 环境完成统计分析。' +
-      '⚠️ 首次使用需先运行 bio_r_env action=install 安装 R 语言（约 5-10 分钟）。' +
-      '可用包：DESeq2/edgeR/limma（差异表达）、fgsea+msigdbr（GSEA 排序富集 + MSigDB 基因集，免手动 GMT）、' +
-      'phyloseq（微生物组）、Biostrings/GenomicRanges/SummarizedExperiment、' +
-      'Rtsne（t-SNE 降维聚类）、' +
-      'ggplot2/ggtree/ComplexHeatmap（可视化）、dplyr/tibble/readr（数据处理）。' +
-      '把完整 R 程序写在 code 参数；print/cat 输出返回在 stdout；给顶层变量 result 赋一个 JSON 可序列化值可结构化返回。' +
-      '工作目录为会话工作区（workdir 可覆盖）。适合差异表达、GSEA、微生物组多样性、R 生态绘图等（与 bio_python 分工见 dsh-bio-genie 主 skill）。' +
-      '触发词：DESeq2、edgeR、limma、差异表达、GSEA、fgsea、msigdbr、MSigDB、基因集、phyloseq、Rtsne、t-SNE、降维、聚类、ggplot2、ggtree、ComplexHeatmap、R语言。',
-    parameters: {
-      code: { type: 'string', required: true, description: '完整 R 源码。' },
-      workdir: { type: 'string', description: '工作目录（绝对路径，或相对默认工作区的相对路径）。默认：会话工作区。' },
-      timeoutMs: { type: 'number', description: '超时毫秒数。默认 120000（R 包加载慢，长任务请加大）。' },
-    },
-    output: {
-      schema: {
-        type: 'object',
-        additionalProperties: false,
-        properties: {
-          ok: { type: 'boolean', required: true },
-          stdout: { type: 'string', required: true },
-          stderr: { type: 'string', required: true },
-          error: { type: 'string' },
-          result: { type: 'json' },
-          exitCode: { type: 'integer' },
-          timedOut: { type: 'boolean', required: true },
-          truncated: { type: 'boolean' },
-          needs_repair: { type: 'boolean' },
-        },
-      },
-      render: renderBioPython,
-    },
-    async execute(args, exec) {
-      const env = await requireREnv(config)
-      const timeoutMs = args.timeoutMs ?? config.rDefaultTimeoutMs ?? 120_000
-      const cwd = resolveWorkdir(exec, args.workdir)
-      const t0 = Date.now()
-      // 使用持久化 R 会话（加速）；配置 persistentR=false 时禁用
-      let out
-      if (false && config.persistentR !== false) {  // 临时禁用
-        try {
-          const session = getPersistentSession(env.rscript, env.libDir)
-          await session.start()
-          const result = await session.execute(args.code, timeoutMs)
-          out = { ok: result.ok, stdout: result.stdout, stderr: result.stderr, result: result.result }
-        } catch (sessionErr) {
-          // 持久化会话失败，回退到传统方式
-          out = await runRBridge(env.rscript, env.libDir, args.code, { cwd, timeoutMs, signal: exec.signal })
-        }
-      } else {
-        out = await runRBridge(env.rscript, env.libDir, args.code, { cwd, timeoutMs, signal: exec.signal })
-      }
-      const canonical = { ...out }
-      if (canonical.result === null || canonical.result === undefined) delete canonical.result
-      // R 代码级失败判定：stderr 含 "Error ..." 或 "Execution halted"（r_bridge 恒返回 ok:true + 错误文本）
-      const hasRError = /(^|\n)\s*Error|Execution halted/.test(out.stderr ?? '')
-      if (hasRError) canonical.needs_repair = true
-      const preview = (args.code ?? '').replace(/\s+/g, ' ').trim().slice(0, 200)
-      if (config.enableLog !== false) {
-        appendLog({
-          kind: 'bio_r',
-          ok: out.ok === true && !hasRError,
-          code_hash: codeHash(args.code ?? ''),
-          code_preview: preview,
-          workdir: cwd,
-          stdout_len: (out.stdout ?? '').length,
-          stderr_len: (out.stderr ?? '').length,
-          result_type: typeof out.result,
-          duration_ms: Date.now() - t0,
-          timed_out: out.timedOut === true,
-          needs_repair: hasRError,
-        })
-      }
-      // 会话记忆：R 版失败配对/成功沉淀（签名前缀 r:，与 Python 侧互不干扰）
-      if (config.enableMemory !== false) {
-        const sig = rCodeSignature(args.code ?? '')
-        if (hasRError) {
-          pendingFixes.set(sig, { error_signature: rErrorSignature(out.stderr), failed_preview: preview })
-          if (pendingFixes.size > 20) pendingFixes.delete(pendingFixes.keys().next().value)
-        } else {
-          const pending = pendingFixes.get(sig)
-          if (pending) {
-            rememberLesson({
-              error_signature: pending.error_signature,
-              fix_hint: preview,
-              example: `${pending.failed_preview}  →  ${preview}`,
-            })
-            pendingFixes.delete(sig)
-          }
-          rememberSuccess({ signature: sig, template: preview, tool: 'bio_r' })
-        }
-      }
-      return canonical
-    },
-  })))
-
   // ============ 环境诊断 ============
   disposers.push(ctx.tools.register(defineTool({
     name: 'bio_env',
@@ -344,75 +242,6 @@ export function registerTools(ctx, config) {
         numpy: env.numpy ?? null,
         envDir: env.envDir,
         bootstrapped: env.bootstrapped === true,
-      }
-    },
-  })))
-
-  // ============ R 环境诊断 ============
-  disposers.push(ctx.tools.register(defineTool({
-    name: 'bio_r_env',
-    description:
-      '检查/安装内置 R 环境：R 版本、Bioconductor 版本、核心包版本（DESeq2/fgsea/phyloseq/ggplot2 等）与私有库目录。' +
-      'action=status 快速检查（不等待包探测）；action=install 安装 R 语言（首次约 5-10 分钟）；action=reinstall 重建核心包集。' +
-      '触发词：R环境、R版本、Bioconductor版本、R包缺失、安装R。',
-    parameters: {
-      action: { type: 'string', enum: ['status', 'install', 'reinstall'], description: 'status=快速检查（默认）；install=安装 R 语言；reinstall=重建核心包集' },
-    },
-    output: {
-      schema: {
-        type: 'object',
-        additionalProperties: false,
-        properties: {
-          ready: { type: 'boolean', required: true },
-          rscript: { type: 'string' },
-          rVersion: { type: 'string' },
-          bioc: { type: 'string' },
-          packages: { type: 'object', additionalProperties: true },
-          libDir: { type: 'string', required: true },
-          bootstrapped: { type: 'boolean', required: true },
-          source: { type: 'string', description: 'R 来源：system=系统 R / private=插件私有 / bootstrap=引导安装' },
-        },
-      },
-      render: (_args, value) => [{
-        type: 'text',
-        text: value.ready
-          ? `R 环境就绪（R ${value.rVersion ?? '?'} / Bioconductor ${value.bioc ?? '?'}，来源: ${value.source ?? 'unknown'}）：${value.rscript}`
-          : 'R 环境未就绪：请运行 bio_r_env action=install 安装 R 语言。',
-      }],
-    },
-    async execute(args) {
-      const action = args.action ?? 'status'
-      
-      if (action === 'install' || action === 'reinstall') {
-        // 显式安装：调用 ensureREnvironment 触发完整引导
-        const env = await ensureREnvironment(config, { force: true })
-        return {
-          ready: env.ready === true,
-          rscript: env.rscript ?? null,
-          rVersion: env.rVersion ?? null,
-          bioc: env.bioc ?? null,
-          packages: env.packages ?? null,
-          libDir: env.libDir,
-          bootstrapped: env.bootstrapped === true,
-          source: env.source ?? null,
-        }
-      }
-      
-      // status：快速检查（不等待包探测）
-      const rscript = rscriptPath(config)
-      const lib = rLibDir(config)
-      const exists = existsSync(rscript)
-      const isSystemR = exists && rscript !== join(rInstallDir(), 'bin', 'Rscript.exe')
-      
-      return {
-        ready: exists,
-        rscript: exists ? rscript : null,
-        rVersion: exists ? 'detected' : null,
-        bioc: exists ? 'detected' : null,
-        packages: exists ? {} : null,
-        libDir: lib,
-        bootstrapped: false,
-        source: isSystemR ? 'system' : (exists ? 'private' : null),
       }
     },
   })))
@@ -933,6 +762,28 @@ function semanticTools(config) {
       },
       op: 'plasmid_map',
       timeoutMs: 60_000,
+    }),
+    // ---- Python 差异表达/GSEA 工具（替代 R 引擎）----
+    bioTool(config, {
+      name: 'bio_deseq2',
+      description: '差异表达分析（Python）：counts 矩阵 + 样本信息 → 差异基因表。触发词：差异表达。',
+      parameters: {
+        counts_file: { type: 'string', required: true, description: 'counts 矩阵 CSV' },
+        meta_file: { type: 'string', required: true, description: '样本信息 CSV' },
+        contrast: { type: 'string', default: 'trt_vs_ctrl', description: '对比组' },
+      },
+      op: 'deseq2',
+      timeoutMs: 120_000,
+    }),
+    bioTool(config, {
+      name: 'bio_gsea',
+      description: 'GSEA 富集分析（Python）：差异表达结果 → 富集通路。触发词：GSEA、富集。',
+      parameters: {
+        de_results_file: { type: 'string', required: true, description: '差异表达结果 CSV' },
+        gene_sets: { type: 'string', default: 'hallmark', description: '基因集' },
+      },
+      op: 'gsea',
+      timeoutMs: 120_000,
     }),
     // ---- R 语义化工具（避免慢速 bio_r 调用）----
     bioTool(config, {

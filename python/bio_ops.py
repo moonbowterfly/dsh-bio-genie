@@ -30,6 +30,7 @@ from ml_tools_3 import op_stats_test
 from dna_design import op_primer_design, op_seq_optimize
 from dna_design_2 import op_assembly_design, op_plasmid_map
 from r_semantic import op_r_deseq2, op_r_gsea, op_r火山图, op_r_dimred
+from deg_tools import op_deseq2_python, op_gsea_python
 socket.setdefaulttimeout(20)
 from retry_utils import retry_on_network_error
 
@@ -1046,6 +1047,8 @@ OPS = {
     'r_gsea': op_r_gsea,
     'r_火山图': op_r火山图,
     'r_dimred': op_r_dimred,
+    'deseq2': op_deseq2_python,
+    'gsea': op_gsea_python,
 }
 
 

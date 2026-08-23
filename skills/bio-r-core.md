@@ -2,9 +2,10 @@
 language: r
 ---
 
-# R 执行器核心（bio_r）
+# R 分析指南（Python 优先）
 
-> 与 bio_python 对称的 R 生态入口。加载任何 R 分析任务前先读本 skill。
+> ⚠️ **全面 Python 化**：本插件已移除 R 引擎，所有分析使用 Python 实现。
+> 本 skill 保留 R 相关知识供参考，实际执行请用 Python 工具。
 
 ## 环境事实（牢记）
 

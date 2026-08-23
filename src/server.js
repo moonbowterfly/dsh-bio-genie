@@ -171,6 +171,15 @@ const TOOL_SCHEMAS = [
     { key: 'size', type: 'number', default: 5000, desc: '总大小(bp)' },
     { key: 'features', type: 'text', placeholder: '[{"name":"promoter","start":0,"end":200,"type":"regulatory"}]', desc: '特征列表(JSON)' },
   ]},
+  { name: 'deseq2', label: '差异表达(Python)', engine: 'python', params: [
+    { key: 'counts_file', type: 'text', required: true, placeholder: '/path/to/counts.csv', desc: 'counts 矩阵 CSV' },
+    { key: 'meta_file', type: 'text', required: true, placeholder: '/path/to/meta.csv', desc: '样本信息 CSV' },
+    { key: 'contrast', type: 'text', default: 'trt_vs_ctrl', desc: '对比组' },
+  ]},
+  { name: 'gsea', label: 'GSEA 富集(Python)', engine: 'python', params: [
+    { key: 'de_results_file', type: 'text', required: true, placeholder: '/path/to/de_results.csv', desc: '差异表达结果 CSV' },
+    { key: 'gene_sets', type: 'text', default: 'hallmark', desc: '基因集' },
+  ]},
   { name: 'r_deseq2', label: '差异表达(DESeq2)', engine: 'python', params: [
     { key: 'counts_file', type: 'text', required: true, placeholder: '/path/to/counts.csv', desc: 'counts 矩阵 CSV' },
     { key: 'meta_file', type: 'text', required: true, placeholder: '/path/to/meta.csv', desc: '样本信息 CSV' },
