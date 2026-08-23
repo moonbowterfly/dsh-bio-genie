@@ -171,6 +171,26 @@ const TOOL_SCHEMAS = [
     { key: 'size', type: 'number', default: 5000, desc: '总大小(bp)' },
     { key: 'features', type: 'text', placeholder: '[{"name":"promoter","start":0,"end":200,"type":"regulatory"}]', desc: '特征列表(JSON)' },
   ]},
+  { name: 'r_deseq2', label: '差异表达(DESeq2)', engine: 'python', params: [
+    { key: 'counts_file', type: 'text', required: true, placeholder: '/path/to/counts.csv', desc: 'counts 矩阵 CSV' },
+    { key: 'meta_file', type: 'text', required: true, placeholder: '/path/to/meta.csv', desc: '样本信息 CSV' },
+    { key: 'contrast', type: 'text', default: 'trt_vs_ctrl', desc: '对比组' },
+  ]},
+  { name: 'r_gsea', label: 'GSEA 富集', engine: 'python', params: [
+    { key: 'de_results_file', type: 'text', required: true, placeholder: '/path/to/de_results.csv', desc: '差异表达结果 CSV' },
+    { key: 'species', type: 'select', options: ['human','mouse'], default: 'human', desc: '物种' },
+    { key: 'category', type: 'text', default: 'H', desc: '基因集分类' },
+  ]},
+  { name: 'r_火山图', label: '火山图(ggplot2)', engine: 'python', params: [
+    { key: 'de_results_file', type: 'text', required: true, placeholder: '/path/to/de_results.csv', desc: '差异表达结果 CSV' },
+    { key: 'output_file', type: 'text', default: 'volcano.pdf', desc: '输出文件' },
+  ]},
+  { name: 'r_dimred', label: 't-SNE 降维', engine: 'python', params: [
+    { key: 'data_file', type: 'text', required: true, placeholder: '/path/to/data.csv', desc: '数值矩阵 CSV' },
+    { key: 'n_components', type: 'number', default: 2, desc: '降维维度' },
+    { key: 'perplexity', type: 'number', default: 30, desc: '困惑度' },
+  ]},
+
 
 
 ]

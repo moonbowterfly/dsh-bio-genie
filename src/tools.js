@@ -934,6 +934,50 @@ function semanticTools(config) {
       op: 'plasmid_map',
       timeoutMs: 60_000,
     }),
+    // ---- R 语义化工具（避免慢速 bio_r 调用）----
+    bioTool(config, {
+      name: 'bio_r_deseq2',
+      description: '差异表达分析（DESeq2）：输入 counts 矩阵 + 样本信息，输出差异基因表。触发词：差异表达、DESeq2。',
+      parameters: {
+        counts_file: { type: 'string', required: true, description: 'counts 矩阵 CSV 路径' },
+        meta_file: { type: 'string', required: true, description: '样本信息 CSV 路径' },
+        contrast: { type: 'string', description: '对比组（默认 trt_vs_ctrl）' },
+      },
+      op: 'r_deseq2',
+      timeoutMs: 120_000,
+    }),
+    bioTool(config, {
+      name: 'bio_r_gsea',
+      description: 'GSEA 富集分析（fgsea + msigdbr）：输入差异表达结果，输出富集通路。触发词：GSEA、富集。',
+      parameters: {
+        de_results_file: { type: 'string', required: true, description: '差异表达结果 CSV 路径' },
+        species: { type: 'string', default: 'human', description: '物种' },
+        category: { type: 'string', default: 'H', description: '基因集分类' },
+      },
+      op: 'r_gsea',
+      timeoutMs: 120_000,
+    }),
+    bioTool(config, {
+      name: 'bio_r_火山图',
+      description: '火山图（ggplot2）：输入差异表达结果，输出火山图 PDF。触发词：火山图。',
+      parameters: {
+        de_results_file: { type: 'string', required: true, description: '差异表达结果 CSV 路径' },
+        output_file: { type: 'string', default: 'volcano.pdf', description: '输出文件路径' },
+      },
+      op: 'r_火山图',
+      timeoutMs: 60_000,
+    }),
+    bioTool(config, {
+      name: 'bio_r_dimred',
+      description: 't-SNE 降维：输入数值矩阵，输出降维坐标。触发词：t-SNE、降维。',
+      parameters: {
+        data_file: { type: 'string', required: true, description: '数值矩阵 CSV 路径' },
+        n_components: { type: 'number', default: 2, description: '降维维度' },
+        perplexity: { type: 'number', default: 30, description: '困惑度' },
+      },
+      op: 'r_dimred',
+      timeoutMs: 60_000,
+    }),
   ]
 }
 
@@ -959,3 +1003,4 @@ function renderBioPython(_args, value) {
 }
 
 
+    
