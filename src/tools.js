@@ -245,15 +245,19 @@ export function registerTools(ctx, config) {
       const timeoutMs = args.timeoutMs ?? config.rDefaultTimeoutMs ?? 120_000
       const cwd = resolveWorkdir(exec, args.workdir)
       const t0 = Date.now()
-      // 使用持久化 R 会话（加速）；失败时回退到传统方式
+      // 使用持久化 R 会话（加速）；配置 persistentR=false 时禁用
       let out
-      try {
-        const session = getPersistentSession(env.rscript, env.libDir)
-        await session.start()
-        const result = await session.execute(args.code, timeoutMs)
-        out = { ok: result.ok, stdout: result.stdout, stderr: result.stderr, result: result.result }
-      } catch (sessionErr) {
-        // 持久化会话失败，回退到传统方式
+      if (config.persistentR !== false) {
+        try {
+          const session = getPersistentSession(env.rscript, env.libDir)
+          await session.start()
+          const result = await session.execute(args.code, timeoutMs)
+          out = { ok: result.ok, stdout: result.stdout, stderr: result.stderr, result: result.result }
+        } catch (sessionErr) {
+          // 持久化会话失败，回退到传统方式
+          out = await runRBridge(env.rscript, env.libDir, args.code, { cwd, timeoutMs, signal: exec.signal })
+        }
+      } else {
         out = await runRBridge(env.rscript, env.libDir, args.code, { cwd, timeoutMs, signal: exec.signal })
       }
       const canonical = { ...out }
