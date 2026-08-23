@@ -12,31 +12,45 @@ import tempfile
 
 
 def _run_r(code, timeout=60):
-    """运行 R 代码并返回结果"""
+    """运行 R 代码并返回结果（通过临时文件，避免 stdin/stdout 问题）"""
     rscript = os.path.join(os.path.expanduser('~'), '.dsh', 'dsh-bio-genie', 'r', 'bin', 'x64', 'Rscript.exe')
-    rlib = os.path.join(os.path.expanduser('~'), '.dsh', 'dsh-bio-genie', 'r-lib')
+    rlib = os.path.join(os.path.join(os.path.expanduser('~'), '.dsh', 'dsh-bio-genie', 'r-lib'))
     
-    # 写入临时文件
+    # 写入临时 R 脚本
     with tempfile.NamedTemporaryFile(mode='w', suffix='.R', delete=False, encoding='utf-8') as f:
         f.write(code)
         tmp_path = f.name
     
+    # 输出文件
+    out_path = tmp_path + '.out'
+    
     try:
         env = os.environ.copy()
         env['R_LIBS'] = rlib
+        # 使用 --vanilla + 输出重定向
+        cmd = f'"{rscript}" --vanilla "{tmp_path}" > "{out_path}" 2>&1'
         result = subprocess.run(
-            [rscript, '--vanilla', tmp_path],
-            capture_output=True, text=True, timeout=timeout,
-            env=env, encoding='utf-8', errors='replace'
+            cmd, shell=True, timeout=timeout, env=env,
+            encoding='utf-8', errors='replace'
         )
+        
+        # 读取输出
+        stdout = ''
+        try:
+            with open(out_path, 'r', encoding='utf-8', errors='replace') as f:
+                stdout = f.read()
+        except:
+            pass
+        
         return {
             'ok': result.returncode == 0,
-            'stdout': result.stdout,
-            'stderr': result.stderr,
+            'stdout': stdout,
+            'stderr': '',
         }
     finally:
         try:
             os.unlink(tmp_path)
+            os.unlink(out_path)
         except:
             pass
 
