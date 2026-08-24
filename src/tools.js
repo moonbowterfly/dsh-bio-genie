@@ -902,6 +902,39 @@ function semanticTools(config) {
       op: 'sbol_read',
       timeoutMs: 60_000,
     }),
+    // ---- Phase 3：基因回路建模（第二层依赖，首次调用自动安装 biocrnpyler/bioscrape）----
+    bioTool(config, {
+      name: 'bio_circuit_compile',
+      description:
+        '基因回路编译（BioCRNpyler，第二层依赖首次调用自动安装）：组件列表' +
+        '（promoter/rbs/cds/terminator，promoter 可带 regulators 调控因子）组装为 DNA 构建体，' +
+        '编译为 CRN 并写出 SBML 模型，返回物种/反应数与网络拓扑图 PNG。' +
+        'SBML 路径可直接传给 bio_circuit_simulate。触发词：基因回路、回路编译、repressilator、遗传线路。',
+      parameters: {
+        components: { type: 'array', required: true, description: '组件列表 [{type: promoter/rbs/cds/terminator, name, regulators?, leak?, protein?}]', items: { type: 'object', additionalProperties: true } },
+        name: { type: 'string', description: '构建体名称，默认 circuit' },
+        context: { type: 'string', enum: ['txtl_extract', 'expression'], description: '表达体系，默认 txtl_extract' },
+        out_file: { type: 'string', description: 'SBML 输出路径（可选，默认工作区 <name>.xml）' },
+      },
+      op: 'circuit_compile',
+      timeoutMs: 300_000,
+    }),
+    bioTool(config, {
+      name: 'bio_circuit_simulate',
+      description:
+        '基因回路动力学仿真（Bioscrape）：加载 SBML 模型做 ODE/SSA 仿真，' +
+        '返回各物种稳态浓度、达峰时间与浓度-时间曲线图 PNG。支持 parameter_overrides 覆盖参数。' +
+        '触发词：回路仿真、动力学模拟、浓度曲线、SSA 随机模拟。',
+      parameters: {
+        sbml_file: { type: 'string', required: true, description: 'SBML 文件路径（bio_circuit_compile 的输出）' },
+        simulation_type: { type: 'string', enum: ['ode', 'ssa'], description: '仿真类型，默认 ode' },
+        timepoints: { type: 'object', additionalProperties: true, description: '{start, end, points}，默认 0-200 共 200 点' },
+        parameter_overrides: { type: 'object', additionalProperties: true, description: '可选参数覆盖 {参数名: 值}' },
+        out_file: { type: 'string', description: '曲线图输出路径（可选）' },
+      },
+      op: 'circuit_simulate',
+      timeoutMs: 300_000,
+    }),
     // ---- Python 差异表达/GSEA 工具（替代 R 引擎）----
     bioTool(config, {
       name: 'bio_deseq2',

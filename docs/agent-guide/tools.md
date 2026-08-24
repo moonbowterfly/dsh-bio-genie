@@ -2,7 +2,7 @@
 language: none
 ---
 
-# 工具全参考（46 个）
+# 工具全参考（48 个）
 
 > 每个工具：功能 → 参数（★=必填）→ 返回关键字段 → 典型触发词。**选工具第一优先，`bio_python` 执行器第二优先**。
 
@@ -187,3 +187,9 @@ language: none
 **bio_gene_knockout** 增强 — 新增 `analysis_type`：`single`（默认，行为不变，`gene` 必填）/ `double`（top_n 候选两两双敲，找合成致死对）/ `essentiality`（全基因必需性扫描）。
 
 **bio_production_envelope** — 生产包络线：`target_reaction ★`（产物反应如 EX_ac_e）、`vary_reaction ★`（扫描反应如 BIOMASS）、`points`（默认 20）。返回 vary_flux→target_flux 曲线与产物理论上限。触发词：生产包络、产量预测。
+
+### 基因回路建模（Phase 3，第二层按需安装）
+
+**bio_circuit_compile** — 基因回路编译（BioCRNpyler，**第二层依赖，首次调用自动安装**）：`components ★`（[{type: promoter|rbs|cds|terminator, name, regulators?}]）、`extract`（默认 txtl_extract）、`output_sbml`（输出路径）、`plot_network`（默认 true）。组装 DNA_construct → TxTlExtract → compile_crn()，返回 SBML 路径 + 物种数/反应数 + networkx 网络图 PNG。触发词：基因回路、回路编译、repressilator、CRN。
+
+**bio_circuit_simulate** — 回路动力学仿真（Bioscrape，**第二层依赖，首次调用自动安装**）：`sbml_file ★`（bio_circuit_compile 的输出）、`simulation_type`（ode 默认 / ssa 随机模拟）、`time_end`/`timepoints`、`param_overrides`（参数覆盖 dict）。返回动力学曲线图 PNG（matplotlib，物种浓度 vs 时间）+ 稳态值 + 峰值时间。触发词：回路仿真、动力学模拟、SSA 随机模拟。

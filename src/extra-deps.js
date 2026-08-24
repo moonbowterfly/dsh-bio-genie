@@ -16,23 +16,35 @@ export const EXTRA_DEPS = {
   // pyparsing>=3.1 是防冲突护栏：pydna 的传递依赖会把 pyparsing 降到 2.4.7，
   // 破坏 matplotlib（_fontconfig_pattern 需要 pyparsing3 的 one_of）。
   clone_simulate: ['pydna', 'pyparsing>=3.1'],
+  // Phase 3 基因回路建模：biocrnpyler 必须 --no-deps（fa2-modified 需 C++ 编译，
+  // 无 Windows wheel；fa2 只用于力导向布局，缺失不影响编译/仿真）
+  circuit_compile: ['biocrnpyler', 'python-libsbml', 'bokeh', 'networkx', 'bioscrape'],
+  circuit_simulate: ['bioscrape'],
   // Phase 2 预留：
   // cobra_model: ['cobra', 'glpk'],
 }
+
+/** 需要 --no-deps 安装的包（其传递依赖在本平台不可装且非必需）。 */
+export const EXTRA_NO_DEPS = new Set(['biocrnpyler'])
 
 /** pip 包名 → import 模块名（不一致或带版本约束时在此覆盖）。 */
 export const EXTRA_IMPORT_NAMES = {
   pydna: 'pydna',
   'pyparsing>=3.1': 'pyparsing',
+  biocrnpyler: 'biocrnpyler',
+  'python-libsbml': 'libsbml',
+  bokeh: 'bokeh',
+  networkx: 'networkx',
+  bioscrape: 'bioscrape',
 }
 
 /** 第三层：需用户手动启用的扩展模块（Phase 2/3 预留）。 */
 export const ADDON_MODULES = {
   'circuit-modeling': {
     name: '基因回路建模',
-    packages: ['biocrnpyler', 'bioscrape'],
+    packages: ['biocrnpyler', 'python-libsbml', 'bokeh', 'networkx', 'bioscrape'],
     tools: ['bio_circuit_compile', 'bio_circuit_simulate'],
-    description: 'BioCRNpyler + Bioscrape',
+    description: 'BioCRNpyler + Bioscrape（biocrnpyler 自动 --no-deps 安装）',
     size: '~20MB',
   },
   'sbol-standard': {

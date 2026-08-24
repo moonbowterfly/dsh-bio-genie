@@ -32,6 +32,7 @@ from dna_design_2 import op_assembly_design, op_plasmid_map
 from deg_tools import op_deseq2_python, op_gsea_python
 from synbio_tools import (op_primer3_design, op_dna_optimize, op_clone_simulate,
                           op_sbol_write, op_sbol_read)
+from circuit_tools import op_circuit_compile, op_circuit_simulate
 socket.setdefaulttimeout(20)
 from retry_utils import retry_on_network_error
 
@@ -1467,6 +1468,9 @@ OPS = {
     'production_envelope': op_production_envelope,
     'sbol_write': op_sbol_write,
     'sbol_read': op_sbol_read,
+    # Phase 3：基因回路建模
+    'circuit_compile': op_circuit_compile,
+    'circuit_simulate': op_circuit_simulate,
 }
 
 

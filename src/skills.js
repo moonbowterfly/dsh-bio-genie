@@ -432,6 +432,7 @@ language: mixed
 | bio_plasmid_map | 质粒图谱（传 genbank_file/sequence 出 PNG/SVG 图形，否则文本模式） |
 | bio_sbol_write / bio_sbol_read | SBOL 3 标准化设计写出/读取（tyto 本体解析） |
 | bio_production_envelope | 生产包络线（产物理论上限预测） |
+| bio_circuit_compile / bio_circuit_simulate | 基因回路编译（→SBML+网络图）/ ODE/SSA 动力学仿真（首次调用自动装 biocrnpyler/bioscrape） |
 | bio_log | 执行日志回溯（最近/检索） |
 | bio_memory | 会话记忆查询（成功模式/修复经验） |
 | bio_env | 环境诊断 |
@@ -484,6 +485,7 @@ language: mixed
 14. 合成生物学路由：高质量引物用 bio_primer3_design（简单预估才用 bio_primer_design）；多约束序列改造（去酶切位点+密码子优化）用 bio_dna_optimize（简单密码子替换才用 bio_seq_optimize）；克隆可行性/组装模拟用 bio_clone_simulate（首次调用会自动安装 pydna，提示用户等待）；质粒出图传 genbank_file 给 bio_plasmid_map 得出版级 PNG/SVG。
 15. 代谢工程路由：bio_fba 的 analysis_type=fva 做通量可变性分析、pfba 做节俭 FBA；bio_gene_knockout 的 analysis_type=double 找合成致死对、essentiality 做全基因必需性扫描；产物产量上限预测用 bio_production_envelope（target=产物交换反应，vary=生物量反应）。
 16. SBOL 标准化：导出设计用 bio_sbol_write（role 写术语名如 promoter，自动解析为 SO URI）；读取外部 SBOL 文件用 bio_sbol_read（可提取序列对接下游分析）。
+17. 基因回路：组件列表（promoter 可带 regulators）→ bio_circuit_compile 得 SBML + 网络拓扑图 → bio_circuit_simulate 做 ODE/SSA 仿真出浓度曲线。首次调用自动安装 biocrnpyler/bioscrape（~20MB，提示用户等待）；simulation_type=ssa 用于噪声/随机性分析。
 
 
 ## 自动代码修复（ACR）— 三层职责边界

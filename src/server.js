@@ -22,10 +22,11 @@
  */
 import { spawn } from 'node:child_process'
 import { join as pathJoin } from 'node:path'
-import { venvPython, resolveEnvDir, bioEnvExists, PYTHON_DIR } from './runtime.js'
+import { venvPython, resolveEnvDir, bioEnvExists, PYTHON_DIR, manageAddon } from './runtime.js'
 
 import { listSkillsForPanel } from './skills.js'
 import { handleConfig } from './config_handler.js'
+import { ADDON_MODULES } from './extra-deps.js'
 
 /** 路由前缀（与 @linxin666/dsh-client-ui-web-ui-settings 同风格）。 */
 const ROUTE_PREFIX = '/api/dsh-bio-genie'
@@ -347,6 +348,41 @@ async function handleSkills(req, res) {
   writeJson(res, 200, { ok: true, value: listSkillsForPanel() })
 }
 
+/**
+ * 高级模块端点（第三层 ADDON_MODULES 管理）：
+ *  - GET  → 全部模块的元数据 + import probe 安装状态
+ *  - POST { module, action: 'install'|'uninstall' } → uv pip install/uninstall + 验证
+ */
+async function handleAddons(req, res, config) {
+  const envDir = resolveEnvDir(config.pythonEnvDir)
+  const py = venvPython(envDir)
+  if (!bioEnvExists(config)) {
+    return writeJson(res, 200, {
+      ok: false, code: 'env-not-ready',
+      message: 'Python venv 未引导（首次调用 bio_python / bio_env 即会触发引导）',
+    })
+  }
+  if (req.method === 'GET') {
+    const modules = {}
+    for (const key of Object.keys(ADDON_MODULES)) {
+      const st = await manageAddon(key, 'status', py)
+      modules[key] = { ...ADDON_MODULES[key], installed: st.installed, packages: st.packages }
+    }
+    return writeJson(res, 200, { ok: true, value: { modules } })
+  }
+  const body = req.body || {}
+  if (typeof body.module !== 'string' || !ADDON_MODULES[body.module]) {
+    return writeJson(res, 400, { ok: false, code: 'bad-request', message: `未知模块: ${body.module}` })
+  }
+  if (body.action !== 'install' && body.action !== 'uninstall') {
+    return writeJson(res, 400, { ok: false, code: 'bad-request', message: `action 仅支持 install/uninstall` })
+  }
+  const result = await manageAddon(body.module, body.action, py)
+  writeJson(res, 200, result.ok
+    ? { ok: true, value: result }
+    : { ok: false, code: 'addon-failed', message: result.error || '操作失败' })
+}
+
 /** 工具 schema 端点：返回所有可调试工具的参数定义。 */
 async function handleToolSchemas(req, res) {
   writeJson(res, 200, { ok: true, value: TOOL_SCHEMAS })
@@ -418,6 +454,7 @@ export function registerApiRoutes(ctx, config = {}) {
     { kind: 'exact', path: `${ROUTE_PREFIX}/config`,         handler: guard((req, res) => handleConfig(req, res, config)) },
     { kind: 'exact', path: `${ROUTE_PREFIX}/tool-schemas`,    handler: guard((req, res) => handleToolSchemas(req, res)) },
     { kind: 'exact', path: `${ROUTE_PREFIX}/execute-tool`,    handler: guard((req, res) => handleExecuteTool(req, res, config)) },
+    { kind: 'exact', path: `${ROUTE_PREFIX}/addons`,          handler: guard((req, res) => handleAddons(req, res, config)) },
   ]) {
     disposers.push(ctx.webServer.register(route))
   }

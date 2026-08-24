@@ -24,7 +24,7 @@ import { fileURLToPath } from 'node:url'
 import { pipeline } from 'node:stream/promises'
 import { Readable } from 'node:stream'
 import os from 'node:os'
-import { EXTRA_DEPS, EXTRA_IMPORT_NAMES } from './extra-deps.js'
+import { EXTRA_DEPS, EXTRA_IMPORT_NAMES, EXTRA_NO_DEPS, ADDON_MODULES } from './extra-deps.js'
 
 /** Absolute path to the installed plugin root (parent of this src/ dir). */
 export const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -432,20 +432,80 @@ export async function ensureExtraDeps(op, exe, { timeoutMs = 600_000 } = {}) {
     return { ok: false, missing, installed: [], error: `uv 二进制不存在，无法自动补装 ${missing.join(', ')}` }
   }
   const pipMirror = pypiMirrorEnv()
-  let r = run(uv, ['pip', 'install', '--python', exe, ...missing], {
-    timeoutMs,
-    ...(pipMirror ? { env: pipMirror } : {}),
+  const errors = []
+  const installed = []
+  // 逐包安装：个别包需 --no-deps（EXTRA_NO_DEPS，如 biocrnpyler 的 fa2-modified
+  // 无 Windows wheel），整批安装会让可装包被不可装包拖死
+  for (const pkg of missing) {
+    const baseArgs = ['pip', 'install', '--python', exe, ...(EXTRA_NO_DEPS.has(pkg) ? ['--no-deps'] : []), pkg]
+    let r = run(uv, baseArgs, { timeoutMs, ...(pipMirror ? { env: pipMirror } : {}) })
+    if (r.code !== 0 && !pipMirror) {
+      r = run(uv, baseArgs, { timeoutMs, env: { UV_DEFAULT_INDEX: MIRROR_PYPI } })
+    }
+    if (r.code !== 0) {
+      errors.push(`${pkg}: ${r.stderr.slice(0, 200)}`)
+    } else {
+      installed.push(pkg)
+    }
+  }
+  if (errors.length > 0) {
+    return { ok: false, missing, installed, error: `自动安装失败: ${errors.join(' | ')}` }
+  }
+  return { ok: true, missing, installed }
+}
+
+/**
+ * 第三层扩展模块（ADDON_MODULES）管理：设置面板/手动触发。
+ * action: 'status' | 'install' | 'uninstall'
+ */
+export async function manageAddon(moduleKey, action, exe, { timeoutMs = 900_000 } = {}) {
+  const mod = ADDON_MODULES[moduleKey]
+  if (!mod) return { ok: false, error: `未知模块: ${moduleKey}` }
+  const importNames = mod.packages.map((p) => EXTRA_IMPORT_NAMES[p] ?? p.replace(/-/g, '_'))
+
+  const probeInstalled = () => mod.packages.map((pkg, i) => {
+    const probe = run(exe, ['-I', '-c', `import ${importNames[i]}`], { timeoutMs: 60_000 })
+    return { package: pkg, installed: probe.code === 0 }
   })
-  if (r.code !== 0 && !pipMirror) {
-    r = run(uv, ['pip', 'install', '--python', exe, ...missing], {
-      timeoutMs,
-      env: { UV_DEFAULT_INDEX: MIRROR_PYPI },
-    })
+
+  if (action === 'status') {
+    const checks = probeInstalled()
+    return { ok: true, module: moduleKey, installed: checks.every((c) => c.installed), packages: checks }
   }
-  if (r.code !== 0) {
-    return { ok: false, missing, installed: [], error: `自动安装 ${missing.join(', ')} 失败: ${r.stderr.slice(0, 300)}` }
+
+  const uv = uvBinary()
+  if (!existsSync(uv)) return { ok: false, error: 'uv 二进制不存在' }
+  const pipMirror = pypiMirrorEnv()
+  const uvRun = (args) => {
+    let r = run(uv, args, { timeoutMs, ...(pipMirror ? { env: pipMirror } : {}) })
+    if (r.code !== 0 && !pipMirror) {
+      r = run(uv, args, { timeoutMs, env: { UV_DEFAULT_INDEX: MIRROR_PYPI } })
+    }
+    return r
   }
-  return { ok: true, missing, installed: missing }
+
+  if (action === 'install') {
+    const errors = []
+    for (const pkg of mod.packages) {
+      const args = ['pip', 'install', '--python', exe, ...(EXTRA_NO_DEPS.has(pkg) ? ['--no-deps'] : []), pkg]
+      const r = uvRun(args)
+      if (r.code !== 0) errors.push(`${pkg}: ${r.stderr.slice(0, 200)}`)
+    }
+    const checks = probeInstalled()
+    const allOk = checks.every((c) => c.installed)
+    return {
+      ok: errors.length === 0 && allOk, module: moduleKey, installed: allOk,
+      packages: checks, ...(errors.length ? { error: errors.join(' | ') } : {}),
+    }
+  }
+
+  if (action === 'uninstall') {
+    const r = uvRun(['pip', 'uninstall', '--python', exe, ...mod.packages])
+    return { ok: r.code === 0, module: moduleKey, installed: false,
+             ...(r.code !== 0 ? { error: r.stderr.slice(0, 300) } : {}) }
+  }
+
+  return { ok: false, error: `未知 action: ${action}（支持 status/install/uninstall）` }
 }
 
 /** 完整自举：下载 uv → uv python install → uv venv → uv pip install。 */
