@@ -22,7 +22,7 @@
 |------|------|
 | 🪄 **许愿式分析（Wish Coding）** | 说人话就能分析：*"这条序列的 GC 含量和 EcoRI 酶切位点？"* |
 | 🧩 **全功能覆盖** | `bio_python` 执行器可运行任意 Biopython 代码（比对、PDB、Phylo、motif、BLAST…），配合 21 个领域/研究 skill 配方 |
-| ⚡ **高频语义化工具** | 36 个固定参数工具（GC 含量、翻译、限制酶、k-mer、文件 IO、BLAST、多序列比对、系统发育树、Entrez 检索、通路富集、PubMed 文献、参考基因组、出版级绘图、机器学习、DNA 设计、差异表达/GSEA）+ 4 个执行器/元工具（bio_python / bio_env / bio_log / bio_memory）——省 token、输出稳定、参数有校验 |
+| ⚡ **高频语义化工具** | 39 个固定参数工具（GC 含量、翻译、限制酶、k-mer、文件 IO、BLAST、多序列比对、系统发育树、Entrez 检索、通路富集、PubMed 文献、参考基因组、出版级绘图、机器学习、DNA 设计、Primer3 引物/多约束 DNA 优化/克隆模拟、差异表达/GSEA）+ 4 个执行器/元工具（bio_python / bio_env / bio_log / bio_memory）——省 token、输出稳定、参数有校验 |
 | 📦 **零安装** | 自动下载隔离的 Python 环境（uv + venv + Biopython 绘图栈）到 `$DSH_HOME/dsh-bio-genie/`，不污染系统 |
 | 🇨🇳 **网络自动适配** | 默认直连官方源，任一环节失败自动切换国内镜像（uv→清华 PyPI、CPython→npmmirror、PyPI 包→清华镜像），无需任何配置 |
 | 🛡️ **环境隔离** | Python 子进程以 `-I`（isolated）模式运行，不受宿主 PYTHONPATH 污染 |
@@ -161,13 +161,13 @@ X 与 gap 在翻译时按未知碱基处理（Biopython 标准行为），含 X/
 
 ### 它是什么
 
-- **人设文件**（`preset/bio-genie/preset.yml` + `agent.cordis.yml`）——覆盖 base persona，告诉 AI「你手头有 40 个工具 + 47 个 skill」。
+- **人设文件**（`preset/bio-genie/preset.yml` + `agent.cordis.yml`）——覆盖 base persona，告诉 AI「你手头有 43 个工具 + 47 个 skill」。
 - **入门口诀**（`skills/dsh-bio-genie-expert.md`）——一个 meta-skill：「先看工作区 → 二选一（语义化工具 / `bio_python`） → 失败按 ACR 三层修 → 报告带可追溯链」。
 - **一键安装**：`pnpm install` 跑 postinstall 钩子会自动把 preset 复制到 `~/.dsh/.agent-presets/bio-genie/`；无需手动操作。
 
 ### 它**不是**
 
-- ❌ **不接管 40 个工具**——所有 `bio_*` 工具仍由本插件的 `cordis.patch.yml` 注入，preset **不重声明**任何工具，避免冲突。
+- ❌ **不接管 43 个工具**——所有 `bio_*` 工具仍由本插件的 `cordis.patch.yml` 注入，preset **不重声明**任何工具，避免冲突。
 - ❌ **不抢默认人设**——postinstall 装完后，「生物基因精灵」出现在 dsh 预设选择器里；用户**主动选择**才激活。`agent-presets.default` 不会被改成 `bio-genie`。
 - ❌ **不破坏其他插件**——presets 与 plugins 是 dsh 的两个独立 seam，共存不冲突。
 

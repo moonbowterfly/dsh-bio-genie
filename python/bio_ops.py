@@ -30,6 +30,7 @@ from ml_tools_3 import op_stats_test
 from dna_design import op_primer_design, op_seq_optimize
 from dna_design_2 import op_assembly_design, op_plasmid_map
 from deg_tools import op_deseq2_python, op_gsea_python
+from synbio_tools import op_primer3_design, op_dna_optimize, op_clone_simulate
 socket.setdefaulttimeout(20)
 from retry_utils import retry_on_network_error
 
@@ -1266,6 +1267,10 @@ OPS = {
     'seq_optimize': op_seq_optimize,
     'assembly_design': op_assembly_design,
     'plasmid_map': op_plasmid_map,
+    # 合成生物学 Phase 1（primer3/dnachisel 内置；pydna 第二层按需自动安装）
+    'primer3_design': op_primer3_design,
+    'dna_optimize': op_dna_optimize,
+    'clone_simulate': op_clone_simulate,
 
     'deseq2': op_deseq2_python,
     'gsea': op_gsea_python,

@@ -24,6 +24,7 @@ import { fileURLToPath } from 'node:url'
 import { pipeline } from 'node:stream/promises'
 import { Readable } from 'node:stream'
 import os from 'node:os'
+import { EXTRA_DEPS, EXTRA_IMPORT_NAMES } from './extra-deps.js'
 
 /** Absolute path to the installed plugin root (parent of this src/ dir). */
 export const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -350,7 +351,8 @@ function findManagedPython(pyDir) {
 }
 
 /** requirements.txt 中除 biopython/numpy 外必须可导入的包（环境完整性判断）。 */
-const REQUIRED_PACKAGES = ['matplotlib', 'pandas', 'seaborn', 'scipy', 'PIL']
+const REQUIRED_PACKAGES = ['matplotlib', 'pandas', 'seaborn', 'scipy', 'PIL',
+  'primer3', 'dna_features_viewer', 'dnachisel']
 
 /** 查询解释器元数据（python 版本 / 核心库 / 绘图栈）。 */
 async function inspect(exe) {
@@ -367,7 +369,9 @@ async function inspect(exe) {
     '        "biopython": _ver("Bio"), "numpy": _ver("numpy"),',
     '        "matplotlib": _ver("matplotlib"),',
     '        "packages": {"matplotlib": _ver("matplotlib"), "pandas": _ver("pandas"),',
-    '                     "seaborn": _ver("seaborn"), "scipy": _ver("scipy"), "PIL": _ver("PIL")}}',
+    '                     "seaborn": _ver("seaborn"), "scipy": _ver("scipy"), "PIL": _ver("PIL"),',
+    '                     "primer3": _ver("primer3"), "dna_features_viewer": _ver("dna_features_viewer"),',
+    '                     "dnachisel": _ver("dnachisel")}}',
     'print(json.dumps(info))',
   ].join(NL)
   const { code, stdout } = await run(exe, ['-I', '-c', probe])
@@ -406,6 +410,42 @@ async function repairPackages(exe, missing) {
   }
   logs.push('[repair] 补装完成')
   return { logs: logs.join(String.fromCharCode(10)), ok: true }
+}
+
+/**
+ * 第二层按需依赖（src/extra-deps.js 的 EXTRA_DEPS）：op 首次调用前检测
+ * 其声明的额外包是否可 import，缺失则用已下载的 uv 就地补装（幂等、镜像回退）。
+ * 返回 { ok, missing[], installed[], error? }；op 无额外依赖时直接 ok。
+ */
+export async function ensureExtraDeps(op, exe, { timeoutMs = 600_000 } = {}) {
+  const extra = EXTRA_DEPS[op]
+  if (!extra || extra.length === 0) return { ok: true, missing: [], installed: [] }
+  const missing = []
+  for (const pkg of extra) {
+    const mod = EXTRA_IMPORT_NAMES[pkg] ?? pkg.replace(/-/g, '_')
+    const probe = run(exe, ['-I', '-c', `import ${mod}`], { timeoutMs: 60_000 })
+    if (probe.code !== 0) missing.push(pkg)
+  }
+  if (missing.length === 0) return { ok: true, missing: [], installed: [] }
+  const uv = uvBinary()
+  if (!existsSync(uv)) {
+    return { ok: false, missing, installed: [], error: `uv 二进制不存在，无法自动补装 ${missing.join(', ')}` }
+  }
+  const pipMirror = pypiMirrorEnv()
+  let r = run(uv, ['pip', 'install', '--python', exe, ...missing], {
+    timeoutMs,
+    ...(pipMirror ? { env: pipMirror } : {}),
+  })
+  if (r.code !== 0 && !pipMirror) {
+    r = run(uv, ['pip', 'install', '--python', exe, ...missing], {
+      timeoutMs,
+      env: { UV_DEFAULT_INDEX: MIRROR_PYPI },
+    })
+  }
+  if (r.code !== 0) {
+    return { ok: false, missing, installed: [], error: `自动安装 ${missing.join(', ')} 失败: ${r.stderr.slice(0, 300)}` }
+  }
+  return { ok: true, missing, installed: missing }
 }
 
 /** 完整自举：下载 uv → uv python install → uv venv → uv pip install。 */

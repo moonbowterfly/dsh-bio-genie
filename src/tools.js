@@ -9,7 +9,7 @@
  * @module dsh-bio-genie/tools
  */
 import { defineTool } from '@deepseek-ai/dsh-tools'
-import { ensureEnvironment, venvPython, resolveEnvDir } from './runtime.js'
+import { ensureEnvironment, venvPython, resolveEnvDir, ensureExtraDeps } from './runtime.js'
 import { runBridge, callBio } from './python.js'
 import { join } from 'node:path'
 import { existsSync } from 'node:fs'
@@ -64,6 +64,11 @@ function bioTool(config, opts) {
       // 限流：不足最小间隔先等待（spawn 之前，省进程启动）
       await throttle(opts.op)
       const py = await requireEnv(config)
+      // 第二层按需依赖（EXTRA_DEPS）：op 声明的额外包缺失时自动 uv pip install
+      const deps = await ensureExtraDeps(opts.op, py)
+      if (!deps.ok) {
+        throw new Error(`dsh-bio-genie 依赖自动安装失败（op=${opts.op}）: ${deps.error}`)
+      }
       const cwd = resolveWorkdir(exec)
       const t0 = Date.now()
       const res = await callBio(py, opts.op, args, { cwd, timeoutMs: callTimeout, signal: exec.signal })
@@ -773,15 +778,80 @@ function semanticTools(config) {
     bioTool(config, {
       name: 'bio_plasmid_map',
       description:
-        '质粒图谱：输入特征列表，生成文本格式的质粒注释图。支持 regulatory/cds/origin/marker 类型。' +
-        '触发词：质粒图、质粒图谱、载体图谱。',
+        '质粒图谱：特征列表 → 文本注释图；传入 genbank_file 或（features+sequence）时输出' +
+        ' PNG/SVG 图形文件（dna-features-viewer，缺失/渲染失败自动回退文本模式）。' +
+        '支持 regulatory/cds/origin/marker 类型与 highlight_regions 高亮。' +
+        '触发词：质粒图、质粒图谱、载体图谱、plasmid map。',
       parameters: {
         name: { type: 'string', description: '质粒名称，默认 plasmid' },
         size: { type: 'number', description: '总大小（bp），默认从特征推断' },
-        features: { type: 'array', required: true, description: '特征列表 [{name,start,end,type,direction}]', items: { type: 'object', additionalProperties: true } },
+        features: { type: 'array', description: '特征列表 [{name,start,end,type,direction}]', items: { type: 'object', additionalProperties: true } },
+        sequence: { type: 'string', description: '质粒序列（图形模式，配合 features 使用）' },
+        genbank_file: { type: 'string', description: 'GenBank 文件路径（图形模式，可不带 features）' },
+        output_format: { type: 'string', enum: ['png', 'svg'], description: '图形输出格式，默认 png' },
+        out_file: { type: 'string', description: '图形输出路径（可选，默认工作区 <name>_map.<format>）' },
+        figure_width: { type: 'number', description: '图宽（英寸），默认 10' },
+        highlight_regions: { type: 'array', description: '可选高亮区域 [{start,end,label}]', items: { type: 'object', additionalProperties: true } },
       },
       op: 'plasmid_map',
-      timeoutMs: 60_000,
+      timeoutMs: 120_000,
+    }),
+    // ---- 合成生物学 Phase 1（2026-08-25，设计文档 02-Phase1-核心扩展）----
+    bioTool(config, {
+      name: 'bio_primer3_design',
+      description:
+        '工业级 PCR 引物设计（Primer3 热力学评分）：模板序列 → 候选引物对' +
+        '（seq/Tm/GC%/发夹/自互补/二聚体 Tm + penalty 排序，rank 1 为推荐）。' +
+        '与 bio_primer_design（Biopython 简单版）区分：本工具走 Primer3 全套二级结构约束，' +
+        '适合需要可投稿级引物质量的场景。触发词：Primer3、工业级引物、qPCR 引物、引物对筛选。',
+      parameters: {
+        sequence: { type: 'string', required: true, description: '模板 DNA 序列' },
+        target_region: { type: 'array', description: '目标扩增区域 [start, length]（0-based）', items: { type: 'number' } },
+        primer_size: { type: 'array', description: '引物长度范围 [min, max]，默认 [18, 25]', items: { type: 'number' } },
+        tm_range: { type: 'array', description: 'Tm 范围 [min, max]，默认 [58, 65]', items: { type: 'number' } },
+        gc_range: { type: 'array', description: 'GC% 范围 [min, max]，默认 [40, 60]', items: { type: 'number' } },
+        max_hairpin_tm: { type: 'number', description: '发夹结构最大 Tm，默认 47' },
+        max_self_any_tm: { type: 'number', description: '自互补最大 Tm，默认 47' },
+        num_return: { type: 'number', description: '返回候选引物对数，默认 5' },
+      },
+      op: 'primer3_design',
+      timeoutMs: 120_000,
+    }),
+    bioTool(config, {
+      name: 'bio_dna_optimize',
+      description:
+        '多约束 DNA 序列优化（DNA Chisel 约束求解）：EnforceTranslation 保持氨基酸不变，' +
+        '同时满足去限制性位点/GC 窗口/禁用 motif 等约束，再做宿主密码子优化，返回修改报告。' +
+        '与 bio_seq_optimize（简单密码子替换）区分：本工具是多约束联合优化。' +
+        '触发词：多约束优化、去除酶切位点、DNA Chisel、序列工程化改造。',
+      parameters: {
+        protein_sequence: { type: 'string', description: '蛋白质序列（与 dna_sequence 二选一）' },
+        dna_sequence: { type: 'string', description: 'DNA 序列（与 protein_sequence 二选一）' },
+        host_organism: { type: 'string', description: '宿主（DNA Chisel species 名，默认 e_coli）' },
+        constraints: {
+          type: 'object', additionalProperties: true,
+          description: '约束：remove_restriction_sites（酶名列表）/ gc_range [min,max] / avoid_motifs（序列列表）',
+        },
+        codon_optimize: { type: 'boolean', description: '是否做密码子优化，默认 true' },
+      },
+      op: 'dna_optimize',
+      timeoutMs: 300_000,
+    }),
+    bioTool(config, {
+      name: 'bio_clone_simulate',
+      description:
+        '克隆模拟（pydna，第二层依赖首次调用自动安装）：gibson 法检测同源臂并模拟环化组装，' +
+        '返回预期产物序列；golden_gate/restriction 做位点可行性检查并给出方案建议。' +
+        '触发词：克隆模拟、Gibson 组装模拟、Golden Gate、质粒构建验证。',
+      parameters: {
+        backbone: { type: 'string', required: true, description: '载体序列（环形）' },
+        inserts: { type: 'array', required: true, description: '插入片段 [{name, sequence}]', items: { type: 'object', additionalProperties: true } },
+        method: { type: 'string', enum: ['gibson', 'golden_gate', 'restriction', 'ligation'], description: '组装方法，默认 gibson' },
+        overlap: { type: 'number', description: 'Gibson 同源臂长度下限（bp），默认 20' },
+        restriction_enzymes: { type: 'array', description: '酶切/Golden Gate 法指定的酶（默认 BsaI）', items: { type: 'string' } },
+      },
+      op: 'clone_simulate',
+      timeoutMs: 300_000,
     }),
     // ---- Python 差异表达/GSEA 工具（替代 R 引擎）----
     bioTool(config, {

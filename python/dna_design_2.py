@@ -99,13 +99,79 @@ def op_assembly_design(args):
     return result
 
 
+def _plasmid_graphic(args, features):
+    """dna-features-viewer 图形模式：GenBank 文件或 features+sequence → PNG/SVG。
+
+    成功返回 dict（含 out_file 路径）；库缺失或无图形输入返回 None 走文本回退。
+    """
+    genbank_file = args.get('genbank_file')
+    output_format = str(args.get('output_format', 'png')).lower()
+    if not genbank_file and not args.get('sequence'):
+        return None
+    try:
+        import matplotlib
+        matplotlib.use('Agg')
+        from dna_features_viewer import (
+            BiopythonTranslator, CircularGraphicRecord, GraphicRecord, GraphicFeature,
+        )
+    except ImportError:
+        return {'graphic': False,
+                'graphic_note': 'dna_features_viewer 未安装，已回退文本模式'
+                                '（可运行 bio_env reinstall=true 补装）'}
+
+    name = args.get('name', 'plasmid')
+    width = float(args.get('figure_width', 10))
+    try:
+        if genbank_file:
+            record = BiopythonTranslator().translate_record(
+                genbank_file, record_class=CircularGraphicRecord)
+        else:
+            seq = ''.join(str(args.get('sequence', '')).upper().split())
+            gfeatures = [
+                GraphicFeature(start=int(f.get('start', 0)), end=int(f.get('end', 0)),
+                               strand=1 if f.get('direction', '+') == '+' else -1,
+                               label=str(f.get('name', '?')))
+                for f in features
+            ]
+            cls = CircularGraphicRecord if args.get('circular', True) else GraphicRecord
+            record = cls(sequence=seq or 'N' * max(1, args.get('size', 1000)),
+                         features=gfeatures)
+        # 高亮区域（可选）
+        for hl in args.get('highlight_regions') or []:
+            record.features.append(GraphicFeature(
+                start=int(hl['start']), end=int(hl['end']), strand=0,
+                color='#fff3b0', label=str(hl.get('label', ''))))
+
+        out_file = args.get('out_file') or os.path.join(
+            os.getcwd(), f'{name}_map.{output_format}')
+        ax, _ = record.plot(figure_width=width)
+        ax.figure.savefig(out_file, bbox_inches='tight', dpi=300)
+        import matplotlib.pyplot as plt
+        plt.close(ax.figure)
+        return {'graphic': True, 'out_file': os.path.abspath(out_file),
+                'output_format': output_format, 'figure_width': width}
+    except Exception as e:
+        return {'graphic': False, 'graphic_note': f'图形渲染失败，已回退文本模式: {e}'}
+
+
 def op_plasmid_map(args):
-    """质粒图谱：输入特征列表，生成文本格式的质粒注释图。"""
+    """质粒图谱：GenBank/features → 图形（dna-features-viewer）或文本注释图。
+
+    传入 genbank_file 或（features + sequence）时优先输出 PNG/SVG 图形文件；
+    dna_features_viewer 缺失或渲染失败时自动回退到原有文本模式。
+    """
     features = args.get('features', [])
     name = args.get('name', 'plasmid')
     total_size = args.get('size', None)
 
+    graphic_result = None
+    if args.get('genbank_file') or (args.get('sequence') and features):
+        graphic_result = _plasmid_graphic(args, features)
+
     if not features:
+        # 仅 GenBank 图形模式不需要 features 列表
+        if args.get('genbank_file') and graphic_result and graphic_result.get('graphic'):
+            return {'name': name, **graphic_result}
         return {'error': 'features list required (e.g. [{"name":"promoter","start":0,"end":200,"type":"regulatory"}])'}
 
     # 构建图谱
@@ -166,7 +232,7 @@ def op_plasmid_map(args):
             f'  {i}. {feat.get("name", "?")} [{feat.get("type", "?")}] {feat.get("start")}-{feat.get("end")} {arrow}'
         )
 
-    return {
+    result = {
         'name': name,
         'size': max_pos,
         'features': features_sorted,
@@ -175,3 +241,6 @@ def op_plasmid_map(args):
         'unannotated_bp': remaining,
         'map_text': '\n'.join(map_lines),
     }
+    if graphic_result:
+        result.update(graphic_result)
+    return result

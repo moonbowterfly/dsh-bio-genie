@@ -426,6 +426,10 @@ language: mixed
 | bio_fig_profile | 数据剖析 + 图型建议（画统计图前先跑） |
 | bio_fig_export | 图文件合规审计（DPI/格式/尺寸/字体嵌入）+ 可选 PNG 预览 |
 | bio_fig_qa | 绘图环境自检（CJK 中文字体 / 期刊预设） |
+| bio_primer3_design | 工业级引物设计（Primer3 热力学评分，候选引物对排序） |
+| bio_dna_optimize | 多约束 DNA 优化（DNA Chisel：去酶切位点/GC 窗口/密码子联合优化） |
+| bio_clone_simulate | 克隆模拟（pydna：Gibson 环化组装模拟，首次调用自动装 pydna） |
+| bio_plasmid_map | 质粒图谱（传 genbank_file/sequence 出 PNG/SVG 图形，否则文本模式） |
 | bio_log | 执行日志回溯（最近/检索） |
 | bio_memory | 会话记忆查询（成功模式/修复经验） |
 | bio_env | 环境诊断 |
@@ -475,6 +479,7 @@ language: mixed
 11. 画统计图/论文图：先 bio_fig_profile 剖析数据再选图型（见 bio-figure skill）；中文图先 bio_fig_qa 查字体；绘制配方见 bio-proto-pub-figure（figurelib 可 import）；投稿前 bio_fig_export 审计。
 12. 统计结论必须跑检验（bio-proto-statistics）：组间比较给 p 值+效应量，多重比较必须校正；误差棒图注写清 SD/SEM/CI + n。
 13. BLAST 用 bio_blast_search（勿在 bio_python 里自己调 qblast）；MSA→建树流水线：bio_msa 的 alignment_fasta 输出直接传给 bio_phylo_build 的 alignment 参数；bio_msa 返回 status=program_missing 时提示用户安装 clustalw/muscle，或改走 bio_python 兜底。
+14. 合成生物学路由：高质量引物用 bio_primer3_design（简单预估才用 bio_primer_design）；多约束序列改造（去酶切位点+密码子优化）用 bio_dna_optimize（简单密码子替换才用 bio_seq_optimize）；克隆可行性/组装模拟用 bio_clone_simulate（首次调用会自动安装 pydna，提示用户等待）；质粒出图传 genbank_file 给 bio_plasmid_map 得出版级 PNG/SVG。
 
 
 ## 自动代码修复（ACR）— 三层职责边界
