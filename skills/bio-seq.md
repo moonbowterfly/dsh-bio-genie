@@ -67,3 +67,5 @@ for frame, pep in six_frame_translations(s).items():
 - `translate()` 返回 `Seq`，可再 `len()` / 继续切片。
 - `molecular_weight(seq, seq_type="protein")` 对蛋白序列请加 `seq_type`。
 - GC 含量不同工具口径不同：`gc_fraction` 返回小数，`GC` 返回百分比数字。
+- ⚠️ **序列分析前必须验证输入质量**：检查长度、N碱基比例、是否为预期类型（DNA/RNA/蛋白）。
+- ⚠️ **不要对 partial 序列做全局统计**（如 GC 含量）——partial 序列不具代表性。

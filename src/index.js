@@ -3,8 +3,8 @@
  *
  * 注入 tools / skills / systemPrompt，贡献：
  *  - 系统提示词段（许愿式分析指引，persona.md 可编辑）
- *  - skill 目录（14 领域 + 1 主 skill）
- *  - bio_python 执行器 + bio_env + 11 个语义化工具
+ *  - skill 目录（17 领域 + 4 研究 + 17 协议 + 8 指南 + 1 主 skill，共 47 个）
+ *  - bio_python 执行器 + bio_env + bio_log/bio_memory + 36 个语义化工具（共 40 个工具）
  *  - 后台预热 Python 环境（零依赖自举：uv + venv + biopython）
  *
  * @module dsh-bio-genie
@@ -15,7 +15,6 @@ import { BIO_PROMPT_SECTION } from './prompt.js'
 import { registerSkills } from './skills.js'
 import { registerTools } from './tools.js'
 import { ensureEnvironment } from './runtime.js'
-import { ensureREnvironment } from './r-runtime.js'
 import { registerApiRoutes } from './server.js'
 
 const SKILLS_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'skills')
@@ -27,7 +26,7 @@ export const name = 'dsh-bio-genie'
 /** 需要的服务。
  *
  * tools/skills/systemPrompt 之外新增 'webServer'：浏览器侧设置面板的
- * /api/dsh-bio-genie/* 路由（skill 清单 / Python 包列表 / R 包列表）
+ * /api/dsh-bio-genie/* 路由（skill 清单 / Python 包列表）
  * 注册在 webServer 上，路由细节见 src/server.js。webServer 是 dsh 宿主
  * 服务，第三方插件无法在缺少它的部署中提供面板的动态数据；这种部署
  * 下面板会优雅降级（静态部分照常渲染，RPC 端点返回 ok:false）。
@@ -37,17 +36,10 @@ export const inject = ['tools', 'skills', 'systemPrompt', 'webServer']
 /** 插件配置默认值（不导出 schemastery schema，避免版本差异）。 */
 const DEFAULT_CONFIG = {
   defaultTimeoutMs: 60000,
-  rDefaultTimeoutMs: 120000,
   warmUp: true,
-  // R 环境体积大（R 安装器 + 核心包集数百 MB），默认不随插件加载预热——
-  // 首次 bio_r 调用时惰性引导（与 Python 一致的"零手动安装"，但按需触发）。
-  warmUpR: true,
   enableLog: true,
   enableMemory: true,
   pythonEnvDir: undefined,
-  // R 可覆盖项：rscriptPath（系统 R 的 Rscript 路径，macOS/Linux 用户自行装 R 后配置）、rLibDir（私有包库）
-  rscriptPath: undefined,
-  rLibDir: undefined,
 }
 
 /**
@@ -61,7 +53,7 @@ export function apply(ctx, config) {
   registerSkills(ctx, SKILLS_DIR, GUIDES_DIR)
   registerTools(ctx, cfg)
 
-  // 设置面板 RPC 路由（loopback-only）：skill 清单 / Python 包列表 / R 包列表。
+  // 设置面板 RPC 路由（loopback-only）：skill 清单 / Python 包列表。
   // registerApiRoutes 内部用 ctx.webServer.register 注册路由，若 webServer
   // 不可用 cordis 会自动降级（inject = ['webServer'] 排队等待）。
   ctx.effect(() => registerApiRoutes(ctx, cfg), 'dsh-bio-genie: api routes')
@@ -73,17 +65,6 @@ export function apply(ctx, config) {
         console.log(`[dsh-bio-genie] Python 环境就绪 (biopython ${env.biopython})`)
       } else {
         console.warn(`[dsh-bio-genie] Python 环境预热失败: ${env.error ?? 'unknown'}（工具调用时将重试）`)
-      }
-    })
-  }
-
-  // R 环境预热默认关闭（体积大）；warmUpR=true 时随插件加载预热
-  if (cfg.warmUpR === true) {
-    void ensureREnvironment(cfg).then((env) => {
-      if (env.ready) {
-        console.log(`[dsh-bio-genie] R 环境就绪 (R ${env.rVersion} / Bioconductor ${env.bioc})`)
-      } else {
-        console.warn(`[dsh-bio-genie] R 环境预热失败: ${env.error ?? 'unknown'}（bio_r 调用时将重试）`)
       }
     })
   }

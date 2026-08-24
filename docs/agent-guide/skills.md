@@ -2,7 +2,7 @@
 language: none
 ---
 
-# Skill 体系导航（41 个）
+# Skill 体系导航（47 个）
 
 > skill 是插件内置的可加载知识库（配方/工作流/坑）。加载方式：用 skill 工具按名字加载。**写非平凡代码前先加载对应领域 skill；命中协议场景直接加载协议。**
 
@@ -14,10 +14,12 @@ language: none
 
 | 层级 | 命名特征 | 分类依据 |
 |---|---|---|
-| 主 skill | `dsh-bio-genie`（唯一） | **路由中枢**：工具分层决策树、双引擎路由表、协议映射。任何生物分析先加载它 |
-| 领域 skill | `bio-*`（21 个：15 个 Python + 6 个 R） | 按 **能力域**划分——Python 侧按 Biopython 模块（io/seq/align/…）；R 侧按 Bioconductor 能力域（basics/rnaseq/enrichment/microbiome/vis）——教「某个模块/包族怎么用」 |
-| 协议 skill | `bio-proto-*`（19 个：17 个 Python + 2 个 R） | 按 **高频任务**划分（质控/建树/富集/绘图/差异表达/GSEA…）——教「某类任务怎么完整做完」，含可执行代码模板 + 常见坑 |
-| 指南 skill | `dsh-bio-genie-guide-*`（9 个） | 插件**整体说明书**——教「这个插件怎么用」，按主题划分 |
+| 主 skill | `dsh-bio-genie`（唯一） | **路由中枢**：工具分层决策树、协议映射、调用规则。任何生物分析先加载它 |
+| 领域 skill | `bio-*`（21 个） | 按 **能力域**划分——按 Biopython 模块（io/seq/align/…）与专题（机器学习/生存分析/变异分析/论文写作等）——教「某个模块/方法族怎么用」 |
+| 协议 skill | `bio-proto-*`（17 个） | 按 **高频任务**划分（质控/建树/富集/绘图/差异表达/GSEA…）——教「某类任务怎么完整做完」，含可执行代码模板 + 常见坑 |
+| 指南 skill | `dsh-bio-genie-guide-*`（8 个） | 插件**整体说明书**——教「这个插件怎么用」，按主题划分 |
+
+合计：主 1 + 领域 21 + 协议 17 + 指南 8 = **47 个**。
 
 ### 维度二：按语言解释器（这个 skill 的代码跑在哪个环境）
 
@@ -26,37 +28,33 @@ language: none
 | 值 | 含义 | 判定依据 |
 |---|---|---|
 | `python` | 仅用插件内置 Python 环境（bio_python / bio_* 工具 / figurelib） | 代码模板全是 Python，只调 Python 生态 |
-| `r` | 仅用 R 环境（bio_r 执行器 / Bioconductor 生态） | 代码模板全是 R |
-| `mixed` | 同一工作流混用 Python 与 R | 正文会明确标注哪一步用哪个解释器 |
+| `mixed` | 同一工作流混用多种路径（语义化工具 + bio_python 代码） | 正文会明确标注哪一步用哪个工具/路径 |
 | `none` | 纯知识/导航/参考，不执行任何代码 | 无代码模板、无工具调用序列 |
 
-**当前状态**：R 引擎已接入（2026-08-17）——6 个 R 领域 skill 与 2 个 R 协议为 `r`；genie 主 skill 为 `mixed`（双引擎路由）；其余领域/协议为 `python`。指南中 python-cookbook/r-cookbook/workflows/plotting 为 `python`/`r`/`mixed`/`python`，其余为 `none`。
+**当前状态**：R 引擎已移除（2026-08）——全部领域/协议 skill 均为 `python` 或 `none`；差异表达与 GSEA 由 Python 语义化工具 `bio_deseq2` / `bio_gsea` 承担。
 
 ### 加载判定顺序（分类的实际用法）
 
 ```
-1. 看 language 字段：确认 skill 依赖的解释器与任务匹配（R 任务配 r 标注的 skill）
-2. 先加载主 skill dsh-bio-genie → 由决策树 + 双引擎路由表定引擎与路径
-3. 命中协议任务（"建树""富集""差异表达""GSEA"）→ 直接加载对应 bio-proto-* 协议
-4. 语义化工具覆盖不了且无协议命中 → 加载对应领域 skill 拿配方，写 bio_python/bio_r 代码
-5. 不确定插件整体用法 / 工具参数 / 出错原因 → 加载对应指南
+1. 先加载主 skill dsh-bio-genie → 由决策树定路径
+2. 命中协议任务（"建树""富集""差异表达""GSEA"）→ 直接加载对应 bio-proto-* 协议
+3. 语义化工具覆盖不了且无协议命中 → 加载对应领域 skill 拿配方，写 bio_python 代码
+4. 不确定插件整体用法 / 工具参数 / 出错原因 → 加载对应指南
 ```
 
 ## 一、主 skill：`dsh-bio-genie`
 
 任何生物分析**先加载**。内容：工具分层决策树（语义化工具表 → 协议映射表 → 调用规则 → ACR → 会话记忆 → 科学严谨性）。它告诉你去哪、用哪个工具、加载哪个 skill。
 
-## 二、21 个领域 skill（Python 配方 15 + R 配方 6）
-
-### Python 侧（Biopython 模块配方）
+## 二、21 个领域 skill（全 Python 配方）
 
 | Skill | 覆盖 | 何时加载 |
 |---|---|---|
 | `bio-core` | 核心工作流：bio_python 用法、许愿→代码 | 任何 Python 分析的起点 |
 | `bio-io` | Bio.SeqIO 读写/格式转换/大文件流式 | 涉及序列文件 IO |
-| `bio-seq` | Bio.Seq/SegUtils：GC、Tm、分子量、反向互补 | 序列操作 |
+| `bio-seq` | Bio.Seq/SeqUtils：GC、Tm、分子量、反向互补 | 序列操作 |
 | `bio-align` | PairwiseAligner/AlignIO：双序列/多序列比对 | 比对任务 |
-| `bio-blast` | Bio.Blast：NCBIWWW/NcBIXML | 远程 BLAST |
+| `bio-blast` | Bio.Blast：NCBIWWW/NCBIXML | 远程 BLAST |
 | `bio-searchio` | Bio.SearchIO：BLAST/HMMER/Exonerate 输出解析 | 解析检索输出 |
 | `bio-entrez` | Bio.Entrez：esearch/efetch/esummary/elink | bio_python 里调 NCBI |
 | `bio-phylo` | Bio.Phylo：Newick/Nexus、树操作、画树 | 系统发育 |
@@ -67,19 +65,14 @@ language: none
 | `bio-graphics` | GenomeDiagram：序列图谱（线性/环形） | 画质粒/基因组图谱 |
 | `bio-popgen` | Bio.PopGen：Fst、LD、单倍型 | 群体遗传 |
 | `bio-figure` | **出版级绘图顾问**：8 步工作流、选图决策、18 陷阱、期刊规格、CJK | 任何画图需求（见 guide-plotting） |
+| `bio-ml` | scikit-learn 生物机器学习：特征工程/分类/降维 | ML 建模任务 |
+| `bio-dna-design` | DNA 序列设计：引物/探针/元件设计约束 | 序列设计任务 |
+| `bio-survival-analysis` | lifelines 生存分析：KM/log-rank/Cox | 生存分析任务 |
+| `bio-variant-analysis` | 变异分析：VCF 解析/注释/过滤 | 变异任务 |
+| `bio-literature-review` | 文献调研方法学：检索式/筛选/综述结构 | 文献综述任务 |
+| `bio-paper-writing` | 论文写作：IMRaD 结构/图表规范/投稿 | 写作任务 |
 
-### R 侧（Bioconductor 包族配方）
-
-| Skill | 覆盖 | 何时加载 |
-|---|---|---|
-| `bio-r-core` | bio_r 契约、环境事实、双引擎分工、ACR 信号表 | 任何 R 分析的起点 |
-| `bio-r-basics` | Biostrings / GenomicRanges / SummarizedExperiment 对象模型 | R 数据结构问题 |
-| `bio-r-rnaseq` | DESeq2 / edgeR 差异表达管道与解读纪律 | 差异表达任务 |
-| `bio-r-enrichment` | fgsea GSEA + enricher ORA；与 bio_enrichr 分工 | 排序富集任务 |
-| `bio-r-microbiome` | phyloseq：OTU 组装、多样性、PCoA、PERMANOVA | 微生物组任务 |
-| `bio-r-vis` | ggplot2 / ggtree / ComplexHeatmap | R 生态绘图任务 |
-
-## 三、19 个协议 skill（高频任务工作流，含代码模板+坑）
+## 三、17 个协议 skill（高频任务工作流，含代码模板+坑）
 
 | 协议 | 触发任务 |
 |---|---|
@@ -100,17 +93,14 @@ language: none
 | `bio-proto-pub-figure` | **出版级出图执行**：9 类图配方/figurelib 调用/自检闭环 |
 | `bio-proto-coords` | 基因组坐标：0/1-based 转换/BED-GFF-VCF 惯例/GRCh37-38/左对齐 |
 | `bio-proto-statistics` | 统计：检验选择/scipy 模板/多重校正/效应量与功效 |
-| `bio-proto-r-de` | **R** 差异表达：counts+meta 输入约定 → DESeq2 全流程模板 |
-| `bio-proto-r-gsea` | **R** GSEA：排序列表+GMT → fgsea 全流程模板 |
 
 ## 四、加载策略
 
-1. **先加载 `dsh-bio-genie`** → 决策树 + 双引擎路由表告诉你引擎与路径。
-2. **命中协议任务**（"批量转换格式""建树""富集分析""差异表达""GSEA"）→ 直接加载对应 `bio-proto-*`，按模板执行。
-3. **语义化工具覆盖不了、且无协议命中** → 加载对应领域 skill（bio-align/bio-r-rnaseq…）拿配方，写 bio_python/bio_r 代码。
-4. **R 任务先加载 `bio-r-core`**（契约/环境/ACR 信号表），再看具体 bio-r-* 领域 skill。
-5. **画图** → 期刊统计图永远先 `bio-figure`（决策）+ `bio-proto-pub-figure`（执行）；R 生态专属图（ggtree/ComplexHeatmap）用 `bio-r-vis`。
-6. **统计/坐标/富集解读** → 分别用 statistics/coords/enrichment-workflow 协议。
+1. **先加载 `dsh-bio-genie`** → 决策树告诉你路径。
+2. **命中协议任务**（"批量转换格式""建树""富集分析""差异表达""GSEA"）→ 直接加载对应 `bio-proto-*`，按模板执行；差异表达/GSEA 优先用语义化工具 `bio_deseq2` / `bio_gsea`。
+3. **语义化工具覆盖不了、且无协议命中** → 加载对应领域 skill（bio-align/bio-phylo…）拿配方，写 bio_python 代码。
+4. **画图** → 期刊统计图永远先 `bio-figure`（决策）+ `bio-proto-pub-figure`（执行）。
+5. **统计/坐标/富集解读** → 分别用 statistics/coords/enrichment-workflow 协议。
 
 ## 五、指南 skill（本系列）
 
@@ -120,7 +110,6 @@ language: none
 | `dsh-bio-genie-guide-tools` | 工具全参考 |
 | `dsh-bio-genie-guide-skills` | 本文件 |
 | `dsh-bio-genie-guide-python` | bio_python 编程指南 |
-| `dsh-bio-genie-guide-r` | **bio_r 编程指南（R/Bioconductor）** |
 | `dsh-bio-genie-guide-workflows` | 端到端工作流 |
 | `dsh-bio-genie-guide-plotting` | 绘图专题 |
 | `dsh-bio-genie-guide-troubleshooting` | 故障排查与边界 |

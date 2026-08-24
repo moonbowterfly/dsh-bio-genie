@@ -13,7 +13,6 @@ language: python
 ## 环境
 
 - **Python**：vcfpy（`pip install vcfpy`）、cyvcf2（需 htslib）
-- **R**：vcfR（Bioconductor）
 - **数据库**：ClinVar、gnomAD、Ensembl VEP、dbSNP
 
 ## 变异分析决策树
@@ -23,7 +22,7 @@ language: python
 ├─ VCF 文件处理
 │   ├─ 格式转换/过滤 → vcfpy / bcftools
 │   ├─ 变异注释 → Ensembl VEP / ANNOVAR
-│   └─ 可视化 → rcircos（R）/ pygenomeviz
+│   └─ 可视化 → pygenomeviz / matplotlib（基因组位置图）
 ├─ 变异解读
 │   ├─ 致病性分类 → ClinVar（P/LP/VUS/LB/B）
 │   ├─ 群体频率 → gnomAD（AF < 0.01 为罕见）
@@ -113,8 +112,8 @@ def query_gnomad(gene, variant):
 
 ### 5. 可视化
 ```python
-# Circos 图（基因组全景）
-# 需要 R rcircos 包
+# Circos 风格基因组全景图
+# 用 Python pygenomeviz / matplotlib 实现（插件已移除 R 引擎）
 
 # 基因组位置图
 import matplotlib.pyplot as plt

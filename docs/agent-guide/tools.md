@@ -2,9 +2,9 @@
 language: none
 ---
 
-# 工具全参考（31 个）
+# 工具全参考（40 个）
 
-> 每个工具：功能 → 参数（★=必填）→ 返回关键字段 → 典型触发词。**选工具第一优先，双引擎执行器（bio_python/bio_r）第二优先**——先按任务选引擎（见 dsh-bio-genie 主 skill 的双引擎路由表），再选工具。
+> 每个工具：功能 → 参数（★=必填）→ 返回关键字段 → 典型触发词。**选工具第一优先，`bio_python` 执行器第二优先**。
 
 ## 一、执行器
 
@@ -25,39 +25,13 @@ language: none
 
 编程规范 → 加载 `dsh-bio-genie-guide-python`。
 
-### bio_r — R 执行器（差异表达/富集/微生物组）
-
-写完整 R 程序到 `code` 参数，在插件隔离的 **R 4.6.0 + Bioconductor 3.23** 环境中执行。工作目录 = 会话工作区。
-
-| 参数 | 说明 |
-|---|---|
-| code ★ | 完整 R 源码 |
-| workdir | 工作目录（绝对路径；默认会话工作区） |
-| timeoutMs | 超时（默认 120000ms——R 包加载慢，长任务请加大） |
-
-返回：`ok / stdout / stderr / error / result / exitCode / timedOut / truncated / needs_repair`。
-- `result`：顶层 `result <- <JSON 可序列化值>`（推荐命名 list；data.frame 亦可）。
-- `needs_repair: true`：stderr 含 `Error`/`Execution halted`，修复重试（最多 3 次尝试）。
-- 可用核心包：DESeq2/edgeR/limma、fgsea、phyloseq、Biostrings/GenomicRanges/SummarizedExperiment、ggplot2/ggtree/ComplexHeatmap、dplyr/tibble/readr（完整清单与版本见 `bio_r_env`；clusterProfiler 与 org.Hs.eg.db **不在**核心集——Windows 下 Bioc 3.23 无 GO.db 二进制）。
-- **首次调用惰性引导**（下载 R + 核心包约 5-20 分钟）：提前告知用户等待，不要重复调用。
-
-编程规范 → 加载 `dsh-bio-genie-guide-r`。
-
-### bio_env — 环境诊断/重建（Python 侧）
+### bio_env — 环境诊断/重建
 
 | 参数 | 说明 |
 |---|---|
 | reinstall | true 时强制重建环境（引导失败或包损坏时用） |
 
 返回：`ready / python / pythonVersion / biopython / numpy / envDir / bootstrapped`。
-
-### bio_r_env — R 环境诊断/核心包重建
-
-| 参数 | 说明 |
-|---|---|
-| reinstall | true 时重新安装核心包集（R 本体不重装） |
-
-返回：`ready / rscript / rVersion / bioc / packages（核心包版本表）/ libDir / bootstrapped`。R 包加载失败时先查这里；`packages` 里没有的包 = 不在核心集（换等效实现或如实告知边界）。
 
 ### bio_log — 执行日志回溯
 
@@ -106,6 +80,14 @@ language: none
 
 **bio_seq_restriction** — 限制酶位点：`sequence ★`、`enzymes`（酶名列表，不传=全部商业常用酶 ~700 种）、`enzyme_set`（commonly/all）、`linear`（默认 true）。返回 `{sites: {酶名: {cut_positions, recognition_site, count}}, requested?, missing_enzymes?}`。cut_positions 是 **1-based 切点坐标**（切点后第一个碱基）。
 
+### 比对与系统发育
+
+**bio_blast_search** — 远程 BLAST（NCBI qblast）：`sequence ★`、`program`（blastn/blastp/blastx，默认 blastn）、`database`（默认 nt 或 nr）、`hitlist_size`（默认 10）、`expect`。**qblast 服务端排队 1-10 分钟属正常，不要重复调用**。返回命中 accession/描述/e-value/score/一致性。
+
+**bio_msa** — 多序列比对：`sequences`（FASTA 字符串）或 `file_path`（二选一）、`program`（clustalw/muscle，默认 clustalw）。调用本机 clustalw/muscle 二进制；缺失时返回 `status=program_missing` 友好提示。返回 Clustal+FASTA 双格式比对、共识序列、保守性统计。
+
+**bio_phylo_build** — 建树：`alignment`（可接 bio_msa 的 alignment_fasta）或 `alignment_file`、`format`（默认 fasta）、`method`（nj/upgma）、`out_file`（可选写 Newick）。返回 Newick 字符串、叶节点数、总枝长。
+
 ### 数据检索（网络）
 
 **bio_entrez_search** — NCBI 检索：`term ★`（如 `"TP53[Gene Name] AND human[Organism]"`）、`db`（nucleotide/protein/gene，默认 nucleotide）、`retmax`（默认 5）、`email`（建议传）。
@@ -130,6 +112,12 @@ language: none
 
 **bio_fig_qa** — 绘图环境自检：`lang`（zh/en，默认 zh）、`journal`（nature/science/ieee/general，默认 nature）。返回 `{matplotlib, cjk_fonts[], cjk_ready, preset_test{journal, lang, ok, applied, error}, hint}`。**cjk_ready=false 时中文标签必然方框**——改英文标签或提示装 Noto CJK。
 
+### 组学分析
+
+**bio_deseq2** — 差异表达分析（Python 实现）：`counts_file ★`（counts 矩阵 CSV）、`meta_file ★`（样本信息 CSV）、`contrast`（对比组，默认 `trt_vs_ctrl`）。返回差异基因表。触发词：差异表达。
+
+**bio_gsea** — GSEA 富集分析（Python 实现）：`de_results_file ★`（差异表达结果 CSV）、`gene_sets`（基因集，默认 `hallmark`）。返回富集通路。触发词：GSEA、富集。
+
 ## 三、工具选择速查（愿望 → 工具）
 
 | 用户愿望 | 工具路径 |
@@ -144,11 +132,11 @@ language: none
 | "人类参考基因组版本" | `bio_ref_genome species=human` |
 | "这组数据怎么画/画成论文图" | `bio_fig_profile` → bio_python 画 → `bio_fig_export` 审计 |
 | "中文图会不会出方框" | `bio_fig_qa` |
-| "counts 矩阵差异表达" | `bio_r`（bio-proto-r-de 协议） |
-| "全基因组排序 GSEA" | `bio_r`（bio-proto-r-gsea 协议） |
-| "微生物组多样性/PCoA" | `bio_r`（bio-r-microbiome skill） |
-| "系统发育树美化/复杂热图" | `bio_r`（bio-r-vis skill） |
-| 以上都覆盖不了 | `bio_python` / `bio_r`（先查 `dsh-bio-genie-guide-skills` 的领域/协议） |
+| "counts 矩阵差异表达" | `bio_deseq2` |
+| "全基因组排序 GSEA" | `bio_gsea` |
+| "远程 BLAST / 多序列比对 / 建树" | `bio_blast_search` / `bio_msa` / `bio_phylo_build` |
+| "微生物组多样性/PCoA" | `bio_python`（scikit-bio/sklearn 配方，见领域 skill） |
+| 以上都覆盖不了 | `bio_python`（先查 `dsh-bio-genie-guide-skills` 的领域/协议） |
 
 **缓存与限流**（插件已内置，无需你处理）：NCBI 查询类 350ms 间隔、Enrichr 600ms；查询类工具（entrez_search/enrichr/pubmed_search/pubmed_abstract/ref_genome）相同参数 24h 内命中缓存（最多 100 条）。bio_python 代码里直接调 Bio.Entrez 时**必须自己**设 email + 遵守 3 req/s。
 

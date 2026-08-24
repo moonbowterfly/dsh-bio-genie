@@ -18,12 +18,13 @@ const protocols = SKILL_MANIFEST.filter((s) => s.file.startsWith('protocols/'))
 const domain = SKILL_MANIFEST.filter((s) => !s.file.startsWith('protocols/'))
 
 console.log(`[skills] ${SKILL_MANIFEST.length} 个 skill（${domain.length} 领域 + ${protocols.length} 协议）+ ${GUIDE_MANIFEST.length} 个指南`)
-assert(protocols.length === 19, `协议数 = 19（实际 ${protocols.length}）`)
-assert(GUIDE_MANIFEST.length === 9, `指南数 = 9（实际 ${GUIDE_MANIFEST.length}）`)
+assert(protocols.length === 17, `协议数 = 17（实际 ${protocols.length}）`)
+assert(GUIDE_MANIFEST.length === 8, `指南数 = 8（实际 ${GUIDE_MANIFEST.length}）`)
 
 // ---- 语言标注约定（用户 2026-08-17）：所有 skill 开头 frontmatter 必须含 language 字段 ----
+// R 引擎已移除（2026-08-25）：language 合法值不再含 'r'。
 const NL = String.fromCharCode(10)
-const VALID_LANGUAGES = ['python', 'r', 'mixed', 'none']
+const VALID_LANGUAGES = ['python', 'mixed', 'none']
 
 /** 解析 frontmatter 里的 language 字段；无 frontmatter 或无字段返回 null。 */
 function frontmatterLanguage(text) {
@@ -40,7 +41,7 @@ function frontmatterLanguage(text) {
 function assertLanguage(label, text) {
   const lang = frontmatterLanguage(text)
   if (!lang) {
-    assert(false, `${label} 缺 language 标注（python/r/mixed/none）`)
+    assert(false, `${label} 缺 language 标注（python/mixed/none）`)
     return
   }
   assert(VALID_LANGUAGES.includes(lang), `${label} language 值合法（${lang}）`)

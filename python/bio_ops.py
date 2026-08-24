@@ -29,7 +29,6 @@ from ml_tools_2 import op_ml_reduce, op_ml_feature, op_ml_cluster
 from ml_tools_3 import op_stats_test
 from dna_design import op_primer_design, op_seq_optimize
 from dna_design_2 import op_assembly_design, op_plasmid_map
-from r_semantic import op_r_deseq2, op_r_gsea, op_r火山图, op_r_dimred
 from deg_tools import op_deseq2_python, op_gsea_python
 socket.setdefaulttimeout(20)
 from retry_utils import retry_on_network_error
@@ -1009,6 +1008,230 @@ def op_fig_qa(args):
     }
 
 
+# ---- BLAST / 多序列比对 / 系统发育 ----
+
+@retry_on_network_error(max_retries=2, delay=5)
+def op_blast_search(args):
+    """远程 BLAST 搜索：NCBIWWW.qblast + NCBIXML 解析。
+
+    返回每个命中的 accession/描述/e-value/score/一致性/比对坐标。
+    qblast 在 NCBI 服务端排队执行，通常耗时 1-10 分钟，属正常现象。
+    """
+    import io
+    from Bio.Blast import NCBIWWW, NCBIXML
+
+    sequence = args['sequence'].strip()
+    program = args.get('program', 'blastn')  # blastn / blastp / blastx
+    database = args.get('database') or ('nt' if program in ('blastn', 'blastx') else 'nr')
+    hitlist_size = int(args.get('hitlist_size', 10))
+    expect = args.get('expect')  # e-value 阈值，可选
+
+    kwargs = {'hitlist_size': hitlist_size}
+    if expect is not None:
+        kwargs['expect'] = float(expect)
+
+    handle = NCBIWWW.qblast(program, database, sequence, **kwargs)
+    xml = handle.read()
+    if isinstance(xml, bytes):
+        xml = xml.decode('utf-8', errors='replace')
+    record = NCBIXML.read(io.StringIO(xml))
+
+    hits = []
+    for aln in record.alignments[:hitlist_size]:
+        if not aln.hsps:
+            continue
+        hsp = aln.hsps[0]  # 每条命中取最优 HSP
+        aln_len = max(hsp.align_length, 1)
+        hits.append({
+            'accession': aln.accession,
+            'title': aln.title,
+            'subject_length': aln.length,
+            'evalue': hsp.expect,
+            'score': hsp.score,
+            'identity_pct': round(100.0 * hsp.identities / aln_len, 2),
+            'align_length': hsp.align_length,
+            'query_start': hsp.query_start,
+            'query_end': hsp.query_end,
+            'subject_start': hsp.sbjct_start,
+            'subject_end': hsp.sbjct_end,
+        })
+    return {
+        'program': program,
+        'database': database,
+        'query_length': record.query_length,
+        'hit_count': len(record.alignments),
+        'hits': hits,
+    }
+
+
+def _find_binary(candidates):
+    """在 PATH 中按候选名查找可执行文件，返回首个命中的路径或 None。"""
+    import shutil
+    for name in candidates:
+        path = shutil.which(name)
+        if path:
+            return path
+    return None
+
+
+def _consensus_and_stats(aln):
+    """对 MultipleSeqAlignment 计算多数共识序列与保守性统计。"""
+    from collections import Counter
+    n = len(aln)
+    length = aln.get_alignment_length()
+    consensus = []
+    fully_conserved = 0
+    sim_sum = 0.0
+    for i in range(length):
+        counts = Counter(str(rec.seq[i]).upper() for rec in aln)
+        top, cnt = counts.most_common(1)[0]
+        consensus.append(top if cnt * 2 >= n else 'N')
+        sim_sum += cnt / n
+        if cnt == n:
+            fully_conserved += 1
+    return {
+        'consensus': ''.join(consensus),
+        'alignment_length': length,
+        'sequence_count': n,
+        'fully_conserved_columns': fully_conserved,
+        'mean_column_identity': round(sim_sum / length, 4) if length else 0.0,
+    }
+
+
+def op_msa(args):
+    """多序列比对：调用本机 clustalw/clustalw2 或 muscle 二进制。
+
+    输入：FASTA 字符串（sequences）或 FASTA 文件路径（file_path）。
+    二进制缺失时返回 status=program_missing + 安装提示，不抛异常——
+    让 Agent 可以提示用户安装或改走 bio_python 兜底。
+    """
+    import subprocess
+    import tempfile
+    from Bio import AlignIO
+
+    program = args.get('program', 'clustalw').lower()
+    if program not in ('clustalw', 'muscle'):
+        raise ValueError(f"program 仅支持 clustalw / muscle，收到: {program}")
+
+    if program == 'clustalw':
+        binary = _find_binary(['clustalw2', 'clustalw'])
+    else:
+        binary = _find_binary(['muscle'])
+    if not binary:
+        return {
+            'status': 'program_missing',
+            'program': program,
+            'hint': (f'本机 PATH 中未找到 {program} 可执行文件。请安装 '
+                     f'{"ClustalW2（http://www.clustal.org/clustal2/）" if program == "clustalw" else "MUSCLE v5（https://drive5.com/muscle/）"}'
+                     f' 并加入 PATH；或改用 bio_python 写代码做渐进式比对。'),
+        }
+
+    sequences = args.get('sequences')
+    file_path = args.get('file_path')
+    if not sequences and not file_path:
+        raise ValueError('sequences（FASTA 字符串）与 file_path 至少提供一个')
+
+    with tempfile.TemporaryDirectory(prefix='bio_msa_') as tmp:
+        in_path = os.path.join(tmp, 'input.fasta')
+        if sequences:
+            with open(in_path, 'w', encoding='utf-8') as fh:
+                fh.write(sequences if sequences.endswith('\n') else sequences + '\n')
+        else:
+            import shutil
+            shutil.copyfile(file_path, in_path)
+
+        if program == 'clustalw':
+            out_path = os.path.join(tmp, 'output.aln')
+            cmd = [binary, f'-INFILE={in_path}', f'-OUTFILE={out_path}', '-QUIET']
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+            if proc.returncode != 0:
+                raise RuntimeError(f'clustalw 运行失败: {proc.stderr or proc.stdout}'[:500])
+            out_fmt = 'clustal'
+        else:
+            out_path = os.path.join(tmp, 'output.fasta')
+            out_fmt = 'fasta'
+            # muscle v5: -align/-output；v3: -in/-out。先试 v5 语法，失败回退。
+            proc = subprocess.run([binary, '-align', in_path, '-output', out_path],
+                                  capture_output=True, text=True, timeout=600)
+            if proc.returncode != 0:
+                proc = subprocess.run([binary, '-in', in_path, '-out', out_path],
+                                      capture_output=True, text=True, timeout=600)
+                if proc.returncode != 0:
+                    raise RuntimeError(f'muscle 运行失败: {proc.stderr or proc.stdout}'[:500])
+
+        aln = AlignIO.read(out_path, out_fmt)
+
+    stats = _consensus_and_stats(aln)
+    # Clustal 文本输出便于人读；FASTA 便于对接 bio_phylo_build。
+    import io
+    clustal_buf = io.StringIO()
+    fasta_buf = io.StringIO()
+    AlignIO.write(aln, clustal_buf, 'clustal')
+    AlignIO.write(aln, fasta_buf, 'fasta')
+    return {
+        'status': 'ok',
+        'program': program,
+        'binary': binary,
+        **stats,
+        'alignment_clustal': clustal_buf.getvalue(),
+        'alignment_fasta': fasta_buf.getvalue(),
+        'sequence_ids': [rec.id for rec in aln],
+    }
+
+
+def op_phylo_build(args):
+    """系统发育树构建：多序列比对 → 距离矩阵 → NJ/UPGMA 树（Newick）。
+
+    输入可对接 op_msa 的 alignment_fasta 输出（alignment 参数传 FASTA 字符串），
+    或传 alignment_file 路径。返回 Newick 字符串、叶节点数、总枝长；
+    提供 out_file 时同时写盘。
+    """
+    import io
+    from Bio import AlignIO, Phylo
+    from Bio.Phylo.TreeConstruction import DistanceCalculator, DistanceTreeConstructor
+
+    method = args.get('method', 'nj').lower()
+    if method not in ('nj', 'upgma'):
+        raise ValueError(f"method 仅支持 nj / upgma，收到: {method}")
+    fmt = args.get('format', 'fasta')  # fasta / clustal / phylip ...
+
+    aln_text = args.get('alignment')
+    aln_file = args.get('alignment_file')
+    if aln_file:
+        aln = AlignIO.read(aln_file, fmt)
+    elif aln_text:
+        aln = AlignIO.read(io.StringIO(aln_text), fmt)
+    else:
+        raise ValueError('alignment（FASTA/Clustal 字符串）与 alignment_file 至少提供一个')
+
+    if len(aln) < 3:
+        raise ValueError(f'建树至少需要 3 条序列，当前比对只有 {len(aln)} 条')
+
+    calculator = DistanceCalculator('identity')
+    dm = calculator.get_distance(aln)
+    constructor = DistanceTreeConstructor()
+    tree = constructor.nj(dm) if method == 'nj' else constructor.upgma(dm)
+
+    buf = io.StringIO()
+    Phylo.write(tree, buf, 'newick')
+    newick = buf.getvalue().strip()
+
+    out_file = args.get('out_file')
+    if out_file:
+        Phylo.write(tree, out_file, 'newick')
+
+    terminals = tree.get_terminals()
+    total_length = sum(c.branch_length or 0.0 for c in tree.find_clades())
+    return {
+        'method': method,
+        'leaf_count': len(terminals),
+        'leaf_names': [t.name for t in terminals],
+        'total_branch_length': round(total_length, 6),
+        'newick': newick,
+        'out_file': out_file or None,
+    }
+
+
 # ---- op 注册表 ----
 OPS = {
     'seq_analyze': op_seq_analyze,
@@ -1043,12 +1266,12 @@ OPS = {
     'seq_optimize': op_seq_optimize,
     'assembly_design': op_assembly_design,
     'plasmid_map': op_plasmid_map,
-    'r_deseq2': op_r_deseq2,
-    'r_gsea': op_r_gsea,
-    'r_火山图': op_r火山图,
-    'r_dimred': op_r_dimred,
+
     'deseq2': op_deseq2_python,
     'gsea': op_gsea_python,
+    'blast_search': op_blast_search,
+    'msa': op_msa,
+    'phylo_build': op_phylo_build,
 }
 
 

@@ -72,3 +72,36 @@ print(tax[0]["ScientificName"], tax[0]["Rank"])
 - 每个请求之间加 `time.sleep(0.34)`（NCBI 限制 3 req/s，不设 email 则 3 req/s 也会更快封）。
 - 出错会抛 `HTTPError`（如 `400 Bad Request`），捕获并重试。
 - 批量下载用 `id=ids`（逗号分隔）一次取回，比循环单条高效。
+
+## ⚠️ 数据质量门控（必做）
+
+### 检索时过滤长度
+
+```python
+# ❌ 可能返回部分序列（400bp 的 16S 没有用）
+term = '"Agrobacterium"[Organism] AND 16S[Title]'
+
+# ✓ 过滤完整长度
+term = '"Agrobacterium"[Organism] AND 16S[Title] AND 1200:1600[SLEN]'
+```
+
+### 下载后验证
+
+```python
+for rec in SeqIO.parse(handle, "fasta"):
+    seq_len = len(rec.seq)
+    n_count = str(rec.seq).upper().count('N')
+    n_pct = n_count / seq_len * 100
+    
+    if seq_len < 1200:
+        print(f"⚠️ {rec.id}: 序列过短 ({seq_len} bp)，跳过")
+        continue
+    if n_pct > 5:
+        print(f"⚠️ {rec.id}: N碱基过多 ({n_pct:.1f}%)，结果可能不可靠")
+```
+
+### GenBank 注释不可盲信
+
+- NCBI GenBank 的 `/product=` 描述**可能有错**（实测：iaaH 被标为 "RolB family"）
+- 关键基因功能必须与文献或 UniProt 交叉验证
+- 发现矛盾时在报告中明确说明

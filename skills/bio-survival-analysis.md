@@ -17,7 +17,6 @@ language: python
   from lifelines import KaplanMeierFitter, CoxPHFitter, logrank_test
   from lifelines.utils import concordance_index
   ```
-- **R**（bio_r 执行器）：survival / survminer / survivalROC / timeROC / rms / cmprsk / forestplot
 - **数据格式**：三列核心——`time`（随访时间）、`event`（1=发生终点事件，0=删失）、协变量列
 
 ## 统计方法选择决策树
@@ -52,7 +51,7 @@ median_expr = df['gene_expression'].median()
 df['group'] = (df['gene_expression'] >= median_expr).map({True: 'High', False: 'Low'})
 
 # ⚠️ 不要「试切点直到显著」——必须在分析前确定切点方法
-# 如果要优化切点，用 maxstat（R survminer::surv_cutpoint）
+# 如果要优化切点，用 maximally selected rank statistics（maxstat 方法）
 ```
 
 ### 3. Kaplan-Meier + log-rank

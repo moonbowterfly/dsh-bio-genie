@@ -24,9 +24,6 @@ import {
 /** 引导可能耗时数分钟；工具执行期间等待引导完成。 */
 const BOOT_WAIT_MS = 600_000
 
-/** R 引导更重（R 安装器 + 核心包集），等待上限更长。 */
-const R_BOOT_WAIT_MS = 2_400_000
-
 /** 「失败挂起」队列：signature → 失败信息，等待同意图的成功来配对成经验（上限 20 防膨胀）。 */
 const pendingFixes = new Map()
 
@@ -37,33 +34,6 @@ async function requireEnv(config) {
     throw new Error(`dsh-bio-genie Python 环境引导失败: ${env.error ?? 'unknown'}（可运行 bio_env 查看详情）`)
   }
   return env.python
-}
-
-/** 确保 R 环境就绪；失败抛错（用户需先运行 bio_r_env action=install 安装 R）。 */
-async function requireREnv(config) {
-  const env = await ensureREnvironment(config)
-  if (!env.ready || !env.rscript) {
-    throw new Error(`dsh-bio R 环境未就绪: ${env.error ?? 'unknown'}（请先运行 bio_r_env action=install 安装 R 语言）`)
-  }
-  return env
-}
-
-/** R 代码意图签名：library()/require() 包名 + :: 命名空间调用（修复常改裸函数名，此两者稳定）。 */
-function rCodeSignature(code) {
-  const text = String(code ?? '')
-  const libs = new Set()
-  for (const m of text.matchAll(/(?:library|require)\s*\(\s*["']?([A-Za-z][\w.]*)["']?\s*\)/g)) libs.add(m[1])
-  const ns = new Set()
-  for (const m of text.matchAll(/\b([A-Za-z][\w.]+)::[A-Za-z_]\w*/g)) ns.add(m[1])
-  return 'r:' + [...libs].sort().join('|') + ' :: ' + [...ns].sort().slice(0, 8).join('|')
-}
-
-/** R 错误签名：stderr 最后一条 Error 行（截断 120 字符）。 */
-function rErrorSignature(stderr) {
-  const text = String(stderr ?? '')
-  let last = null
-  for (const m of text.matchAll(/^Error[^\n]*$/gm)) last = m[0]
-  return (last ?? 'Error (unknown)').slice(0, 120)
 }
 
 /** 定义语义化工具（async 执行，统一 env 确保 + callBio 调用）。 */
@@ -436,6 +406,56 @@ function semanticTools(config) {
       op: 'seq_restriction',
       timeoutMs: 120_000,
     }),
+    // ---- BLAST / 多序列比对 / 系统发育 ----
+    bioTool(config, {
+      name: 'bio_blast_search',
+      description:
+        '远程 BLAST 搜索（NCBI qblast）：输入序列，返回命中 accession/描述/e-value/score/一致性/比对坐标。' +
+        'program 默认 blastn（可选 blastp/blastx），database 默认 nt（blastn/blastx）或 nr（blastp）。' +
+        '注意：qblast 在 NCBI 服务端排队，通常耗时 1-10 分钟，属正常现象，不要重复调用。' +
+        '触发词：BLAST、blastn、序列同源性搜索、远程比对。',
+      parameters: {
+        sequence: { type: 'string', required: true, description: '查询序列（DNA 或蛋白质，视 program 而定）' },
+        program: { type: 'string', enum: ['blastn', 'blastp', 'blastx'], description: 'BLAST 程序，默认 blastn' },
+        database: { type: 'string', description: '数据库，默认 nt（核酸）或 nr（蛋白）' },
+        hitlist_size: { type: 'number', description: '最大命中数，默认 10' },
+        expect: { type: 'number', description: 'e-value 阈值，可选' },
+      },
+      op: 'blast_search',
+      timeoutMs: 600_000,
+      cache: true,
+    }),
+    bioTool(config, {
+      name: 'bio_msa',
+      description:
+        '多序列比对：输入 FASTA 序列（字符串或文件），调用本机 clustalw/muscle 二进制，' +
+        '返回比对结果（Clustal + FASTA 两种格式）、共识序列与保守性统计。' +
+        '二进制缺失时返回友好提示（status=program_missing）。输出可对接 bio_phylo_build 建树。' +
+        '触发词：多序列比对、MSA、clustal、muscle。',
+      parameters: {
+        sequences: { type: 'string', description: 'FASTA 格式序列列表（与 file_path 二选一）' },
+        file_path: { type: 'string', description: 'FASTA 文件路径（与 sequences 二选一）' },
+        program: { type: 'string', enum: ['clustalw', 'muscle'], description: '比对程序，默认 clustalw' },
+      },
+      op: 'msa',
+      timeoutMs: 240_000,
+    }),
+    bioTool(config, {
+      name: 'bio_phylo_build',
+      description:
+        '系统发育树构建：输入多序列比对结果（alignment 字符串，可对接 bio_msa 的 alignment_fasta 输出，' +
+        '或 alignment_file 路径），按 nj/upgma 建树，返回 Newick 字符串、叶节点数、总枝长；' +
+        'out_file 指定时同时写 Newick 文件。触发词：系统发育树、进化树、建树、NJ 树、UPGMA。',
+      parameters: {
+        alignment: { type: 'string', description: '比对结果字符串（与 alignment_file 二选一）' },
+        alignment_file: { type: 'string', description: '比对文件路径（与 alignment 二选一）' },
+        format: { type: 'string', description: '比对格式，默认 fasta（可选 clustal/phylip 等）' },
+        method: { type: 'string', enum: ['nj', 'upgma'], description: '建树方法，默认 nj' },
+        out_file: { type: 'string', description: '输出 Newick 文件路径，可选' },
+      },
+      op: 'phylo_build',
+      timeoutMs: 120_000,
+    }),
     bioTool(config, {
       name: 'bio_entrez_search',
       description:
@@ -784,50 +804,6 @@ function semanticTools(config) {
       },
       op: 'gsea',
       timeoutMs: 120_000,
-    }),
-    // ---- R 语义化工具（避免慢速 bio_r 调用）----
-    bioTool(config, {
-      name: 'bio_r_deseq2',
-      description: '差异表达分析（DESeq2）：输入 counts 矩阵 + 样本信息，输出差异基因表。触发词：差异表达、DESeq2。',
-      parameters: {
-        counts_file: { type: 'string', required: true, description: 'counts 矩阵 CSV 路径' },
-        meta_file: { type: 'string', required: true, description: '样本信息 CSV 路径' },
-        contrast: { type: 'string', description: '对比组（默认 trt_vs_ctrl）' },
-      },
-      op: 'r_deseq2',
-      timeoutMs: 120_000,
-    }),
-    bioTool(config, {
-      name: 'bio_r_gsea',
-      description: 'GSEA 富集分析（fgsea + msigdbr）：输入差异表达结果，输出富集通路。触发词：GSEA、富集。',
-      parameters: {
-        de_results_file: { type: 'string', required: true, description: '差异表达结果 CSV 路径' },
-        species: { type: 'string', default: 'human', description: '物种' },
-        category: { type: 'string', default: 'H', description: '基因集分类' },
-      },
-      op: 'r_gsea',
-      timeoutMs: 120_000,
-    }),
-    bioTool(config, {
-      name: 'bio_r_火山图',
-      description: '火山图（ggplot2）：输入差异表达结果，输出火山图 PDF。触发词：火山图。',
-      parameters: {
-        de_results_file: { type: 'string', required: true, description: '差异表达结果 CSV 路径' },
-        output_file: { type: 'string', default: 'volcano.pdf', description: '输出文件路径' },
-      },
-      op: 'r_火山图',
-      timeoutMs: 60_000,
-    }),
-    bioTool(config, {
-      name: 'bio_r_dimred',
-      description: 't-SNE 降维：输入数值矩阵，输出降维坐标。触发词：t-SNE、降维。',
-      parameters: {
-        data_file: { type: 'string', required: true, description: '数值矩阵 CSV 路径' },
-        n_components: { type: 'number', default: 2, description: '降维维度' },
-        perplexity: { type: 'number', default: 30, description: '困惑度' },
-      },
-      op: 'r_dimred',
-      timeoutMs: 60_000,
     }),
   ]
 }

@@ -14,7 +14,6 @@
  *   旧注册链路（tools/skills/systemPrompt）完全不动。
  * - **小端点 + 幂等**：
  *     - GET  /api/dsh-bio-genie/python-packages  pip freeze 解析（venv 未就绪返回 ok:false）
- *     - GET  /api/dsh-bio-genie/r-packages       installed.packages() 解析（未引导返回 ok:false）
  *     - GET  /api/dsh-bio-genie/skills           listSkillsForPanel()
  * - **超时 + 取消保护**：每个端点最多跑 20s，超时返回 ok:false code:'internal'，
  *   避免面板长时间转圈或被恶意大 payload 阻塞。
@@ -25,7 +24,6 @@ import { spawn } from 'node:child_process'
 import { join as pathJoin } from 'node:path'
 import { venvPython, resolveEnvDir, bioEnvExists, PYTHON_DIR } from './runtime.js'
 
-import { rscriptPath as rscriptPathFn, rLibDir as rLibDirFn, rSpawnEnv } from './r-runtime.js'
 import { listSkillsForPanel } from './skills.js'
 import { handleConfig } from './config_handler.js'
 
@@ -180,28 +178,6 @@ const TOOL_SCHEMAS = [
     { key: 'de_results_file', type: 'text', required: true, placeholder: '/path/to/de_results.csv', desc: '差异表达结果 CSV' },
     { key: 'gene_sets', type: 'text', default: 'hallmark', desc: '基因集' },
   ]},
-  { name: 'r_deseq2', label: '差异表达(DESeq2)', engine: 'python', params: [
-    { key: 'counts_file', type: 'text', required: true, placeholder: '/path/to/counts.csv', desc: 'counts 矩阵 CSV' },
-    { key: 'meta_file', type: 'text', required: true, placeholder: '/path/to/meta.csv', desc: '样本信息 CSV' },
-    { key: 'contrast', type: 'text', default: 'trt_vs_ctrl', desc: '对比组' },
-  ]},
-  { name: 'r_gsea', label: 'GSEA 富集', engine: 'python', params: [
-    { key: 'de_results_file', type: 'text', required: true, placeholder: '/path/to/de_results.csv', desc: '差异表达结果 CSV' },
-    { key: 'species', type: 'select', options: ['human','mouse'], default: 'human', desc: '物种' },
-    { key: 'category', type: 'text', default: 'H', desc: '基因集分类' },
-  ]},
-  { name: 'r_火山图', label: '火山图(ggplot2)', engine: 'python', params: [
-    { key: 'de_results_file', type: 'text', required: true, placeholder: '/path/to/de_results.csv', desc: '差异表达结果 CSV' },
-    { key: 'output_file', type: 'text', default: 'volcano.pdf', desc: '输出文件' },
-  ]},
-  { name: 'r_dimred', label: 't-SNE 降维', engine: 'python', params: [
-    { key: 'data_file', type: 'text', required: true, placeholder: '/path/to/data.csv', desc: '数值矩阵 CSV' },
-    { key: 'n_components', type: 'number', default: 2, desc: '降维维度' },
-    { key: 'perplexity', type: 'number', default: 30, desc: '困惑度' },
-  ]},
-
-
-
 ]
 
 
@@ -366,82 +342,6 @@ async function handlePythonPackages(req, res, config) {
   })
 }
 
-/**
- * R 包列表端点：写一个临时 .R 文件，里面只放
- *   cat(toJSON(list(ok=TRUE, value=list(rscript=..., libDir=..., packages=...))))
- * 用 --file= 喂给 Rscript；path 永远走 JS 字符串不做 R 转义，避开反斜杠
- * 把 "\U..." 误识为 R 半截 unicode 转义（之前 -e 长代码踩坑的修复方案）。
- * Rscript 不存在返回 ok:false code:'env-not-ready'。
- */
-async function handleRPackages(req, res, config) {
-  const rscript = rscriptPathFn(config)
-  const rlib = rLibDirFn(config)
-  const os = await import('node:os')
-  const fs = await import('node:fs')
-  const pathMod = await import('node:path')
-  const tmp = pathMod.join(os.tmpdir(), `dsh-bio-genie-r-pkg-${process.pid}-${Date.now()}.R`)
-  // R 脚本里只放字面 JSON 结构，包路径通过 env var 传入；避免任何字符串拼接。
-  const rScript = `env <- Sys.getenv(c("DSH_BIO_RSCRIPT","DSH_BIO_RLIB"), unset=NA)
-df <- as.data.frame(installed.packages()[, c("Package","Version")], stringsAsFactors=FALSE)
-out <- list(ok=TRUE, value=list(
-  rscript=unname(env["DSH_BIO_RSCRIPT"]),
-  libDir=unname(env["DSH_BIO_RLIB"]),
-  packages=df
-))
-cat(jsonlite::toJSON(out, auto_unbox=TRUE, na="null"), "\\n")\n`
-  try {
-    fs.writeFileSync(tmp, rScript, 'utf8')
-  } catch (err) {
-    return writeJson(res, 200, {
-      ok: false,
-      code: 'tempfile-failed',
-      message: `临时 .R 写入失败：${err.message}`,
-    })
-  }
-  const env = { ...rSpawnEnv(rlib), DSH_BIO_RSCRIPT: rscript, DSH_BIO_RLIB: rlib }
-  // Rscript 长选项语法是 `--file <path>`（空格分隔），不接受 `--file=<path>`，
-  // Windows 上后者会触发 "file name is missing"。
-  const result = await runSubprocess(rscript, ['--vanilla', '--file', tmp], { env })
-  try { fs.unlinkSync(tmp) } catch { /* ignore */ }
-  if (!result.ok) {
-    return writeJson(res, 200, {
-      ok: false,
-      code: result.code,
-      message: `Rscript 失败：${result.stderr.slice(0, 500)}`,
-    })
-  }
-  // R 通过 cat(toJSON(...)) 在最后一行输出 JSON
-  const lastLine = result.stdout.trim().split(/\r?\n/).pop() || ''
-  let parsed
-  try {
-    parsed = JSON.parse(lastLine)
-  } catch (err) {
-    return writeJson(res, 200, {
-      ok: false,
-      code: 'parse-failed',
-      message: `R 输出解析失败：${err.message}\nstdout tail: ${result.stdout.slice(-300)}`,
-    })
-  }
-  if (!parsed.ok) {
-    return writeJson(res, 200, { ok: false, code: 'r-bridge-failed', message: parsed.error || 'unknown' })
-  }
-  // R 的 data.frame → list of {Package, Version}
-  const packages = (parsed.value.packages || []).map((p) => ({
-    name: p.Package,
-    version: p.Version,
-  }))
-  packages.sort((a, b) => a.name.localeCompare(b.name))
-  writeJson(res, 200, {
-    ok: true,
-    value: {
-      rscript,
-      libDir: rlib,
-      count: packages.length,
-      packages,
-    },
-  })
-}
-
 /** Skill 清单端点：纯静态（listSkillsForPanel 已是 in-memory 数据）。 */
 async function handleSkills(req, res) {
   writeJson(res, 200, { ok: true, value: listSkillsForPanel() })
@@ -514,7 +414,6 @@ export function registerApiRoutes(ctx, config = {}) {
   const disposers = []
   for (const route of [
     { kind: 'exact', path: `${ROUTE_PREFIX}/python-packages`, handler: guard((req, res) => handlePythonPackages(req, res, config)) },
-    { kind: 'exact', path: `${ROUTE_PREFIX}/r-packages`,      handler: guard((req, res) => handleRPackages(req, res, config)) },
     { kind: 'exact', path: `${ROUTE_PREFIX}/skills`,          handler: guard((req, res) => handleSkills(req, res)) },
     { kind: 'exact', path: `${ROUTE_PREFIX}/config`,         handler: guard((req, res) => handleConfig(req, res, config)) },
     { kind: 'exact', path: `${ROUTE_PREFIX}/tool-schemas`,    handler: guard((req, res) => handleToolSchemas(req, res)) },

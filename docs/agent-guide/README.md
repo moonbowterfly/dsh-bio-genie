@@ -10,7 +10,7 @@ language: none
 
 用户说人话（"这条序列的 GC 含量和 EcoRI 酶切位点？"），你做三件事：
 
-1. **选路径**：先查语义化工具表（17 个高频工具，快、省 token、参数有校验）→ 命中就用；没命中再用 `bio_python` 执行器写 Biopython/Python 代码。
+1. **选路径**：先查语义化工具表（36 个高频工具，快、省 token、参数有校验）→ 命中就用；没命中再用 `bio_python` 执行器写 Biopython/Python 代码。
 2. **执行**：调用工具，读返回，必要时修复重试（自动代码修复 ACR，最多 2 次修复）。
 3. **报告**：用中文输出可溯源的生物学结论 + 产出的文件路径。**结论必须来自工具输出**，纯推断要标 `[推断-未验证]`（详见 `dsh-bio-genie-guide-rigor`）。
 
@@ -18,19 +18,18 @@ language: none
 
 | 层 | 工具 | 何时用 |
 |---|---|---|
-| 语义化工具 ×17 | `bio_seq_analyze` / `bio_enrichr` / `bio_fig_export` 等 | 高频稳定操作，**第一优先** |
-| 双引擎执行器 | `bio_python`（Python：Biopython 全功能 + 出版级绘图）/ `bio_r`（R 4.6 + Bioconductor 3.23：差异表达/GSEA/微生物组） | 语义化工具覆盖不到的一切，**第二优先**（先按任务选引擎，见主 skill 双引擎路由表） |
-| 元工具 ×4 | `bio_env` / `bio_r_env` / `bio_log` / `bio_memory` | 双环境诊断、日志回溯、经验查询 |
+| 语义化工具 ×36 | `bio_seq_analyze` / `bio_enrichr` / `bio_deseq2` / `bio_gsea` / `bio_fig_export` 等 | 高频稳定操作，**第一优先** |
+| Python 执行器 | `bio_python`（Python：Biopython 全功能 + 出版级绘图） | 语义化工具覆盖不到的一切，**第二优先** |
+| 元工具 ×3 | `bio_env` / `bio_log` / `bio_memory` | 环境诊断、日志回溯、经验查询 |
 
-完整参数与返回结构 → 加载 `dsh-bio-genie-guide-tools`。
+合计 40 个工具。完整参数与返回结构 → 加载 `dsh-bio-genie-guide-tools`。
 
 ## 3. 环境机制（重要，影响用户体验）
 
 - **Python 环境（插件加载时预热）**：自动下载 uv + CPython 3.12 + 隔离 venv（biopython/numpy/matplotlib/pandas/scipy/seaborn/Pillow 等）到 `~/.dsh/dsh-bio-genie/`，首次约 1-2 分钟。告知用户"正在初始化（仅首次）"，**不要重复调用**。
-- **R 环境（首次 bio_r 调用时惰性引导）**：自动下载 R 4.6.0 安装器 + BiocManager 安装核心包集（DESeq2/edgeR/limma/fgsea/phyloseq/ggplot2/ggtree/ComplexHeatmap 等）到私有目录，首次约 **5-20 分钟**。R 任务开始前先告知用户等待。
-- **插件升级后自动补装**：两个环境缺包都会自动补齐（Python：uv pip；R：幂等包安装器），不要重试。
-- **用户零操作**：任何情况下都不要求用户手动装 Python/R/pip/包。
-- 环境异常：`bio_env`（Python）/ `bio_r_env`（R）诊断；reinstall=true 重建。
+- **插件升级后自动补装**：环境缺包会自动补齐（uv pip），不要重试。
+- **用户零操作**：任何情况下都不要求用户手动装 Python/pip/包。
+- 环境异常：`bio_env` 诊断；reinstall=true 重建。
 
 ## 4. 输出规范（用户看到的是你）
 
@@ -44,11 +43,10 @@ language: none
 
 | 指南 skill | 内容 | 何时加载 |
 |---|---|---|
-| `dsh-bio-genie-guide-tools` | 23 个工具完整参数/返回/示例 | 不确定工具怎么用、参数怎么传时 |
-| `dsh-bio-genie-guide-skills` | 41 个 skill 导航与分类体系（功能层级 × 语言解释器） | 选 skill、查协议时 |
+| `dsh-bio-genie-guide-tools` | 40 个工具完整参数/返回/示例 | 不确定工具怎么用、参数怎么传时 |
+| `dsh-bio-genie-guide-skills` | 47 个 skill 导航与分类体系 | 选 skill、查协议时 |
 | `dsh-bio-genie-guide-python` | bio_python 编程指南（可用库/契约/坑） | 写任何非平凡 Python 代码前 |
-| `dsh-bio-genie-guide-r` | bio_r 编程指南（R/Bioconductor 核心包/契约/坑） | 写任何非平凡 R 代码前 |
-| `dsh-bio-genie-guide-workflows` | 13 个端到端工作流（10 Python + 3 R） | 用户需求命中某场景时 |
+| `dsh-bio-genie-guide-workflows` | 端到端工作流（全 Python） | 用户需求命中某场景时 |
 | `dsh-bio-genie-guide-plotting` | 出版级绘图专题（fig 工具+figurelib） | 任何画图需求 |
 | `dsh-bio-genie-guide-troubleshooting` | 故障排查 + 插件边界 | 出错了、或用户要超能力时 |
 | `dsh-bio-genie-guide-rigor` | 科学严谨性与报告规范 | 写结论/报告前 |
@@ -65,4 +63,4 @@ language: none
 
 > 维护约定（给插件开发者）：插件功能/工具/skill/依赖/用法变更时，**必须同步更新本目录对应指南**（工具增删改→tools.md 及受影响指南；skill 变更→skills.md；计数变更→tools.md/skills.md 中的数量与表）。本目录经 `GUIDE_MANIFEST`（src/skills.js）注册为 `dsh-bio-genie-guide-*` 技能，是 agent 的行为依据，文档与实现不一致会直接导致 agent 用错插件。
 
-> 语言标注约定：**所有 skill 文件（领域/协议/指南）开头 frontmatter 必须含 `language:` 字段**——`python`（仅插件内置 Python 环境）/ `r`（R 语言）/ `mixed`（Python+R 混用）/ `none`（纯知识/导航，无解释器执行）。新增 skill 不带标注会被 test-skills.mjs 拒绝。
+> 语言标注约定：**所有 skill 文件（领域/协议/指南）开头 frontmatter 必须含 `language:` 字段**——`python`（仅插件内置 Python 环境）/ `mixed`（多路径混用）/ `none`（纯知识/导航，无解释器执行）。新增 skill 不带标注会被 test-skills.mjs 拒绝。

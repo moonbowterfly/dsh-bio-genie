@@ -15,6 +15,7 @@ const RATE_LIMIT_MS = {
   entrez_fetch: 350,
   pubmed_search: 350,
   pubmed_abstract: 350,
+  blast_search: 350,
   enrichr: 600,
   ref_genome: 200,
 }

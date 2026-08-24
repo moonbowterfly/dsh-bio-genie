@@ -4,7 +4,9 @@ language: mixed
 
 # 端到端工作流（13 个场景）
 
-> 每个场景：用户愿望 → 工具调用序列 → 产出 → 注意点。命中场景按序列执行，不要跳步、不要发明步骤。**场景 1-10 走 Python 引擎，场景 11-13 走 R 引擎**（双引擎路由见 dsh-bio-genie 主 skill）。
+> 每个场景：用户愿望 → 工具调用序列 → 产出 → 注意点。命中场景按序列执行，不要跳步、不要发明步骤。**全部场景走 Python 引擎**（差异表达/GSEA 用语义化工具 bio_deseq2 / bio_gsea）。
+>
+> **⚠️ 所有场景执行前必须通过数据质量门控（见 rigor 指南 §0），每个结论必须标注证据级别（见 rigor 指南 §1b）。**
 
 ## 1. 序列质控与特征统计
 
@@ -128,36 +130,35 @@ bio_python：scipy 检验（ttest_ind/mannwhitneyu）+ 效应量（Cohen's d）+
 - 网络步骤（BLAST/Entrez/Enrichr）失败时：一次重试 → 仍失败如实报告（限流/网络），不无限重试。
 - 每个场景结尾：**生物学解读**一段（结论 + 证据出处 + 局限）。
 
-## 11. 差异表达（R 引擎）
+## 11. 差异表达（Python 语义化工具）
 
 愿望："这两组 RNA-seq counts 哪些基因差异表达？"
 
 ```
 （文件系统工具确认 counts.csv / meta.csv 列名对齐）
-bio_r code=<bio-proto-r-de 模板> timeoutMs=180000
-→ 首次调用若 R 未引导：告知用户等待（5-20 分钟），不重复调用
+bio_deseq2 counts_file=<counts.csv> meta_file=<meta.csv> contrast=<trt_vs_ctrl>
 产出：de_results.csv（padj<0.05 且 |log2FC|>1 的上下调基因数 + top10）
-后续：火山图（bio-r-vis 或 Python figurelib）→ 显著基因列表 bio_enrichr 富集
+后续：火山图（bio_fig_profile → bio_python figurelib）→ 显著基因列表 bio_enrichr 富集
 ```
 
-## 12. 排序 GSEA（R 引擎）
+## 12. 排序 GSEA（Python 语义化工具）
 
 愿望："差异表达的全基因组排序里，哪些通路整体变化？"
 
 ```
-（用户提供 rank.csv（gene+log2FC）与 *.gmt 基因集；只有显著列表没有排序 → 改 bio_enrichr）
-bio_r code=<bio-proto-r-gsea 模板> timeoutMs=180000
+（差异表达结果已由 bio_deseq2 产出；只有显著列表没有排序 → 改 bio_enrichr）
+bio_gsea de_results_file=<de_results.csv> gene_sets=hallmark
 产出：gsea_results.csv + 上/下调显著通路数（padj<0.25，GSEA 阈值）
-注意：GMT 需用户从 MSigDB 官网下载放入工作区
+注意：非内置基因集需用户从 MSigDB 官网下载放入工作区
 ```
 
-## 13. 微生物组多样性（R 引擎）
+## 13. 微生物组多样性（bio_python）
 
 愿望："两组样本的肠道菌群多样性和结构差异？"
 
 ```
 （用户提供 otu.csv 丰度表 + meta.csv 分组）
-加载 bio-r-microbiome → bio_r 跑：phyloseq 组装 → Shannon/Observed → wilcox 检验 → Bray-Curtis PCoA → PERMANOVA
+bio_python 跑：pandas 组装 → Shannon/Observed α 多样性 → wilcox 检验 → Bray-Curtis PCoA → PERMANOVA
 产出：alpha 表 + pcoa.png + R²/p 值 + 解读（效应方向、每组 n 小时标探索性）
-注意：otu_table(taxa_are_rows=TRUE) 必声明；中文图转 Python figurelib
+注意：丰度表行列方向（taxa 在行/列）必须先确认；中文图用 figurelib
 ```

@@ -21,8 +21,8 @@
 | Feature | Description |
 |---------|-------------|
 | 🪄 **Wish-style Analysis (Wish Coding)** | Plain language in, results out: *"What's the GC content and EcoRI cut sites of this sequence?"* |
-| 🧩 **Dual-Engine Coverage** | `bio_python` executor runs arbitrary Biopython code (alignment, PDB, Phylo, motif, BLAST…) + `bio_r` executor ships R 4.6/Bioconductor 3.23 (DESeq2 differential expression, fgsea GSEA, phyloseq microbiome), backed by 21 domain skill recipes |
-| ⚡ **High-Frequency Semantic Tools** | 17 fixed-parameter tools (GC content, translation, restriction enzymes, k-mer, file IO, Entrez, pathway enrichment, PubMed literature, reference genome, publication-grade plotting) + 6 executor tools (bio_python / bio_r / bio_env / bio_r_env / bio_log / bio_memory) — token-efficient, stable output, validated arguments |
+| 🧩 **Full Coverage** | The `bio_python` executor runs arbitrary Biopython code (alignment, PDB, Phylo, motif, BLAST…), backed by 21 domain/research skill recipes |
+| ⚡ **High-Frequency Semantic Tools** | 36 fixed-parameter tools (GC content, translation, restriction enzymes, k-mer, file IO, BLAST, multiple sequence alignment, phylogenetic trees, Entrez, pathway enrichment, PubMed literature, reference genome, publication-grade plotting, machine learning, DNA design, differential expression/GSEA) + 4 executor/meta tools (bio_python / bio_env / bio_log / bio_memory) — token-efficient, stable output, validated arguments |
 | 📦 **Zero Installation** | Automatically downloads an isolated Python environment (uv + venv + Biopython) to `$DSH_HOME/dsh-bio-genie/`, no system pollution |
 | 🇨🇳 **China-Network Ready** | Auto network adaptation: official sources by default, automatic switch to domestic mirrors on any failure (uv→Tsinghua PyPI, CPython→npmmirror, PyPI packages→Tsinghua), zero configuration required |
 | 🛡️ **Environment Isolation** | Python subprocesses run in `-I` (isolated) mode, immune to host PYTHONPATH pollution |
@@ -30,8 +30,8 @@
 | 📜 **Transparency Log** | Every code execution / tool call appends an async JSONL log (hash/preview/duration); `bio_log` traces back any analysis |
 | 🧬 **Scientific Rigor Guardrails** | Persona enforces "biological conclusions must trace to tool output"; pure inference is marked [inferred — unverified] |
 | 🧠 **Session Memory** | Successful code patterns + error→fix lessons accumulate automatically (local JSON); query via `bio_memory`, gets smarter over time |
-| ⚙️ **Settings Panel** | "BioGenie" menu in dsh Settings sidebar (⚙️) — four tabs: Overview (package info/config defaults), Skill Modules (50 entries by domain/R/protocol/guide), Python Environment (venv packages), R Environment (Bioconductor packages) |
-| 📚 **Protocol Knowledge Base** | 19 high-frequency task protocols (QC/alignment/BLAST/cloning/trees/structure/enrichment/publication figures/coordinate systems/statistics/differential expression/GSEA…), each with runnable code templates + pitfalls, bundled with the plugin |
+| ⚙️ **Settings Panel** | "BioGenie" menu in dsh Settings sidebar (⚙️) — tabs: Overview (package info/config defaults), Skill Modules (47 entries grouped by main/domain/research/protocol/guide), Python Environment (venv packages), Tool Debug |
+| 📚 **Protocol Knowledge Base** | 17 high-frequency task protocols (QC/alignment/BLAST/cloning/trees/structure/enrichment/publication figures/coordinate systems/statistics/differential expression/GSEA…), each with runnable code templates + pitfalls, bundled with the plugin |
 
 ---
 
@@ -101,6 +101,9 @@ Finally restart the dsh web service.
 | `bio_seq_io_read` | Read FASTA/GenBank (UTF-8/GBK adaptive) | read fasta, parse file |
 | `bio_seq_io_write` | Write sequence files | write fasta, save sequence |
 | `bio_seq_restriction` | Restriction enzyme cut sites (CommOnly default / all optional) | restriction enzyme, cut site |
+| `bio_blast_search` | Remote BLAST (NCBI qblast: blastn/blastp/blastx → hit accession/e-value/score/identity) | BLAST, homology search |
+| `bio_msa` | Multiple sequence alignment (clustalw/muscle; returns Clustal+FASTA alignment, consensus, conservation stats; friendly hint if binary missing) | MSA, multiple alignment |
+| `bio_phylo_build` | Phylogenetic tree construction (nj/upgma → Newick; accepts bio_msa alignment_fasta output) | phylogenetic tree, NJ |
 | `bio_entrez_search` | NCBI search (esearch+esummary; db=gene returns gene metadata: full name/chromosome/aliases) | NCBI, search gene, gene info |
 | `bio_entrez_fetch` | NCBI sequence retrieval | download sequence |
 | `bio_enrichr` | Pathway/GO enrichment (gene symbol list → p-value ranked terms; GO/KEGG/Reactome/MSigDB libraries) | enrichment, pathway, GO, KEGG |
@@ -119,12 +122,12 @@ X and gaps are treated as unknown bases during translation (Biopython standard b
 
 ---
 
-## 📚 Skill System (22 total)
+## 📚 Skill System (47 total)
 
 ### Master skill: `dsh-bio-genie`
-Tool-layering decision tree + dual-engine routing table: **check the semantic tool table first → use it if matched; otherwise pick the engine (Python/R) and write code**.
+Tool-layering decision tree: **check the semantic tool table first → use it if matched; otherwise write Biopython code with the bio_python executor**.
 
-### 21 Domain Recipes (15 Python + 6 R)
+### 17 Domain Recipes + 4 Research Methods
 
 | Skill | Biopython modules covered |
 |-------|---------------------------|
@@ -143,12 +146,10 @@ Tool-layering decision tree + dual-engine routing table: **check the semantic to
 | `bio-graphics` | Bio.Graphics.GenomeDiagram (map drawing) |
 | `bio-popgen` | Bio.PopGen (population genetics) |
 | `bio-figure` | Publication-grade figure consultant (figurelib: chart selection, 18 pitfalls, journal specs, CJK Chinese support) |
-| `bio-r-core` | R executor core (bio_r contract, dual-engine routing, ACR signals) |
-| `bio-r-basics` | Biostrings / GenomicRanges / SummarizedExperiment (object models) |
-| `bio-r-rnaseq` | DESeq2 / edgeR differential expression pipelines & interpretation discipline |
-| `bio-r-enrichment` | fgsea GSEA + enricher ORA (division of labor with bio_enrichr) |
-| `bio-r-microbiome` | phyloseq microbiome diversity (alpha/beta/PCoA/PERMANOVA) |
-| `bio-r-vis` | ggplot2 / ggtree / ComplexHeatmap (R ecosystem viz) |
+| `bio-ml` | scikit-learn ML on biological data (classification / dimred / clustering / feature importance) |
+| `bio-dna-design` | DNA design (primers, codon optimization, plasmid maps) |
+
+Research-method skills: `bio-survival-analysis`, `bio-variant-analysis`, `bio-literature-review`, `bio-paper-writing`. Plus 17 protocol templates and 8 agent guides bundled with the plugin.
 
 ---
 
@@ -158,13 +159,13 @@ This plugin also ships a **dsh agent preset** — `bio-genie` — that turns the
 
 ### What it is
 
-- **Persona files** (`preset/bio-genie/preset.yml` + `agent.cordis.yml`) — override the base persona, telling AI: "you have 23 tools + 51 skills + two engines at hand".
-- **Onboarding mantra** (`skills/dsh-bio-genie-expert.md`) — a meta-skill: "1. Inspect workspace → 2. Pick tool / `bio_python` / `bio_r` → 3. Fail by ACR three-layer repair → 4. Report with traceable chain".
+- **Persona files** (`preset/bio-genie/preset.yml` + `agent.cordis.yml`) — override the base persona, telling AI: "you have 40 tools + 47 skills at hand".
+- **Onboarding mantra** (`skills/dsh-bio-genie-expert.md`) — a meta-skill: "1. Inspect workspace → 2. Pick semantic tool / `bio_python` → 3. Fail by ACR three-layer repair → 4. Report with traceable chain".
 - **One-shot install**: `pnpm install` runs postinstall hook to copy the preset to `~/.dsh/.agent-presets/bio-genie/`; no manual steps.
 
 ### What it is **not**
 
-- ❌ **Does NOT own the 23 tools** — every `bio_*` tool is still injected by the plugin's `cordis.patch.yml`; the preset **does not redeclare** any tool to avoid conflicts.
+- ❌ **Does NOT own the 40 tools** — every `bio_*` tool is still injected by the plugin's `cordis.patch.yml`; the preset **does not redeclare** any tool to avoid conflicts.
 - ❌ **Does NOT change the default persona** — after postinstall, "生物基因精灵" appears in dsh's preset selector; users **actively pick** it to activate. `agent-presets.default` is **not** changed to `bio-genie`.
 - ❌ **Does NOT break other plugins** — presets and plugins are two independent seams in dsh; they coexist without conflict.
 
@@ -299,7 +300,6 @@ node --input-type=module -e "import('./src/runtime.js').then(m => m.ensureEnviro
 - **numpy**: BSD License
 - **scipilot-figure-skill** (figurelib plotting scripts): MIT (Copyright Haojae, see THIRD_PARTY_NOTICES.md)
 - **K-Dense scientific-agent-skills** (figurelib style assets + knowledge protocol sources): MIT (Copyright K-Dense Inc., see THIRD_PARTY_NOTICES.md)
-- **R / Bioconductor ecosystem**: GPL-2|GPL-3 (R core) / Artistic-2.0 / MIT / LGPL-3 / GPL-2 / AGPL-3 (phyloseq) — runtime-install + API-call model with zero source redistribution; per-package license table and compliance rationale in THIRD_PARTY_NOTICES.md
 - **BioSQL intentionally excluded** (LGPL)
 
 ---

@@ -89,32 +89,11 @@ model ──bio_seq_analyze(seq)──▶ tools.js
 幂等 + 进程内锁（`bootstrapLock`）防并发；`state.json` 记录状态。插件加载时后台预热
 （`warmUp`），工具调用时若未就绪则等待（最长 10 分钟超时）。
 
-### 5.1 R 环境引导（双引擎，2026-08-17 起）
+### 5.1 R 引擎（已移除，2026-08）
 
-与 Python 侧同构的零依赖自举模型（`src/r-runtime.js`，独立模块不动 Python 侧）：
-
-1. **下载 R 4.6.0 安装器**（官方 CRAN → 失败自动切清华镜像；校验文件是
-   `md5sum.R-4.6.0.txt`——按版本命名，非 `md5sum.txt`，两源实测踩坑修正）
-2. **静默安装**到 `$DSH_HOME/dsh-bio-genie/r/`（Inno Setup `/VERYSILENT /NORESTART /DIR`）
-3. **BiocManager 装核心包集**到 `r-lib/`（版本对固定 R 4.6.0 ↔ Bioc 3.23；
-   `install.packages.compile.from.source="never"` 二进制优先；清华 CRAN + 清华
-   Bioconductor 镜像回退）
-
-与 Python 侧的差异：
-- **惰性引导**：`warmUpR` 默认 false（R+核心包数百 MB，不为从未用 R 的用户强制下载）；
-  首次 `bio_r` 调用触发（工具等待上限 40 分钟）。
-- **包级修复**：缺包 → 幂等安装器补装（R 本体不重装）；`bio_r_env reinstall=true` 强制重装包集。
-- **平台边界**：引导器仅 Windows（R 安装器无可移植静默安装路径）；macOS/Linux 需用户
-  自行装 R 并配置 `rscriptPath`（诚实报错，不假装支持）。
-- **许可模型**：R/CRAN/Bioc 软件全部运行时从官方仓库安装到用户私有目录，
-  插件零源码分发（逐包许可证清单与 AGPL phyloseq 论证见 THIRD_PARTY_NOTICES.md）。
-
-执行层 `r/r_bridge.R`：与 `python/bridge.py` 同构的 JSON 信封（stdin 读
-`{code, cwd}` → stdout 一行 `{ok, stdout, stderr, result}`）；`result <- 值`
-结构化返回；错误被捕获写 stderr（`Error`/`Execution halted` 标记），TS 侧据此
-判定 `needs_repair`（与 Python 的 traceback 判定对称）。UTF-8 走原始字节通道
-（Windows GBK 环境防乱码）。R 子进程环境隔离：`R_LIBS` 指向私有库、
-`R_ENVIRON_USER/R_PROFILE_USER` 清空 + `--vanilla`。
+R 执行器（bio_r / bio_r_env）及其惰性引导机制已从插件中移除；差异表达与
+GSEA 改由 Python 语义化工具 `bio_deseq2` / `bio_gsea` 提供。
+历史决策与移除细节见 `docs/R_REMOVAL_REPORT.md`。
 
 ## 6. 工具 schema 约定
 
@@ -137,7 +116,6 @@ model ──bio_seq_analyze(seq)──▶ tools.js
   **所有 skill（领域/协议/指南）开头 frontmatter 必须含 `language:` 字段**
   （`python`/`r`/`mixed`/`none`），test-skills.mjs 强制校验。
 - **加依赖**：改 `python/requirements.txt`；`bio_env reinstall` 生效。
-- **加 R 核心包**：改 `r/requirements-r.txt`（安装器自动读取）；存量环境缺包自动补装。
 - **改提示词**：编辑 `prompts/persona.md` 后重启 dsh。
 - **说明书同步义务**：工具/skill/依赖变更必须同步更新 `docs/agent-guide/` 对应指南。
 
@@ -161,12 +139,10 @@ model ──bio_seq_analyze(seq)──▶ tools.js
 - **当前内容（v0.3.1+，2026-08-18 起）**：四 tab 内部 state 切换的设置面板
   - **总览 tab**：包元信息 + 配置默认值只读视图 + 文档导航（v0.3.0 原有）
   - **Skill 模块 tab**：调 GET /api/dsh-bio-genie/skills 拉真实清单，主 skill 1 +
-    40 领域/R/协议 + 9 指南共 50 个条目，按 category 分组显示
+    领域/研究/协议/指南共 47 个条目，按 category 分组显示
   - **Python 环境 tab**：调 GET /api/dsh-bio-genie/python-packages 拉 venv 内
     `pip list --format=json` 真实结果，name + version 按字母排序；venv 未引导时
     明确标注 + 引导触发方式
-  - **R 环境 tab**：调 GET /api/dsh-bio-genie/r-packages 拉 Rscript 临时脚本跑
-    `installed.packages()` 真实结果（同上排序与降级逻辑）
 - **数据通道（v0.3.1 新增，loopback-only RPC）**：浏览器 fetch('/api/dsh-bio-genie/<endpoint>')
   同源调宿主侧 server.js 注册的路由；server.js 用 isLoopbackRequest 守卫
   （127.0.0.1/localhost/sec-fetch-site/origin 三层校验）拒绝跨站/非本地访问。

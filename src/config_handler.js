@@ -19,19 +19,16 @@ export async function handleConfig(req, res, config) {
   if (req.method === 'GET') {
     writeJson(res, 200, {
       ok: true,
-      value: {
-        persistentR: config.persistentR !== false,
-        warmUpR: config.warmUpR !== false,
-      }
+      value: {}
     })
   } else if (req.method === 'POST') {
     const val = req.body && req.body.value
-    const key = req.body && req.body.key || 'persistentR'
-    
-    if (typeof val !== 'boolean') {
-      return writeJson(res, 400, { ok: false, error: 'value must be boolean' })
+    const key = req.body && req.body.key
+
+    if (!key || typeof val !== 'boolean') {
+      return writeJson(res, 400, { ok: false, error: 'key and boolean value required' })
     }
-    
+
     // 返回说明信息（实际修改需手动编辑）
     writeJson(res, 200, {
       ok: true,
