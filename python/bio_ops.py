@@ -30,7 +30,8 @@ from ml_tools_3 import op_stats_test
 from dna_design import op_primer_design, op_seq_optimize
 from dna_design_2 import op_assembly_design, op_plasmid_map
 from deg_tools import op_deseq2_python, op_gsea_python
-from synbio_tools import op_primer3_design, op_dna_optimize, op_clone_simulate
+from synbio_tools import (op_primer3_design, op_dna_optimize, op_clone_simulate,
+                          op_sbol_write, op_sbol_read)
 socket.setdefaulttimeout(20)
 from retry_utils import retry_on_network_error
 
@@ -820,12 +821,13 @@ def op_metabolic_model(args):
 
 
 def op_fba(args):
-    """通量平衡分析（FBA）：预测代谢通量分布。"""
+    """通量平衡分析：fba（默认）/ fva（通量可变性分析）/ pfba（节俭 FBA）。"""
     import cobra
-    
+
     model_id = args.get('model_id', 'ecoli_core_model')
     objective = args.get('objective')
-    
+    analysis_type = str(args.get('analysis_type', 'fba')).lower()
+
     # 加载模型
     if model_id == 'textbook' or model_id == 'e_coli_core':
         # 使用COBRApy自带的模型
@@ -833,19 +835,73 @@ def op_fba(args):
     else:
         model_dir = os.path.join(os.path.dirname(__file__), '..', 'data', 'models')
         model_path = os.path.join(model_dir, f'{model_id}.xml')
-        
+
         if not os.path.exists(model_path):
             return {'error': f'Model not found: {model_id}.xml'}
-        
+
         model = cobra.io.read_sbml_model(model_path)
-    
+
     # 设置目标函数
     if objective:
         if objective in model.reactions:
             model.objective = objective
         else:
             return {'error': f'Objective reaction not found: {objective}'}
-    
+
+    if analysis_type == 'fva':
+        # 通量可变性分析：每个反应在最优解附近的 [min, max] 范围
+        from cobra.flux_analysis import flux_variability_analysis
+        fraction = float(args.get('fraction_of_optimum', 1.0))
+        fva_df = flux_variability_analysis(model, fraction_of_optimum=fraction)
+        ranges = {}
+        for rid, row in fva_df.iterrows():
+            lo, hi = float(row['minimum']), float(row['maximum'])
+            if abs(lo) > 1e-10 or abs(hi) > 1e-10:
+                ranges[rid] = [round(lo, 6), round(hi, 6)]
+        return {
+            'analysis_type': 'fva',
+            'fraction_of_optimum': fraction,
+            'n_reactions': len(fva_df),
+            'n_variable': len(ranges),
+            'flux_ranges': ranges,
+            'model_id': model_id,
+            'objective': str(model.objective),
+        }
+
+    if analysis_type == 'pfba':
+        # 节俭 FBA：在最优生长下最小化总通量
+        from cobra.flux_analysis import pfba
+        solution = pfba(model)
+        if solution.status != 'optimal':
+            return {'error': f'pFBA failed: {solution.status}'}
+        fluxes = {r.id: round(float(solution.fluxes[r.id]), 6)
+                  for r in model.reactions if abs(solution.fluxes[r.id]) > 1e-10}
+        # pFBA 的 objective_value 是最小化后的总通量；生长率需从目标反应通量取
+        # （目标表达式含 forward/reverse 两个变量，取正系数且存在于通量表的反应）
+        growth = None
+        try:
+            coefs = model.objective.get_linear_coefficients(model.objective.variables)
+            for var, coef in coefs.items():
+                if coef > 0 and var.name in solution.fluxes.index:
+                    growth = round(float(solution.fluxes[var.name]), 6)
+                    break
+        except Exception:
+            pass
+        return {
+            'analysis_type': 'pfba',
+            'objective_value': round(float(solution.objective_value), 6),
+            'growth_rate': growth,
+            'status': solution.status,
+            'fluxes': fluxes,
+            'total_flux': round(float(abs(solution.fluxes).sum()), 6),
+            'model_id': model_id,
+            'objective': str(model.objective),
+            'note': 'pFBA 的 objective_value 为最小化总通量；生长率见 growth_rate。',
+        }
+
+    if analysis_type != 'fba':
+        return {'error': f'analysis_type 仅支持 fba / fva / pfba，收到: {analysis_type}'}
+
     # 运行FBA
     solution = model.optimize()
     
@@ -876,52 +932,118 @@ def op_fba(args):
     }
 
 
-def op_gene_knockout(args):
-    """基因敲除分析：预测基因敲除对生长的影响。"""
+def _load_cobra_model(model_id):
+    """加载 COBRA 模型（textbook 内置或 data/models/<id>.xml）。"""
     import cobra
-    
+    if model_id in ('textbook', 'e_coli_core', 'ecoli_core_model'):
+        return cobra.io.load_model('textbook')
+    model_dir = os.path.join(os.path.dirname(__file__), '..', 'data', 'models')
+    model_path = os.path.join(model_dir, f'{model_id}.xml')
+    if not os.path.exists(model_path):
+        return None
+    return cobra.io.read_sbml_model(model_path)
+
+
+def op_gene_knockout(args):
+    """基因敲除分析：single（默认）/ double（两两组合）/ essentiality（全基因扫描）。"""
     model_id = args.get('model_id', 'ecoli_core_model')
     gene = args.get('gene')
-    
+    analysis_type = str(args.get('analysis_type', 'single')).lower()
+
+    model = _load_cobra_model(model_id)
+    if model is None:
+        return {'error': f'Model not found: {model_id}.xml'}
+
+    wt_growth = float(model.optimize().objective_value or 0)
+
+    if analysis_type == 'essentiality':
+        # 全基因 essentiality 扫描：逐个敲除，分类 essential/reduced/non-essential
+        results = {'essential': [], 'reduced': [], 'non_essential': []}
+        for g in model.genes:
+            with model:
+                g.knock_out()
+                sol = model.optimize()
+                growth = float(sol.objective_value) if sol.status == 'optimal' else 0.0
+            pct = (growth / wt_growth * 100) if wt_growth > 1e-9 else 0
+            if growth < 1e-6:
+                results['essential'].append(g.id)
+            elif pct < 90:
+                results['reduced'].append({'gene': g.id, 'growth_percent': round(pct, 2)})
+            else:
+                results['non_essential'].append(g.id)
+        return {
+            'analysis_type': 'essentiality',
+            'model_id': model_id,
+            'wild_type_growth': round(wt_growth, 6),
+            'n_genes': len(model.genes),
+            'n_essential': len(results['essential']),
+            'n_reduced': len(results['reduced']),
+            'essential_genes': results['essential'],
+            'reduced_genes': results['reduced'],
+        }
+
+    if analysis_type == 'double':
+        # 双基因敲除：先单敲取影响最大的 top N，再做两两组合
+        top_n = int(args.get('top_n', 10))
+        singles = []
+        for g in model.genes:
+            with model:
+                g.knock_out()
+                sol = model.optimize()
+                growth = float(sol.objective_value) if sol.status == 'optimal' else 0.0
+            singles.append((g.id, growth))
+        # 按对生长的负面影响排序取 top N（跳过上不明显的必需基因两两组合太多时的爆炸）
+        singles.sort(key=lambda x: x[1])
+        candidates = [g for g, _ in singles[:top_n]]
+        combos = []
+        import itertools
+        for g1, g2 in itertools.combinations(candidates, 2):
+            with model:
+                model.genes.get_by_id(g1).knock_out()
+                model.genes.get_by_id(g2).knock_out()
+                sol = model.optimize()
+                growth = float(sol.objective_value) if sol.status == 'optimal' else 0.0
+            pct = (growth / wt_growth * 100) if wt_growth > 1e-9 else 0
+            combos.append({'pair': [g1, g2], 'growth': round(growth, 6),
+                           'growth_percent': round(pct, 2)})
+        combos.sort(key=lambda c: c['growth'])
+        return {
+            'analysis_type': 'double',
+            'model_id': model_id,
+            'wild_type_growth': round(wt_growth, 6),
+            'top_n_candidates': candidates,
+            'n_combinations': len(combos),
+            'top_combinations': combos[:10],
+            'note': '按双敲后生长率升序排列；合成致死组合 growth≈0。',
+        }
+
+    if analysis_type != 'single':
+        return {'error': f'analysis_type 仅支持 single / double / essentiality，收到: {analysis_type}'}
+
     if not gene:
         return {'error': 'Gene ID required'}
-    
-    # 加载模型
-    if model_id == 'textbook' or model_id == 'e_coli_core':
-        # 使用COBRApy自带的模型
-        model = cobra.io.load_model('textbook')
-    else:
-        model_dir = os.path.join(os.path.dirname(__file__), '..', 'data', 'models')
-        model_path = os.path.join(model_dir, f'{model_id}.xml')
-        
-        if not os.path.exists(model_path):
-            return {'error': f'Model not found: {model_id}.xml'}
-        
-        model = cobra.io.read_sbml_model(model_path)
-    
+
     # 检查基因是否存在
-    gene_obj = model.genes.get_by_id(gene)
-    if not gene_obj:
-        return {'error': f'Gene not found: {gene}'}
-    
-    # 野生型FBA
-    wt_solution = model.optimize()
-    wt_growth = wt_solution.objective_value
-    
+    try:
+        gene_obj = model.genes.get_by_id(gene)
+    except KeyError:
+        return {'error': f'Gene not found: {gene}（可用 bio_metabolic_model action=info 查看基因列表）'}
+
     # 基因敲除
     with model:
         gene_obj.knock_out()
         ko_solution = model.optimize()
         ko_growth = ko_solution.objective_value
-    
+
     # 计算影响
     growth_change = ko_growth - wt_growth
     growth_percent = (growth_change / wt_growth * 100) if wt_growth > 0 else 0
-    
+
     # 判断必需性
     is_essential = ko_growth < 1e-6  # 生长率接近0
-    
+
     return {
+        'analysis_type': 'single',
         'gene': gene,
         'gene_name': gene_obj.name,
         'model_id': model_id,
@@ -931,6 +1053,70 @@ def op_gene_knockout(args):
         'growth_change_percent': round(growth_percent, 2),
         'is_essential': is_essential,
         'essentiality': 'essential' if is_essential else ('reduced' if growth_percent < -10 else 'non-essential'),
+    }
+
+
+def op_production_envelope(args):
+    """生产包络线：固定目标反应为优化目标，扫描某反应通量，产出 (vary_flux → target_max) 曲线。
+
+    用途：预测基因改造后产物产量的理论上限（如固定不同生长率看产物得率）。
+    """
+    model_id = args.get('model_id', 'ecoli_core_model')
+    target = args.get('target_reaction')
+    vary = args.get('vary_reaction')
+    points = int(args.get('points', 20))
+
+    if not target or not vary:
+        return {'error': 'target_reaction 与 vary_reaction 均必填（如 target=EX_ac_e, vary=BIOMASS_Ecoli_core_w_GAM）'}
+
+    model = _load_cobra_model(model_id)
+    if model is None:
+        return {'error': f'Model not found: {model_id}.xml'}
+    if target not in model.reactions:
+        return {'error': f'target_reaction 不存在: {target}'}
+    if vary not in model.reactions:
+        return {'error': f'vary_reaction 不存在: {vary}'}
+
+    vary_rxn = model.reactions.get_by_id(vary)
+    lo, hi = vary_rxn.bounds
+    # 经典生产包络：扫描范围取 lo 到「vary 反应在当前模型下的最优通量」
+    # （否则 exchange/biomass 类反应默认上界 1000，大部分扫描点不可行）
+    vary_range = args.get('vary_range')
+    if vary_range:
+        lo, hi = float(vary_range[0]), float(vary_range[1])
+    else:
+        sol0 = model.optimize()
+        opt_flux = float(sol0.fluxes[vary]) if sol0.status == 'optimal' else hi
+        hi = max(lo, opt_flux)
+    if hi - lo < 1e-9:
+        return {'error': f'vary_reaction {vary} 的扫描范围为空（lo={lo}, hi={hi}），可传 vary_range 显式指定'}
+    step = (hi - lo) / max(points - 1, 1)
+
+    data = []
+    for i in range(points):
+        v = lo + i * step
+        with model:
+            model.reactions.get_by_id(vary).bounds = (v, v)
+            model.objective = target
+            sol = model.optimize()
+            data.append({
+                'vary_flux': round(v, 6),
+                'target_flux': round(float(sol.objective_value), 6) if sol.status == 'optimal' else None,
+                'status': sol.status,
+            })
+
+    feasible = [d for d in data if d['target_flux'] is not None]
+    peak = max(feasible, key=lambda d: d['target_flux']) if feasible else None
+    return {
+        'model_id': model_id,
+        'target_reaction': target,
+        'vary_reaction': vary,
+        'points': points,
+        'envelope': data,
+        'max_target_flux': peak['target_flux'] if peak else None,
+        'max_at_vary_flux': peak['vary_flux'] if peak else None,
+        'note': 'envelope 为 vary_reaction 固定在各取值时 target_reaction 的最优通量；'
+                'max_target_flux 即产物理论上限。',
     }
 
 
@@ -1277,6 +1463,10 @@ OPS = {
     'blast_search': op_blast_search,
     'msa': op_msa,
     'phylo_build': op_phylo_build,
+    # Phase 2：代谢工程深化 + SBOL 标准化
+    'production_envelope': op_production_envelope,
+    'sbol_write': op_sbol_write,
+    'sbol_read': op_sbol_read,
 }
 
 

@@ -268,3 +268,120 @@ def op_clone_simulate(args):
                           '电泳模拟/产物序列可结合 bio_seq_restriction 与 bio_python 完成。')
     report['feasible'] = feasible
     return report
+
+
+# ---- Phase 2：SBOL 3 标准化读写 ----
+
+def _role_uri(role):
+    """角色名/term → 本体 URI（tyto 解析，失败原样返回）。"""
+    try:
+        import tyto
+        uri = tyto.SO.get_uri_by_term(str(role))
+        if uri:
+            return uri
+    except Exception:
+        pass
+    return str(role)
+
+
+def op_sbol_write(args):
+    """SBOL 3 写出：组件列表（name/type/sequence/role）→ SBOL 3 XML 文件。
+
+    每个组件生成 Component（SBO 类型 + SO role）+ 关联 Sequence（IUPAC DNA），
+    本体 URI 经 tyto 解析（如 promoter → SO:0000167）。
+    """
+    try:
+        import sbol3
+    except ImportError:
+        return {'error': 'sbol3 未安装，请运行 bio_env reinstall=true 或 uv pip install sbol3 tyto'}
+
+    components = args.get('components') or []
+    output_file = args.get('output_file')
+    if not components:
+        raise ValueError('components 必填（[{name, type, sequence, role}]）')
+    if not output_file:
+        raise ValueError('output_file 必填（SBOL 3 XML 输出路径）')
+
+    namespace = str(args.get('namespace', 'https://dsh-bio-genie.local/design'))
+    sbol3.set_namespace(namespace)
+
+    type_map = {
+        'dna': sbol3.SBO_DNA, 'rna': sbol3.SBO_RNA,
+        'protein': sbol3.SBO_PROTEIN, 'complex': sbol3.SBO_NON_COVALENT_COMPLEX,
+    }
+
+    doc = sbol3.Document()
+    written = []
+    for i, comp in enumerate(components):
+        cname = str(comp.get('name') or f'component_{i + 1}')
+        ctype = type_map.get(str(comp.get('type', 'dna')).lower(), sbol3.SBO_DNA)
+        roles = [_role_uri(comp['role'])] if comp.get('role') else []
+        c = sbol3.Component(cname, ctype, name=cname, roles=roles)
+        doc.add(c)
+        seq_text = _clean_seq(comp.get('sequence', '') or '')
+        if seq_text:
+            s = sbol3.Sequence(f'{cname}_seq', elements=seq_text.lower() if False else seq_text,
+                               encoding=sbol3.IUPAC_DNA_ENCODING,
+                               namespace=namespace)
+            doc.add(s)
+            c.sequences.append(s.identity)
+        written.append({'name': cname, 'type': comp.get('type', 'dna'),
+                        'role': comp.get('role'), 'has_sequence': bool(seq_text)})
+
+    doc.write(output_file)
+    return {
+        'output_file': os.path.abspath(output_file),
+        'n_components': len(written),
+        'components': written,
+        'namespace': namespace,
+        'format': 'SBOL 3 (RDF/XML)',
+    }
+
+
+def op_sbol_read(args):
+    """SBOL 3 读取：SBOL 3 XML → 组件列表（name/type/role/sequence）。
+
+    include_sequences=true 时返回各组件关联的序列（可直接导出 FASTA 用）。
+    """
+    try:
+        import sbol3
+    except ImportError:
+        return {'error': 'sbol3 未安装，请运行 bio_env reinstall=true 或 uv pip install sbol3 tyto'}
+
+    sbol_file = args.get('sbol_file')
+    if not sbol_file:
+        raise ValueError('sbol_file 必填（SBOL 3 XML 文件路径）')
+    if not os.path.exists(sbol_file):
+        return {'error': f'文件不存在: {sbol_file}'}
+
+    include_sequences = bool(args.get('include_sequences', True))
+
+    doc = sbol3.Document()
+    doc.read(sbol_file)
+
+    components = []
+    for obj in doc.objects:
+        if not isinstance(obj, sbol3.Component):
+            continue
+        entry = {
+            'name': obj.display_id,
+            'types': [str(t) for t in obj.types],
+            'roles': [str(r) for r in obj.roles],
+        }
+        if include_sequences:
+            seqs = []
+            for seq_uri in obj.sequences:
+                seq_obj = doc.find(str(seq_uri))
+                if seq_obj is not None and getattr(seq_obj, 'elements', None):
+                    seqs.append(seq_obj.elements)
+            if seqs:
+                entry['sequences'] = seqs
+                entry['sequence_lengths'] = [len(s) for s in seqs]
+        components.append(entry)
+
+    return {
+        'sbol_file': os.path.abspath(sbol_file),
+        'n_components': len(components),
+        'components': components,
+        'note': 'roles/types 为本体 URI（SO/SBO）；用 tyto.SO.get_term_by_uri 可反查术语名。',
+    }

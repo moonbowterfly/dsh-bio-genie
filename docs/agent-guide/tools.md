@@ -2,7 +2,7 @@
 language: none
 ---
 
-# 工具全参考（43 个）
+# 工具全参考（46 个）
 
 > 每个工具：功能 → 参数（★=必填）→ 返回关键字段 → 典型触发词。**选工具第一优先，`bio_python` 执行器第二优先**。
 
@@ -175,3 +175,15 @@ language: none
 **bio_dna_optimize** — 多约束 DNA 优化（DNA Chisel）：`protein_sequence` 或 `dna_sequence`（二选一）、`host_organism`（默认 e_coli）、`constraints`（remove_restriction_sites/gc_range/avoid_motifs）、`codon_optimize`（默认 true）。保持氨基酸不变，多约束满足后做密码子优化，返回优化序列 + 修改报告。与 bio_seq_optimize（简单替换）区分。触发词：多约束优化、去除酶切位点、DNA Chisel。
 
 **bio_clone_simulate** — 克隆模拟（pydna，**第二层依赖，首次调用自动安装**）：`backbone ★`、`inserts ★`（[{name,sequence}]）、`method`（gibson/golden_gate/restriction/ligation）、`overlap`（Gibson 同源臂下限，默认 20）、`restriction_enzymes`。Gibson 返回预期产物序列；Golden Gate/酶切做位点可行性检查。触发词：克隆模拟、Gibson 组装模拟、质粒构建验证。
+
+**bio_sbol_write** — SBOL 3 写出：`components ★`（[{name,type,sequence,role}]）、`output_file ★`、`namespace`。role 经 tyto 解析为 SO 本体 URI。返回写入路径 + 组件数。触发词：SBOL、标准化设计导出。
+
+**bio_sbol_read** — SBOL 3 读取：`sbol_file ★`、`include_sequences`（默认 true）。返回组件列表（types/roles URI + 关联序列）。触发词：SBOL 读取、SBOL 解析。
+
+### 代谢工程增强（Phase 2）
+
+**bio_fba** 增强 — 新增 `analysis_type`：`fba`（默认，行为不变）/ `fva`（通量可变性，返回每反应 [min,max] 范围，`fraction_of_optimum` 可调）/ `pfba`（节俭 FBA，最小化总通量）。
+
+**bio_gene_knockout** 增强 — 新增 `analysis_type`：`single`（默认，行为不变，`gene` 必填）/ `double`（top_n 候选两两双敲，找合成致死对）/ `essentiality`（全基因必需性扫描）。
+
+**bio_production_envelope** — 生产包络线：`target_reaction ★`（产物反应如 EX_ac_e）、`vary_reaction ★`（扫描反应如 BIOMASS）、`points`（默认 20）。返回 vary_flux→target_flux 曲线与产物理论上限。触发词：生产包络、产量预测。

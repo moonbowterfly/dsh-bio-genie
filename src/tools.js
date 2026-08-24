@@ -612,28 +612,49 @@ function semanticTools(config) {
     bioTool(config, {
       name: 'bio_fba',
       description:
-        '通量平衡分析（FBA）：预测代谢通量分布。返回最优生长速率、主要反应通量、代谢物影子价格。' +
+        '通量平衡分析：预测代谢通量分布。analysis_type=fba（默认，最优生长+影子价格）/ ' +
+        'fva（通量可变性分析，返回每个反应的 [min,max] 范围）/ pfba（节俭 FBA，最小化总通量）。' +
         'model_id 指定模型（默认 textbook，COBRApy 内置 E. coli core），objective 可指定目标函数反应。' +
-        '触发词：FBA、通量平衡、代谢通量、生长速率预测。',
+        '触发词：FBA、FVA、pFBA、通量平衡、通量可变性、代谢通量、生长速率预测。',
       parameters: {
         model_id: { type: 'string', description: '模型标识，默认 textbook（COBRApy 内置）' },
         objective: { type: 'string', description: '目标函数反应 ID（可选，默认使用模型目标）' },
+        analysis_type: { type: 'string', enum: ['fba', 'fva', 'pfba'], description: '分析类型，默认 fba' },
+        fraction_of_optimum: { type: 'number', description: 'FVA 专用：最优性比例，默认 1.0' },
       },
       op: 'fba',
-      timeoutMs: 120_000,
+      timeoutMs: 300_000,
     }),
     bioTool(config, {
       name: 'bio_gene_knockout',
       description:
-        '基因敲除分析：预测基因敲除对生长的影响。返回敲除后生长速率、变化百分比、必需性判断。' +
-        'model_id 默认 textbook（COBRApy 内置 E. coli core），gene 为基因 ID（如 b0002）。' +
-        '触发词：基因敲除、敲除分析、必需基因、基因必需性。',
+        '基因敲除分析：analysis_type=single（默认，单基因敲除）/ double（top N 基因两两组合双敲，' +
+        '找合成致死对）/ essentiality（全基因必需性扫描，essential/reduced/non-essential 分类）。' +
+        'model_id 默认 textbook（COBRApy 内置 E. coli core），gene 为基因 ID（如 b0002，single 必填）。' +
+        '触发词：基因敲除、双敲除、合成致死、敲除分析、必需基因、基因必需性。',
       parameters: {
         model_id: { type: 'string', description: '模型标识，默认 textbook（COBRApy 内置）' },
-        gene: { type: 'string', required: true, description: '基因 ID，如 b0002' },
+        gene: { type: 'string', description: '基因 ID，如 b0002（analysis_type=single 时必填）' },
+        analysis_type: { type: 'string', enum: ['single', 'double', 'essentiality'], description: '分析类型，默认 single' },
+        top_n: { type: 'number', description: 'double 专用：单敲影响最大的候选基因数，默认 10' },
       },
       op: 'gene_knockout',
-      timeoutMs: 120_000,
+      timeoutMs: 600_000,
+    }),
+    bioTool(config, {
+      name: 'bio_production_envelope',
+      description:
+        '生产包络线：固定目标反应为优化目标，扫描另一反应（如生物量）的通量取值，' +
+        '返回 vary_flux → target_flux 曲线与产物理论上限。用于评估基因改造后的产量天花板。' +
+        '触发词：生产包络、production envelope、产物得率上限、产量预测。',
+      parameters: {
+        model_id: { type: 'string', description: '模型标识，默认 textbook（COBRApy 内置）' },
+        target_reaction: { type: 'string', required: true, description: '目标反应 ID（产物，如 EX_ac_e）' },
+        vary_reaction: { type: 'string', required: true, description: '扫描反应 ID（如 BIOMASS_Ecoli_core_w_GAM）' },
+        points: { type: 'number', description: '扫描点数，默认 20' },
+      },
+      op: 'production_envelope',
+      timeoutMs: 600_000,
     }),
     // ---- 代谢通路设计（2026-08-22 新增，基于KEGG数据库）----
     bioTool(config, {
@@ -852,6 +873,34 @@ function semanticTools(config) {
       },
       op: 'clone_simulate',
       timeoutMs: 300_000,
+    }),
+    // ---- Phase 2：SBOL 3 标准化读写 ----
+    bioTool(config, {
+      name: 'bio_sbol_write',
+      description:
+        'SBOL 3 标准化设计写出：组件列表（name/type/sequence/role）→ SBOL 3 XML 文件。' +
+        '每个组件生成 Component + 关联 Sequence，role 经 tyto 解析为 SO 本体 URI（如 promoter→SO:0000167）。' +
+        '触发词：SBOL、标准化设计、合成生物学数据交换、SBOL 导出。',
+      parameters: {
+        components: { type: 'array', required: true, description: '组件列表 [{name, type(dna/rna/protein/complex), sequence, role}]', items: { type: 'object', additionalProperties: true } },
+        output_file: { type: 'string', required: true, description: 'SBOL 3 XML 输出路径' },
+        namespace: { type: 'string', description: '命名空间 URI，默认 https://dsh-bio-genie.local/design' },
+      },
+      op: 'sbol_write',
+      timeoutMs: 60_000,
+    }),
+    bioTool(config, {
+      name: 'bio_sbol_read',
+      description:
+        'SBOL 3 标准化设计读取：SBOL 3 XML 文件 → 组件列表（name/types/roles/关联序列）。' +
+        'include_sequences=true 时提取各组件的 DNA 序列（可对接 FASTA 导出）。' +
+        '触发词：SBOL 读取、SBOL 解析、读取标准化设计。',
+      parameters: {
+        sbol_file: { type: 'string', required: true, description: 'SBOL 3 XML 文件路径' },
+        include_sequences: { type: 'boolean', description: '是否提取关联序列，默认 true' },
+      },
+      op: 'sbol_read',
+      timeoutMs: 60_000,
     }),
     // ---- Python 差异表达/GSEA 工具（替代 R 引擎）----
     bioTool(config, {

@@ -13,14 +13,17 @@
 
 /** 第二层：op 名 → 运行时按需自动补装的 pip 包列表。 */
 export const EXTRA_DEPS = {
-  clone_simulate: ['pydna'],
+  // pyparsing>=3.1 是防冲突护栏：pydna 的传递依赖会把 pyparsing 降到 2.4.7，
+  // 破坏 matplotlib（_fontconfig_pattern 需要 pyparsing3 的 one_of）。
+  clone_simulate: ['pydna', 'pyparsing>=3.1'],
   // Phase 2 预留：
   // cobra_model: ['cobra', 'glpk'],
 }
 
-/** pip 包名 → import 模块名（不一致时在此覆盖）。 */
+/** pip 包名 → import 模块名（不一致或带版本约束时在此覆盖）。 */
 export const EXTRA_IMPORT_NAMES = {
   pydna: 'pydna',
+  'pyparsing>=3.1': 'pyparsing',
 }
 
 /** 第三层：需用户手动启用的扩展模块（Phase 2/3 预留）。 */

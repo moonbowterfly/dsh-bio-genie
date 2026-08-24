@@ -47,3 +47,7 @@ statsmodels>=0.14
 primer3-py>=2.3.0
 dna-features-viewer>=3.1.0
 dnachisel>=3.3.0
+# 合成生物学 Phase 2（2026-08-25 新增）：SBOL 3 标准化读写（体积小 ~5MB，第一层内置；
+# 若后续出现 Windows 兼容问题可降级到 src/extra-deps.js 第二层）
+sbol3>=1.0
+tyto>=1.4
