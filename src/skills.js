@@ -283,14 +283,14 @@ export const GUIDE_MANIFEST = [
   {
     name: 'dsh-bio-genie-guide-tools',
     category: 'guide',
-    description: '23 个工具完整参考：每个工具的参数/返回字段/典型触发词 + 愿望→工具选择速查 + 缓存限流说明。',
+    description: '49 个工具完整参考：每个工具的参数/返回字段/典型触发词 + 愿望→工具选择速查 + 缓存限流说明。',
     whenToUse: '不确定某个 bio_* 工具的参数、返回结构或选哪个工具时。',
     file: 'tools.md',
   },
   {
     name: 'dsh-bio-genie-guide-skills',
     category: 'guide',
-    description: '51 个 skill 导航：主 skill + 15 领域 + 8 指南 + 19 协议的加载时机与触发任务表。',
+    description: '49 个 skill 导航：主 skill + 22 领域 + 17 协议 + 9 指南的加载时机与触发任务表。',
     whenToUse: '需要决定加载哪个领域/协议 skill 时。',
     file: 'skills.md',
   },
