@@ -18,9 +18,14 @@ import { existsSync, mkdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { isAbsolute, join, resolve } from 'node:path'
 
-/** 保底工作区目录（自动创建）。 */
+/** dsh 工作区根目录（用户规范 2026-08-25：所有会话工作区统一位于 ~/.dsh/sessions/ 下）。 */
+export function workspaceRoot() {
+  return join(homedir(), '.dsh', 'sessions')
+}
+
+/** 保底工作区目录（自动创建；仅无会话 cwd / 未指定显式 workdir 时使用）。 */
 export function fallbackWorkspace() {
-  return join(homedir(), 'deepseek-harness', 'bio-genie-workspace')
+  return join(workspaceRoot(), 'default')
 }
 
 /**
