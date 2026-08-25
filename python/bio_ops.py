@@ -853,7 +853,7 @@ def op_fba(args):
         # 通量可变性分析：每个反应在最优解附近的 [min, max] 范围
         from cobra.flux_analysis import flux_variability_analysis
         fraction = float(args.get('fraction_of_optimum', 1.0))
-        fva_df = flux_variability_analysis(model, fraction_of_optimum=fraction)
+        fva_df = flux_variability_analysis(model, fraction_of_optimum=fraction, processes=1)
         ranges = {}
         for rid, row in fva_df.iterrows():
             lo, hi = float(row['minimum']), float(row['maximum'])
