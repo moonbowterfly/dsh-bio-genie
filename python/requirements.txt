@@ -36,18 +36,16 @@ requests>=2.28
 #  - statsmodels:  统计建模（假设检验/回归/时间序列）
 scikit-learn>=1.3
 statsmodels>=0.14
-# 合成生物学 Phase 1（2026-08-25 新增，设计文档 hermes-sci-worker/bio-genie-improvement/02）：
-#  - primer3-py:           工业级 PCR 引物设计（bio_primer3_design；预编译 wheel）
-#  - dna-features-viewer:  质粒图形化图谱（bio_plasmid_map 图形模式；纯 Python + matplotlib）
-#  - dnachisel:            多约束 DNA 序列优化（bio_dna_optimize；纯 Python）
-# 三者均为第一层内置依赖，随环境引导一次性安装。
-# 注意：pydna（bio_clone_simulate）不在此列——走 src/extra-deps.js 第二层按需自动安装。
-# 注意：primer3-py 在当前 Windows + Python 3.12 环境仅有 <=2.3.0 的可用 wheel
-#（>=2.6.0 无对应产物，2026-08-25 uv 实测 unsatisfiable），故下限放宽到 2.3.0。
-primer3-py>=2.3.0
-dna-features-viewer>=3.1.0
-dnachisel>=3.3.0
-# 合成生物学 Phase 2（2026-08-25 新增）：SBOL 3 标准化读写（体积小 ~5MB，第一层内置；
-# 若后续出现 Windows 兼容问题可降级到 src/extra-deps.js 第二层）
-sbol3>=1.0
-tyto>=1.4
+# ⚠️ 合成生物学五项已下沉第二层（v0.6.16 分层调整，2026-08-26）：
+# primer3-py / dnachisel / dna-features-viewer 不再随环境引导安装，改由
+# src/extra-deps.js EXTRA_DEPS 首次调用对应 op 时自动补装。下沉原因：第一层是
+# 全量解析、单包无解即整体失败的原子操作——冷启动实测 dnachisel>=3.3.0 为
+# 不可满足约束（PyPI 实际上限 3.2.16），卡死整个引导且 systemPython 兜底同炸；
+# 且 primer3-py 在 Windows+Python 3.12 仅有 <=2.3.0 可用 wheel（天花板低）。
+# 下沉后坏约束最多废掉一个 op，不再全局连坐：
+#  - primer3-py>=2.3.0         → bio_primer3_design
+#  - dnachisel>=3.2,<4         → bio_dna_optimize
+#  - dna-features-viewer>=3.1  → bio_plasmid_map 图形模式（缺失自动回退文本模式）
+#  - sbol3>=1.0 / tyto>=1.4    → bio_sbol_write / bio_sbol_read
+#    （二次下沉原因：tyto 声明 pyparsing(<3)，留在第一层会把整个环境钉死在
+#     pyparsing 2.4.7，与 clone_simulate 护栏 pyparsing>=3.1 结构性互斥）

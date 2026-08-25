@@ -1061,13 +1061,14 @@ function semanticTools(config) {
       op: 'wetlab_design',
       timeoutMs: 30_000,
     }),
-    // ---- Phase 2：SBOL 3 标准化读写 ----
+    // ---- Phase 2：SBOL 3 标准化读写（第二层依赖，首次调用自动安装 sbol3/tyto）----
     bioTool(config, {
       name: 'bio_sbol_write',
       description:
         'SBOL 3 标准化设计写出：组件列表（name/type/sequence/role）→ SBOL 3 XML 文件。' +
         '每个组件生成 Component + 关联 Sequence，role 经 tyto 解析为 SO 本体 URI（如 promoter→SO:0000167）。' +
         '注意：首次调用 tyto 需解析 SO 本体，耗时可达 1-2 分钟，属正常现象，请耐心等待不要重复调用或改用自写 XML。' +
+        '依赖说明：sbol3/tyto 属第二层按需依赖（auto），首次调用时自动补装。' +
         '触发词：SBOL、标准化设计、合成生物学数据交换、SBOL 导出。',
       parameters: {
         components: { type: 'array', required: true, description: '组件列表 [{name, type(dna/rna/protein/complex), sequence, role}]', items: { type: 'object', additionalProperties: true } },
@@ -1082,6 +1083,7 @@ function semanticTools(config) {
       description:
         'SBOL 3 标准化设计读取：SBOL 3 XML 文件 → 组件列表（name/types/roles/关联序列）。' +
         'include_sequences=true 时提取各组件的 DNA 序列（可对接 FASTA 导出）。' +
+        '依赖说明：sbol3/tyto 属第二层按需依赖（auto），首次调用时自动补装。' +
         '触发词：SBOL 读取、SBOL 解析、读取标准化设计。',
       parameters: {
         sbol_file: { type: 'string', required: true, description: 'SBOL 3 XML 文件路径' },

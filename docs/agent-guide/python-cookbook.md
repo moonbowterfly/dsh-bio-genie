@@ -31,10 +31,10 @@ language: python
 | `PIL`（Pillow） | 图像读写（灰度预览、DPI 读取） | builtin |
 | `reportlab` + `rlPyCairo` | GenomeDiagram 渲染 PNG 的后端 | builtin |
 | `cobra` | 代谢建模（FBA/FVA/pFBA/loopless/geometric/OptKnock、`cobra.io.read_sbml_model`） | builtin |
-| `primer3` | 工业级引物设计（`primer3.bindings.design_primers`） | builtin |
-| `dnachisel` | 多约束 DNA 优化（`DnaOptimizationProblem` / `CodonOptimize` / `AvoidPattern`；**V2 与新 Spec 体系不兼容**） | builtin |
-| `dna_features_viewer` | 质粒图（`GraphicRecord` + `from_biopython_record`） | builtin |
-| `sbol3` / `tyto` | SBOL 3 读写 / 本体 URI 解析（`tyto.SO.get_term_by_uri`） | builtin |
+| `primer3` | 工业级引物设计（`primer3.bindings.design_primers`；首调自动装） | auto |
+| `dnachisel` | 多约束 DNA 优化（`DnaOptimizationProblem` / `CodonOptimize` / `AvoidPattern`；**V2 与新 Spec 体系不兼容**；首调自动装） | auto |
+| `dna_features_viewer` | 质粒图（`GraphicRecord` + `from_biopython_record`；首调自动装） | auto |
+| `sbol3` / `tyto` | SBOL 3 读写 / 本体 URI 解析（`tyto.SO.get_term_by_uri`；首调自动装） | auto |
 | `requests` | HTTP API（KEGG/Enrichr 等；`Bio.Entrez` 请勿手调——用 bio_entrez_* 工具） | builtin |
 | `pydna` | 克隆模拟（Dseqrecord/Assembly；**注意 pyparsing>=3.1 冲突护栏**） | auto |
 | `biocrnpyler` | 基因回路编译（部件→CRN→SBML；**自动 --no-deps 安装**） | auto |

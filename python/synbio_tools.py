@@ -3,10 +3,14 @@
 所有第三方依赖均为**函数体内懒加载**：模块导入失败时返回带安装提示的
 error 字典，不影响 bio_ops.py 其余 op 的加载。
 
-- primer3-py / dnachisel：第一层内置依赖（requirements.txt），缺失多半是
-  环境未补装，提示 bio_env reinstall。
+- primer3-py / dnachisel：第二层按需依赖（v0.6.16 起，src/extra-deps.js
+  EXTRA_DEPS 注册），TS 侧会在调用 primer3_design/dna_optimize 前自动
+  uv pip install（dna-features-viewer 同理挂 plasmid_map）；此处仍兜底返回友好错误。
 - pydna：第二层按需依赖（src/extra-deps.js EXTRA_DEPS），TS 侧会在调用
   clone_simulate 前自动 uv pip install；此处仍兜底返回友好错误。
+- sbol3 / tyto：同为第二层（2026-08-26 下沉，挂 sbol_write/sbol_read）；
+  tyto 的 pyparsing(<3) 约束是移出第一层的直接原因（避免钉死全局 pyparsing 2.x，
+  与 clone_simulate 护栏 pyparsing>=3.1 冲突）。
 """
 import os
 import sys

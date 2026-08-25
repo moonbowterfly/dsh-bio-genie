@@ -724,11 +724,11 @@ def op_env_status(args):
         ('PIL',        'Pillow',                  'builtin', '图像'),
         ('reportlab',  'reportlab',               'builtin', 'PDF/GenomeDiagram 后端'),
         ('cobra',      'cobra',                   'builtin', '代谢建模 FBA/FVA/OptKnock'),
-        ('primer3',    'primer3-py',              'builtin', '工业级引物设计'),
-        ('dnachisel',  'dnachisel',               'builtin', '多约束 DNA 优化'),
-        ('dna_features_viewer', 'dna-features-viewer', 'builtin', '质粒图'),
-        ('sbol3',      'sbol3',                   'builtin', 'SBOL 3 读写'),
-        ('tyto',       'tyto',                    'builtin', '本体查询'),
+        ('primer3',    'primer3-py',              'auto',   '工业级引物设计（首调自动装）'),
+        ('dnachisel',  'dnachisel',               'auto',   '多约束 DNA 优化（首调自动装）'),
+        ('dna_features_viewer', 'dna-features-viewer', 'auto', '质粒图（首调自动装）'),
+        ('sbol3',      'sbol3',                   'auto',   'SBOL 3 读写（首调自动装）'),
+        ('tyto',       'tyto',                    'auto',   '本体查询（首调自动装）'),
         ('requests',   'requests',                'builtin', 'HTTP API'),
         ('pydna',      'pydna',                   'auto',   '克隆模拟（首调自动装）'),
         ('biocrnpyler','biocrnpyler',             'auto',   '基因回路编译（首调自动装）'),
@@ -1771,7 +1771,8 @@ OPS = {
     'seq_optimize': op_seq_optimize,
     'assembly_design': op_assembly_design,
     'plasmid_map': op_plasmid_map,
-    # 合成生物学 Phase 1（primer3/dnachisel 内置；pydna 第二层按需自动安装）
+    # 合成生物学 Phase 1（v0.6.16 起 primer3/dnachisel/dna-features-viewer 均为
+    # 第二层按需自动安装，注册见 src/extra-deps.js EXTRA_DEPS）
     'primer3_design': op_primer3_design,
     'dna_optimize': op_dna_optimize,
     'clone_simulate': op_clone_simulate,

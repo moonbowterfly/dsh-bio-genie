@@ -350,9 +350,12 @@ function findManagedPython(pyDir) {
   return walk(pyDir, 1)
 }
 
-/** requirements.txt 中除 biopython/numpy 外必须可导入的包（环境完整性判断）。 */
-const REQUIRED_PACKAGES = ['matplotlib', 'pandas', 'seaborn', 'scipy', 'PIL',
-  'primer3', 'dna_features_viewer', 'dnachisel']
+/** requirements.txt 中除 biopython/numpy 外必须可导入的包（环境完整性判断）。
+ * ⚠️ 只列第一层（builtin）包。第二层按需包（primer3/dnachisel/dna-features-viewer，
+ * v0.6.16 下沉进 EXTRA_DEPS）绝不能出现在这里——否则冷启动后完整性检查永远判缺、
+ * 触发 repairPackages 重装仍补不齐，陷入「修复循环」直至误走完整自举重建。
+ * 第二层的缺失由 ensureExtraDeps 在对应 op 首次调用时负责补装，两层互不越界。 */
+const REQUIRED_PACKAGES = ['matplotlib', 'pandas', 'seaborn', 'scipy', 'PIL']
 
 /** 查询解释器元数据（python 版本 / 核心库 / 绘图栈）。 */
 async function inspect(exe) {

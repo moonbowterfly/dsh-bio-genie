@@ -172,9 +172,9 @@ language: none
 
 ### 合成生物学（Phase 1）
 
-**bio_primer3_design** — 工业级引物设计（Primer3）：`sequence ★`、`target_region [start,len]`、`primer_size`/`tm_range`/`gc_range`、`max_hairpin_tm`/`max_self_any_tm`、`num_return`（默认 5）。返回候选引物对（Tm/GC%/发夹/二聚体评分 + penalty 排序，rank 1 推荐；`position` 为 **0-based** Primer3 约定）。与 bio_primer_design（简单版）区分：需要可投稿级引物质量时用本工具。触发词：Primer3、工业级引物、qPCR 引物。
+**bio_primer3_design** — 工业级引物设计（Primer3）：`sequence ★`、`target_region [start,len]`、`primer_size`/`tm_range`/`gc_range`、`max_hairpin_tm`/`max_self_any_tm`、`num_return`（默认 5）。返回候选引物对（Tm/GC%/发夹/二聚体评分 + penalty 排序，rank 1 推荐；`position` 为 **0-based** Primer3 约定）。与 bio_primer_design（简单版）区分：需要可投稿级引物质量时用本工具。触发词：Primer3、工业级引物、qPCR 引物。依赖说明：primer3-py 属第二层按需依赖（auto），首次调用本工具时运行时自动补装，无需手动操作。
 
-**bio_dna_optimize** — 多约束 DNA 优化（DNA Chisel）：`protein_sequence` 或 `dna_sequence`（二选一）、`host_organism`（默认 e_coli）、`constraints`（remove_restriction_sites/gc_range/avoid_motifs）、`codon_optimize`（默认 true）。保持氨基酸不变，多约束满足后做密码子优化，返回优化序列 + 修改报告。与 bio_seq_optimize（简单替换）区分。触发词：多约束优化、去除酶切位点、DNA Chisel。
+**bio_dna_optimize** — 多约束 DNA 优化（DNA Chisel）：`protein_sequence` 或 `dna_sequence`（二选一）、`host_organism`（默认 e_coli）、`constraints`（remove_restriction_sites/gc_range/avoid_motifs）、`codon_optimize`（默认 true）。保持氨基酸不变，多约束满足后做密码子优化，返回优化序列 + 修改报告。与 bio_seq_optimize（简单替换）区分。触发词：多约束优化、去除酶切位点、DNA Chisel。依赖说明：dnachisel 属第二层按需依赖（auto），首次调用时自动补装（PyPI 上限 3.2.16，安装约束 >=3.2,<4）。
 
 **bio_clone_simulate** — 克隆模拟（pydna，**第二层依赖，首次调用自动安装**）：`backbone ★`、`inserts ★`（[{name,sequence}]）、`method`（gibson/golden_gate/restriction/ligation）、`overlap`（Gibson 同源臂下限，默认 20）、`restriction_enzymes`。Gibson 返回预期产物序列；Golden Gate/酶切做位点可行性检查。触发词：克隆模拟、Gibson 组装模拟、质粒构建验证。
 
