@@ -954,6 +954,39 @@ function semanticTools(config) {
       op: 'clone_simulate',
       timeoutMs: 300_000,
     }),
+    // ---- CRISPR 工具链（2026-08-25 新增）----
+    bioTool(config, {
+      name: 'bio_crispr_guide',
+      description:
+        'CRISPR sgRNA 设计：扫描模板序列中的 PAM 位点（支持 SpCas9/Cas12a/Cas12e），' +
+        '返回 GC/效率分/off-target 数排名靠前的 guide 候选。' +
+        '效率分为基于 GC 含量+末端 poly-run+PAM 的简化预测（0-100，非实验验证）；off-target 仅扫描输入模板，全基因组扫描需用 Cas-OFFinder。' +
+        '触发词：sgRNA 设计、Cas9 引导 RNA、CRISPR 设计、sgRNA 筛选、PAM 扫描。',
+      parameters: {
+        sequence: { type: 'string', required: true, description: '模板 DNA 序列' },
+        cas: { type: 'string', enum: ['spcas9', 'cas9_hifi', 'espcas9', 'cas12a', 'cas12e'], description: 'Cas 蛋白类型，默认 spcas9' },
+        gc_min: { type: 'number', description: 'GC% 下限，默认 30' },
+        gc_max: { type: 'number', description: 'GC% 上限，默认 80' },
+        max_offtargets: { type: 'number', description: 'off-target 数上限，默认 10' },
+        max_mismatches: { type: 'number', description: 'off-target 错配上限，默认 3' },
+        top_n: { type: 'number', description: '返回候选数，默认 10' },
+      },
+      op: 'crispr_guide',
+      timeoutMs: 60_000,
+    }),
+    bioTool(config, {
+      name: 'bio_crispr_verify',
+      description:
+        'CRISPR 编辑验证（Sanger 测序分析）：对野生型与编辑后序列做全局比对（Needleman-Wunsch），' +
+        '统计 indel/substitution 数量与编辑效率。仅做两序列比对，不解析 .ab1 trace 文件。' +
+        '触发词：编辑验证、Sanger 比对、indel 分析、编辑效率计算、敲除验证。',
+      parameters: {
+        wild_type: { type: 'string', required: true, description: '野生型参考序列' },
+        edited: { type: 'string', required: true, description: '编辑后序列' },
+      },
+      op: 'crispr_verify',
+      timeoutMs: 30_000,
+    }),
     // ---- Phase 2：SBOL 3 标准化读写 ----
     bioTool(config, {
       name: 'bio_sbol_write',

@@ -30,7 +30,7 @@
 | 📜 **透明性日志** | 每次代码执行/工具调用异步记 JSONL 日志（哈希/预览/耗时），`bio_log` 可回溯任何一次分析 |
 | 🧬 **科学严谨性约束** | persona 强制「生物学结论必须可溯源到工具输出」，纯推断标注 [推断-未验证] |
 | 🧠 **会话记忆** | 成功代码模式 + 错误→修复经验自动沉淀（本地 JSON），`bio_memory` 查询，越用越聪明 |
-| ⚙️ **设置面板** | dsh 设置面板（⚙️ 齿轮）侧栏「BioGenie」菜单——标签页：总览（包元信息/配置默认值）、Skill 模块（47 个条目按主 skill/领域/研究/协议/指南分组）、Python 环境（venv 包列表）、工具调试 |
+| ⚙️ **设置面板** | dsh 设置面板（⚙️ 齿轮）侧栏「BioGenie」菜单——标签页：总览（包元信息/配置默认值）、Skill 模块（49 个条目按主 skill/领域/研究/协议/指南分组）、Python 环境（venv 包列表）、工具调试 |
 | 📚 **协议知识库** | 17 个高频任务协议（质控/比对/BLAST/克隆/建树/结构/富集/出版级绘图/坐标系统/统计检验/差异表达/GSEA…），每个含可执行代码模板 + 常见坑，随插件打包 |
 
 ---
@@ -124,7 +124,7 @@ X 与 gap 在翻译时按未知碱基处理（Biopython 标准行为），含 X/
 
 ---
 
-## 📚 Skill 体系（47 个）
+## 📚 Skill 体系（49 个）
 
 ### 主 skill：`dsh-bio-genie`
 工具分层决策树：**先查语义化工具表 → 命中就用；否则用 bio_python 执行器写 Biopython 代码**。
@@ -161,7 +161,7 @@ X 与 gap 在翻译时按未知碱基处理（Biopython 标准行为），含 X/
 
 ### 它是什么
 
-- **人设文件**（`preset/bio-genie/preset.yml` + `agent.cordis.yml`）——覆盖 base persona，告诉 AI「你手头有 49 个工具 + 47 个 skill」。
+- **人设文件**（`preset/bio-genie/preset.yml` + `agent.cordis.yml`）——覆盖 base persona，告诉 AI「你手头有 51 个工具 + 49 个 skill」。
 - **入门口诀**（`skills/dsh-bio-genie-expert.md`）——一个 meta-skill：「先看工作区 → 二选一（语义化工具 / `bio_python`） → 失败按 ACR 三层修 → 报告带可追溯链」。
 - **一键安装**：`pnpm install` 跑 postinstall 钩子会自动把 preset 复制到 `~/.dsh/.agent-presets/bio-genie/`；无需手动操作。
 

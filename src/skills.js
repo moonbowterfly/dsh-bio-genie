@@ -429,6 +429,7 @@ language: mixed
 | bio_primer3_design | 工业级引物设计（Primer3 热力学评分，候选引物对排序） |
 | bio_dna_optimize | 多约束 DNA 优化（DNA Chisel：去酶切位点/GC 窗口/密码子联合优化） |
 | bio_clone_simulate | 克隆模拟（pydna：Gibson 环化组装模拟，首次调用自动装 pydna） |
+| bio_crispr_guide / bio_crispr_verify | sgRNA 设计（PAM 扫描+off-target+效率分）/ 编辑验证（两序列比对+indel 定量） |
 | bio_plasmid_map | 质粒图谱（传 genbank_file/sequence 出 PNG/SVG 图形，否则文本模式） |
 | bio_sbol_write / bio_sbol_read | SBOL 3 标准化设计写出/读取（tyto 本体解析） |
 | bio_production_envelope | 生产包络线（产物理论上限预测） |
@@ -496,6 +497,7 @@ language: mixed
 15. 代谢工程路由：bio_fba 的 analysis_type=fva 做通量可变性分析、pfba 做节俭 FBA；bio_gene_knockout 的 analysis_type=double 找合成致死对、essentiality 做全基因必需性扫描；产物产量上限预测用 bio_production_envelope（target=产物交换反应，vary=生物量反应）。
 16. SBOL 标准化：导出设计用 bio_sbol_write（role 写术语名如 promoter，自动解析为 SO URI）；读取外部 SBOL 文件用 bio_sbol_read（可提取序列对接下游分析）。
 17. 基因回路：组件列表（promoter 可带 regulators）→ bio_circuit_compile 得 SBML + 网络拓扑图 → bio_circuit_simulate 做 ODE/SSA 仿真出浓度曲线。首次调用自动安装 biocrnpyler/bioscrape（~20MB，提示用户等待）；simulation_type=ssa 用于噪声/随机性分析。
+18. CRISPR：设计 sgRNA 用 bio_crispr_guide（指定 Cas 类型，默认 SpCas9 NGG，按 efficiency_score 降序 + off-target 升序排序，top_n 默认 10）；编辑验证用 bio_crispr_verify（需提供 wild_type 与 edited 序列，返回 indel/substitution 统计与编辑效率）。
 
 
 ## 自动代码修复（ACR）— 三层职责边界
