@@ -693,30 +693,38 @@ function semanticTools(config) {
       name: 'bio_fba',
       description:
         '通量平衡分析：预测代谢通量分布。analysis_type=fba（默认，最优生长+影子价格）/ ' +
-        'fva（通量可变性分析，返回每个反应的 [min,max] 范围）/ pfba（节俭 FBA，最小化总通量）。' +
+        'fva（通量可变性分析，返回每个反应的 [min,max] 范围）/ pfba（节俭 FBA，最小化总通量）/ ' +
+        'loopless（消除热力学不可行循环）/ geometric（欧几里得通量范数最小化）/ ' +
+        'optionsfva（完整通量范围，含固定反应）。' +
         'model_id 指定模型（默认 textbook，COBRApy 内置 E. coli core），objective 可指定目标函数反应。' +
-        '触发词：FBA、FVA、pFBA、通量平衡、通量可变性、代谢通量、生长速率预测。',
+        '触发词：FBA、FVA、pFBA、loopless、geometric、通量平衡、通量可变性、代谢通量、生长速率预测。',
       parameters: {
         model_id: { type: 'string', description: '模型标识，默认 textbook（COBRApy 内置）' },
         objective: { type: 'string', description: '目标函数反应 ID（可选，默认使用模型目标）' },
-        analysis_type: { type: 'string', enum: ['fba', 'fva', 'pfba'], description: '分析类型，默认 fba' },
+        analysis_type: { type: 'string', enum: ['fba', 'fva', 'pfba', 'loopless', 'geometric', 'optionsfva'], description: '分析类型，默认 fba' },
         fraction_of_optimum: { type: 'number', description: 'FVA 专用：最优性比例，默认 1.0' },
       },
       op: 'fba',
       timeoutMs: 300_000,
     }),
+
     bioTool(config, {
       name: 'bio_gene_knockout',
       description:
         '基因敲除分析：analysis_type=single（默认，单基因敲除）/ double（top N 基因两两组合双敲，' +
-        '找合成致死对）/ essentiality（全基因必需性扫描，essential/reduced/non-essential 分类）。' +
+        '找合成致死对）/ essentiality（全基因必需性扫描，essential/reduced/non-essential 分类）/ ' +
+        'optknock（贪心搜最大化目标产物分泌的敲除组合：target_reaction 指定外泌反应如 EX_ac_e，' +
+        'min_growth 最小生长率占比，max_knockouts 最大敲除数；返回 recommended_knockouts + flux_improvement）。' +
         'model_id 默认 textbook（COBRApy 内置 E. coli core），gene 为基因 ID（如 b0002，single 必填）。' +
-        '触发词：基因敲除、双敲除、合成致死、敲除分析、必需基因、基因必需性。',
+        '触发词：基因敲除、双敲除、合成致死、敲除分析、必需基因、OptKnock、提升产量敲除、最大化产物分泌。',
       parameters: {
         model_id: { type: 'string', description: '模型标识，默认 textbook（COBRApy 内置）' },
         gene: { type: 'string', description: '基因 ID，如 b0002（analysis_type=single 时必填）' },
-        analysis_type: { type: 'string', enum: ['single', 'double', 'essentiality'], description: '分析类型，默认 single' },
+        analysis_type: { type: 'string', enum: ['single', 'double', 'essentiality', 'optknock'], description: '分析类型，默认 single' },
         top_n: { type: 'number', description: 'double 专用：单敲影响最大的候选基因数，默认 10' },
+        target_reaction: { type: 'string', description: 'optknock 专用：目标反应（建议外泌反应如 EX_ac_e）' },
+        min_growth: { type: 'number', description: 'optknock 专用：最小生长率（占 WT 比例），默认 0.1' },
+        max_knockouts: { type: 'number', description: 'optknock 专用：最大敲除数，默认 3' },
       },
       op: 'gene_knockout',
       timeoutMs: 600_000,
