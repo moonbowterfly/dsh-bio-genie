@@ -59,15 +59,39 @@ export function ensureOutputDirs(cwd) {
   }
 }
 
+/** 幂等确保目录存在（不存在则创建；失败静默——由调用方决定回退）。 */
+function ensureDir(dir) {
+  if (existsSync(dir)) return true
+  try {
+    mkdirSync(dir, { recursive: true })
+    return existsSync(dir)
+  } catch {
+    return false
+  }
+}
+
+/**
+ * 目录是否可用作工作区：已存在即可用；不存在则尝试创建，创建成功才可用。
+ * 创建失败（盘符不存在 / 无权限 / 只读）→ 不可用，调用方必须回退，
+ * 以避免把「存在于别台电脑、本机没有」的路径直接当工作区使用。
+ */
+function usableWorkspaceDir(dir) {
+  return ensureDir(dir)
+}
+
 /**
  * 解析一次工具调用的工作目录。
  * 优先级：显式 workdir 参数 > 会话工作区 header.cwd（排除 dsh 框架默认填充的服务器目录）
- *   > 用户配置的默认工作区 A（设置面板「工作区」tab）> 插件保底 ~/.dsh/sessions/default。
+ *   > 用户配置的默认工作区 A（设置面板「工作区」tab，需本机可用，否则回退）
+ *   > 插件保底 ~/.dsh/sessions/default。
  *
- * 说明（2026-08-25 实测）：dsh 对未显式指定 cwd 的会话会把 header.cwd 填充为
- * 服务器启动目录（process.cwd()），并非 undefined——若直接使用，用户配置的默认
- * 工作区 A 永远不会生效。因此当 sessionWorkspace 等于 process.cwd() 时视为
- * 「未指定工作区」，继续走配置/保底链。
+ * 说明（2026-08-25 实测）：
+ * - dsh 对未显式指定 cwd 的会话会把 header.cwd 填充为服务器启动目录
+ *   （process.cwd()），并非 undefined——若直接使用，用户配置的默认工作区 A
+ *   永远不会生效。因此当 sessionWorkspace 等于 process.cwd() 时视为
+ *   「未指定工作区」，继续走配置/保底链。
+ * - 配置的默认工作区 A 可能是指定者在别的机器上配置的路径（本机不存在、
+ *   盘符不同/缺失）：必须实际可创建才采用，否则安全回退，绝不硬用坏路径。
  *
  * @param {object} [exec] 工具执行上下文。
  * @param {string} [workdir] 用户显式指定的工作目录（绝对路径，或相对基准的相对路径）。
@@ -77,23 +101,33 @@ export function resolveWorkdir(exec, workdir) {
   const serverCwd = process.cwd()
   const rawSessionCwd = sessionWorkspace(exec)
   const sessionCwd = rawSessionCwd && rawSessionCwd !== serverCwd ? rawSessionCwd : undefined
-  const configured = sessionCwd ? undefined : getConfiguredDefaultWorkspace()
-  const base = sessionCwd || configured || fallbackWorkspace()
-  const cwd = !workdir
-    ? base
-    : isAbsolute(workdir)
-      ? workdir
-      : resolve(base, workdir)
 
-  // 保底目录可能尚不存在：幂等创建，避免 python 写文件时目录缺失。
-  if (!existsSync(cwd)) {
-    try {
-      mkdirSync(cwd, { recursive: true })
-    } catch {
-      // 只读/权限受限等场景不致命：bridge 会在 chdir 失败时保持原目录并报错
-    }
+  // ① 用户显式 workdir 参数：尽力使用（相对路径基于会话工作区/保底解析）
+  if (workdir) {
+    const base = sessionCwd || fallbackWorkspace()
+    const cwd = isAbsolute(workdir) ? workdir : resolve(base, workdir)
+    ensureDir(cwd)
+    ensureOutputDirs(cwd)
+    return cwd
   }
-  // 规范目录：result/figures/out 自动预建
-  ensureOutputDirs(cwd)
-  return cwd
+
+  // ② 会话工作区（用户显式用 cwd 创建的会话）
+  if (sessionCwd) {
+    ensureDir(sessionCwd)
+    ensureOutputDirs(sessionCwd)
+    return sessionCwd
+  }
+
+  // ③ 用户配置的默认工作区 A：必须本机可用（存在或能创建成功），否则回退
+  const configured = getConfiguredDefaultWorkspace()
+  if (configured && usableWorkspaceDir(configured)) {
+    ensureOutputDirs(configured)
+    return configured
+  }
+
+  // ④ 保底默认工作区
+  const fb = fallbackWorkspace()
+  ensureDir(fb)
+  ensureOutputDirs(fb)
+  return fb
 }

@@ -12,7 +12,7 @@
  */
 import { readFileSync, writeFileSync, renameSync, mkdirSync, existsSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join, dirname } from 'node:path'
+import { isAbsolute, join, dirname } from 'node:path'
 
 function writeJson(res, status, body) {
   const payload = JSON.stringify(body)
@@ -75,6 +75,14 @@ export async function handleWorkspaceConfig(req, res) {
   // POST
   const val = req.body && req.body.defaultWorkspace
   const next = typeof val === 'string' && val.trim() ? val.trim() : null
+  if (next !== null && !isAbsolute(next)) {
+    writeJson(res, 400, {
+      ok: false,
+      code: 'not-absolute',
+      message: `默认工作区必须是绝对路径（如 D:/Program/dsh/my-workspace），收到: ${next}`,
+    })
+    return
+  }
   try {
     setConfiguredDefaultWorkspace(next)
     writeJson(res, 200, { ok: true, value: { defaultWorkspace: next, updated: true } })
