@@ -1005,6 +1005,26 @@ function semanticTools(config) {
       op: 'dna_syncheck',
       timeoutMs: 30_000,
     }),
+    // ---- 湿实验方案设计（2026-08-25 新增）----
+    bioTool(config, {
+      name: 'bio_wetlab_design',
+      description:
+        '湿实验方案设计：把干实验结论转化为可执行的湿实验 protocol。' +
+        '支持 7 种方案类型：pcr_amplification（PCR 扩增）、gibson_assembly（Gibson 组装）、' +
+        'golden_gate（Golden Gate 组装）、restriction_cloning（限制酶克隆）、' +
+        'crispr_editing（CRISPR 编辑）、strain_construction（菌株构建）、transformation（转化）。' +
+        '输入上游工具输出（bio_primer3_design/bio_clone_simulate/bio_crispr_guide/bio_gene_knockout optknock 等），' +
+        '输出完整 protocol（试剂/条件/预期结果/质量控制/注意事项）。' +
+        '触发词：湿实验方案、PCR protocol、克隆方案、CRISPR 实验方案、菌株构建方案、转化方案。',
+      parameters: {
+        protocol_type: { type: 'string', required: true, enum: ['pcr_amplification', 'gibson_assembly', 'golden_gate', 'restriction_cloning', 'crispr_editing', 'strain_construction', 'transformation'], description: '方案类型' },
+        input_data: { type: 'object', required: true, additionalProperties: true, description: '上游工具输出（dict）' },
+        host_organism: { type: 'string', description: '宿主生物，默认 e_coli' },
+        scale: { type: 'string', enum: ['small', 'medium', 'large'], description: '实验规模，默认 small' },
+      },
+      op: 'wetlab_design',
+      timeoutMs: 30_000,
+    }),
     // ---- Phase 2：SBOL 3 标准化读写 ----
     bioTool(config, {
       name: 'bio_sbol_write',
