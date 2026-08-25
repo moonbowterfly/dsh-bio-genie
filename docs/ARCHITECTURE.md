@@ -46,7 +46,7 @@ model ──bio_python(code)──▶ tools.js
                               │ resolveWorkdir(exec, workdir)
                               │   ├─ 显式 workdir → 用之（绝对路径原样；相对路径基于默认基准）
                               │   ├─ 会话工作区 exec.agent.session.header.cwd → 用之
-                              │   └─ 均不可用 → ~/deepseek-harness/bio-genie-workspace（自动创建）
+                              │   └─ 均不可用 → ~/.dsh/sessions/default（自动创建）
                               ▼
                      spawn <python> -I bridge.py   （cwd=工作区，stdin=JSON envelope）
                               ▼

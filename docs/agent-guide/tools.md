@@ -15,7 +15,7 @@ language: none
 | 参数 | 说明 |
 |---|---|
 | code ★ | 完整 Python 源码 |
-| workdir | 工作目录（绝对路径；默认会话工作区，无工作区时 `~/deepseek-harness/bio-genie-workspace`） |
+| workdir | 工作目录（绝对路径；默认会话工作区，无工作区时 `~/.dsh/sessions/default`） |
 | timeoutMs | 超时（默认 60000ms） |
 
 返回：`ok / stdout / stderr / error / result / exitCode / timedOut / truncated / needs_repair`。

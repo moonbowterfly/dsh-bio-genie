@@ -1,27 +1,20 @@
 /**
- * dsh-bio-genie — 默认工作区配置（bio agent 默认工作区 A 路径）
+ * dsh-bio-genie — 遗留默认工作区配置（bio agent 默认工作区 A 路径）
  *
- * 语义（用户规范 2026-08-25）：
- *   - 用户在设置面板「工作区」tab 指定 A 路径后，bio-genie 预设会话
- *     未显式指定工作区（无 session.header.cwd）时，自动以 A 为默认工作区
- *   - 未设置 / 清空 → 保持 dsh 默认行为（插件保底 ~/.dsh/sessions/default）
- *
- * 存储：~/.dsh/dsh-bio-genie/workspace-config.json（插件运行时目录，原子写）
+ * 语义（2026-08-26 降级为遗留兜底）：
+ *   - 新版 dsh 引擎 workspace-first（Web UI 必须先选/建工作区才能开会话），
+ *     「默认工作区」作为用户特性已由引擎原生工作区取代，设置面板 tab 与
+ *     HTTP 端点已移除。
+ *   - 本模块仅保留读取层：历史版本写入的
+ *     ~/.dsh/dsh-bio-genie/workspace-config.json 若仍存在，resolveWorkdir()
+ *     的解析链继续尊重它（第③优先级），避免升级后静默改变行为。
+ *   - 不再提供任何写入入口；文件删除 / 清空 → 自动走保底 ~/.dsh/sessions/default。
  *
  * @module dsh-bio-genie/workspace-config
  */
-import { readFileSync, writeFileSync, renameSync, mkdirSync, existsSync } from 'node:fs'
+import { readFileSync, existsSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { isAbsolute, join, dirname } from 'node:path'
-
-function writeJson(res, status, body) {
-  const payload = JSON.stringify(body)
-  res.writeHead(status, {
-    'content-type': 'application/json; charset=utf-8',
-    'referrer-policy': 'no-referrer',
-  })
-  res.end(payload)
-}
+import { join } from 'node:path'
 
 /** 配置文件路径：插件运行时目录 ~/.dsh/dsh-bio-genie/workspace-config.json */
 export function workspaceConfigFile() {
@@ -38,55 +31,5 @@ export function getConfiguredDefaultWorkspace() {
     return typeof p === 'string' && p.trim() ? p.trim() : undefined
   } catch {
     return undefined
-  }
-}
-
-/** 写默认工作区配置（原子写：tmp + rename）。value 为路径字符串或 null（清空）。 */
-export function setConfiguredDefaultWorkspace(value) {
-  const file = workspaceConfigFile()
-  const dir = dirname(file)
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-  const tmp = `${file}.tmp`
-  writeFileSync(tmp, JSON.stringify({
-    defaultWorkspace: typeof value === 'string' && value.trim() ? value.trim() : null,
-    updatedAt: new Date().toISOString(),
-  }, null, 2), 'utf8')
-  renameSync(tmp, file)
-}
-
-/**
- * 设置面板「工作区」tab 端点：
- *   GET  /api/dsh-bio-genie/workspace-config → { defaultWorkspace, configured, configFile }
- *   POST /api/dsh-bio-genie/workspace-config { defaultWorkspace: 'D:/...' | null | '' } → 写入
- */
-export async function handleWorkspaceConfig(req, res) {
-  if (req.method === 'GET') {
-    const a = getConfiguredDefaultWorkspace()
-    writeJson(res, 200, {
-      ok: true,
-      value: {
-        defaultWorkspace: a || null,
-        configured: !!a,
-        configFile: workspaceConfigFile(),
-      },
-    })
-    return
-  }
-  // POST
-  const val = req.body && req.body.defaultWorkspace
-  const next = typeof val === 'string' && val.trim() ? val.trim() : null
-  if (next !== null && !isAbsolute(next)) {
-    writeJson(res, 400, {
-      ok: false,
-      code: 'not-absolute',
-      message: `默认工作区必须是绝对路径（如 D:/Program/dsh/my-workspace），收到: ${next}`,
-    })
-    return
-  }
-  try {
-    setConfiguredDefaultWorkspace(next)
-    writeJson(res, 200, { ok: true, value: { defaultWorkspace: next, updated: true } })
-  } catch (err) {
-    writeJson(res, 500, { ok: false, code: 'write-failed', message: err?.message || String(err) })
   }
 }

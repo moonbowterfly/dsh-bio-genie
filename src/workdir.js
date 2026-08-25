@@ -5,8 +5,10 @@
  *   1. 显式 workdir 参数（绝对路径原样使用；相对路径基于下面的基准解析）
  *   2. 会话工作区 `exec.agent.session.header.cwd`（与 dsh 内置 fs 工具的
  *      session-cwd 做法一致：每个会话操作自己的工作区，而不是服务器启动目录）
- *   3. 保底工作区 `~/deepseek-harness/bio-genie-workspace`（会话工作区未
- *      指定或不可用时自动创建）
+ *   3. 遗留配置的默认工作区 A `~/.dsh/dsh-bio-genie/workspace-config.json`
+ *      （仅当历史版本写过该文件时生效；该用户特性已由新版 dsh 引擎的
+ *      workspace-first 机制取代，设置面板入口已移除，详见 workspace_config.js）
+ *   4. 保底工作区 `~/.dsh/sessions/default`（以上均未指定或不可用时自动创建）
  *
  * 历史背景：旧实现默认 `process.cwd()`（dsh 服务器启动目录），导致
  * bio_python 写出的文件落在 checkout 目录而不是会话工作区，且与
@@ -82,16 +84,18 @@ function usableWorkspaceDir(dir) {
 /**
  * 解析一次工具调用的工作目录。
  * 优先级：显式 workdir 参数 > 会话工作区 header.cwd（排除 dsh 框架默认填充的服务器目录）
- *   > 用户配置的默认工作区 A（设置面板「工作区」tab，需本机可用，否则回退）
+ *   > 遗留配置的默认工作区 A（workspace-config.json，仅历史文件存在时生效，需本机可用否则回退）
  *   > 插件保底 ~/.dsh/sessions/default。
  *
  * 说明（2026-08-25 实测）：
  * - dsh 对未显式指定 cwd 的会话会把 header.cwd 填充为服务器启动目录
- *   （process.cwd()），并非 undefined——若直接使用，用户配置的默认工作区 A
+ *   （process.cwd()），并非 undefined——若直接使用，遗留配置的默认工作区 A
  *   永远不会生效。因此当 sessionWorkspace 等于 process.cwd() 时视为
  *   「未指定工作区」，继续走配置/保底链。
  * - 配置的默认工作区 A 可能是指定者在别的机器上配置的路径（本机不存在、
  *   盘符不同/缺失）：必须实际可创建才采用，否则安全回退，绝不硬用坏路径。
+ * - 新版 dsh 引擎 workspace-first（UI 必须选工作区开会话），第③层仅服务
+ *   升级前已写入 workspace-config.json 的存量部署；新用户永远走②/④。
  *
  * @param {object} [exec] 工具执行上下文。
  * @param {string} [workdir] 用户显式指定的工作目录（绝对路径，或相对基准的相对路径）。

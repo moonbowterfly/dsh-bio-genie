@@ -107,7 +107,7 @@ export function registerTools(ctx, config) {
       '触发词：任意代码、写python、复杂分析、Biopython脚本。',
     parameters: {
       code: { type: 'string', required: true, description: '完整 Python 源码，使用 Biopython。' },
-      workdir: { type: 'string', description: '工作目录（绝对路径，或相对默认工作区的相对路径）。默认：会话工作区；会话工作区未指定时用 ~/deepseek-harness/bio-genie-workspace。' },
+      workdir: { type: 'string', description: '工作目录（绝对路径，或相对会话工作区的相对路径）。默认：会话工作区；会话工作区未指定时用 ~/.dsh/sessions/default。' },
       timeoutMs: { type: 'number', description: '超时毫秒数。默认插件默认值。' },
     },
     output: {
