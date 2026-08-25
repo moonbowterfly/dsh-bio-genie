@@ -80,10 +80,15 @@ const TOOL_SCHEMAS = [
   { name: 'fba', label: 'FBA 分析', engine: 'python', params: [
     { key: 'model_id', type: 'text', default: 'textbook', desc: '模型 ID' },
     { key: 'objective', type: 'text', placeholder: 'Biomass_Ecoli_core', desc: '目标函数（可选）' },
+    { key: 'analysis_type', type: 'select', options: ['fba', 'fva', 'pfba', 'loopless', 'geometric', 'optionsfva'], default: 'fba', desc: '分析类型' },
   ]},
   { name: 'gene_knockout', label: '基因敲除', engine: 'python', params: [
     { key: 'model_id', type: 'text', default: 'textbook', desc: '模型 ID' },
-    { key: 'gene', type: 'text', required: true, placeholder: 'b2779', desc: '基因 ID' },
+    { key: 'gene', type: 'text', required: true, placeholder: 'b2779', desc: '基因 ID（single 模式必填）' },
+    { key: 'analysis_type', type: 'select', options: ['single', 'double', 'essentiality', 'optknock'], default: 'single', desc: '分析类型' },
+    { key: 'target_reaction', type: 'text', placeholder: 'EX_ac_e', desc: 'OptKnock 目标反应（外泌反应）' },
+    { key: 'min_growth', type: 'number', default: 0.1, desc: 'OptKnock 最小生长率（占 WT 比例）' },
+    { key: 'max_knockouts', type: 'number', default: 3, desc: 'OptKnock 最大敲除数' },
   ]},
   { name: 'pathway_search', label: '通路搜索', engine: 'python', params: [
     { key: 'target_metabolite', type: 'text', required: true, placeholder: 'glycolysis', desc: '目标代谢物/关键词' },

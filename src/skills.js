@@ -495,7 +495,7 @@ language: mixed
 12. 统计结论必须跑检验（bio-proto-statistics）：组间比较给 p 值+效应量，多重比较必须校正；误差棒图注写清 SD/SEM/CI + n。
 13. BLAST 用 bio_blast_search（勿在 bio_python 里自己调 qblast）；MSA→建树流水线：bio_msa 的 alignment_fasta 输出直接传给 bio_phylo_build 的 alignment 参数；bio_msa 返回 status=program_missing 时提示用户安装 clustalw/muscle，或改走 bio_python 兜底。
 14. 合成生物学路由：高质量引物用 bio_primer3_design（简单预估才用 bio_primer_design）；多约束序列改造（去酶切位点+密码子优化）用 bio_dna_optimize（简单密码子替换才用 bio_seq_optimize）；克隆可行性/组装模拟用 bio_clone_simulate（首次调用会自动安装 pydna，提示用户等待）；质粒出图传 genbank_file 给 bio_plasmid_map 得出版级 PNG/SVG。
-15. 代谢工程路由：bio_fba 的 analysis_type=fva 做通量可变性分析、pfba 做节俭 FBA；bio_gene_knockout 的 analysis_type=double 找合成致死对、essentiality 做全基因必需性扫描；产物产量上限预测用 bio_production_envelope（target=产物交换反应，vary=生物量反应）。
+15. 代谢工程路由：bio_fba 的 analysis_type=fva 做通量可变性分析、pfba 做节俭 FBA、loopless 消除热力学不可行循环、geometric 唯一最小通量解、optionsfva 完整通量范围；bio_gene_knockout 的 analysis_type=double 找合成致死对、essentiality 做全基因必需性扫描、optknock 自动找最大化目标产物分泌的敲除组合（默认乙酸 EX_ac_e）；产物产量上限预测用 bio_production_envelope（target=产物交换反应，vary=生物量反应）。
 16. SBOL 标准化：导出设计用 bio_sbol_write（role 写术语名如 promoter，自动解析为 SO URI）；读取外部 SBOL 文件用 bio_sbol_read（可提取序列对接下游分析）。
 17. 基因回路：组件列表（promoter 可带 regulators）→ bio_circuit_compile 得 SBML + 网络拓扑图 → bio_circuit_simulate 做 ODE/SSA 仿真出浓度曲线。首次调用自动安装 biocrnpyler/bioscrape（~20MB，提示用户等待）；simulation_type=ssa 用于噪声/随机性分析。
 18. CRISPR：设计 sgRNA 用 bio_crispr_guide（指定 Cas 类型，默认 SpCas9 NGG，按 efficiency_score 降序 + off-target 升序排序，top_n 默认 10）；编辑验证用 bio_crispr_verify（需提供 wild_type 与 edited 序列，返回 indel/substitution 统计与编辑效率）。

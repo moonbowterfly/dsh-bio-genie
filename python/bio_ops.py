@@ -902,8 +902,95 @@ def op_fba(args):
             'note': 'pFBA 的 objective_value 为最小化总通量；生长率见 growth_rate。',
         }
 
-    if analysis_type != 'fba':
-        return {'error': f'analysis_type 仅支持 fba / fva / pfba，收到: {analysis_type}'}
+    if analysis_type not in ('fba', 'fva', 'pfba', 'loopless', 'geometric', 'optionsfva'):
+        return {'error': f'analysis_type 仅支持 fba / fva / pfba / loopless / geometric / optionsfva，收到: {analysis_type}'}
+
+    if analysis_type == 'loopless':
+        # Loopless FBA：消除热力学不可行循环
+        from cobra.flux_analysis import loopless_solution
+        base = model.optimize()
+        if base.status != 'optimal':
+            return {'error': f'基础 FBA 失败: {base.status}'}
+        try:
+            ll_sol = loopless_solution(model)
+        except Exception as e:
+            return {'error': f'Loopless FBA 失败: {e}'}
+        if ll_sol.status != 'optimal':
+            return {'error': f'Loopless FBA 不可行: {ll_sol.status}'}
+        fluxes = {r.id: round(float(ll_sol.fluxes[r.id]), 6)
+                  for r in model.reactions if abs(ll_sol.fluxes[r.id]) > 1e-10}
+        growth = None
+        try:
+            coefs = model.objective.get_linear_coefficients(model.objective.variables)
+            for var, coef in coefs.items():
+                if coef > 0 and var.name in ll_sol.fluxes.index:
+                    growth = round(float(ll_sol.fluxes[var.name]), 6)
+                    break
+        except Exception:
+            pass
+        return {
+            'analysis_type': 'loopless',
+            'objective_value': round(float(ll_sol.objective_value), 6),
+            'growth_rate': growth,
+            'status': ll_sol.status,
+            'fluxes': fluxes,
+            'n_reactions_with_flux': len(fluxes),
+            'model_id': model_id,
+            'note': 'Loopless FBA 在保持最优目标值的前提下消除热力学不可行循环，结果更接近真实代谢状态。',
+        }
+
+    if analysis_type == 'geometric':
+        # Geometric FBA：最小化欧几里得通量范数（相比 pFBA 是一种不同的通量最小化策略）
+        from cobra.flux_analysis import geometric_fba
+        try:
+            g_sol = geometric_fba(model)
+        except Exception as e:
+            return {'error': f'Geometric FBA 失败: {e}'}
+        if g_sol.status != 'optimal':
+            return {'error': f'Geometric FBA 不可行: {g_sol.status}'}
+        fluxes = {r.id: round(float(g_sol.fluxes[r.id]), 6)
+                  for r in model.reactions if abs(g_sol.fluxes[r.id]) > 1e-10}
+        growth = None
+        try:
+            coefs = model.objective.get_linear_coefficients(model.objective.variables)
+            for var, coef in coefs.items():
+                if coef > 0 and var.name in g_sol.fluxes.index:
+                    growth = round(float(g_sol.fluxes[var.name]), 6)
+                    break
+        except Exception:
+            pass
+        return {
+            'analysis_type': 'geometric',
+            'objective_value': round(float(g_sol.objective_value), 6),
+            'growth_rate': growth,
+            'status': g_sol.status,
+            'fluxes': fluxes,
+            'model_id': model_id,
+            'note': 'Geometric FBA 最小化欧几里得通量范数，给出唯一的最小通量解。',
+        }
+
+    if analysis_type == 'optionsfva':
+        # 所有可选 FVA：寻找所有等价最优解的通量范围
+        from cobra.flux_analysis import flux_variability_analysis
+        fraction = float(args.get('fraction_of_optimum', 1.0))
+        fva_df = flux_variability_analysis(model, fraction_of_optimum=fraction, processes=1)
+        # 所有 FVA 范围 [min, max]，包括固定的
+        ranges = {}
+        for rid, row in fva_df.iterrows():
+            lo, hi = float(row['minimum']), float(row['maximum'])
+            ranges[rid] = {'min': round(lo, 6), 'max': round(hi, 6), 'range': round(hi - lo, 6)}
+        fixed_count = sum(1 for v in ranges.values() if abs(v['range']) < 1e-9)
+        return {
+            'analysis_type': 'optionsfva',
+            'fraction_of_optimum': fraction,
+            'n_reactions': len(fva_df),
+            'n_fixed': fixed_count,
+            'n_variable': len(ranges) - fixed_count,
+            'flux_ranges': ranges,
+            'model_id': model_id,
+            'note': 'optionsFVA 返回所有反应的完整 [min, max] 范围（含固定反应），n_fixed 为通量固定的反应数。',
+        }
+
 
     # 运行FBA
     solution = model.optimize()
@@ -1020,8 +1107,90 @@ def op_gene_knockout(args):
             'note': '按双敲后生长率升序排列；合成致死组合 growth≈0。',
         }
 
-    if analysis_type != 'single':
-        return {'error': f'analysis_type 仅支持 single / double / essentiality，收到: {analysis_type}'}
+    if analysis_type not in ('single', 'double', 'essentiality', 'optknock', 'production_envelope'):
+        return {'error': f'analysis_type 仅支持 single / double / essentiality / optknock / production_envelope，收到: {analysis_type}'}
+
+    if analysis_type == 'optknock':
+        # OptKnock：贪心算法找最大化目标反应分泌的敲除组合（cobra 0.32+ 移除了原生 OptKnock）
+        target_reaction = args.get('target_reaction', 'EX_ac_e')
+        min_growth = float(args.get('min_growth', 0.1))  # 最小生长率（占 WT 的比例）
+        max_knockouts = int(args.get('max_knockouts', 3))
+        if target_reaction not in model.reactions:
+            return {'error': f'target_reaction 不存在: {target_reaction}（建议用外泌反应如 EX_xx_e）'}
+        min_growth_abs = min_growth * wt_growth
+        # 单敲除评估
+        single_impact = []
+        for g in model.genes:
+            with model:
+                g.knock_out()
+                sol = model.optimize()
+                if sol.status == 'optimal':
+                    growth = float(sol.objective_value)
+                    flux = float(sol.fluxes.get(target_reaction, 0))
+                    single_impact.append({
+                        'gene': g.id,
+                        'growth': round(growth, 6),
+                        'growth_percent': round(growth / wt_growth * 100, 2) if wt_growth > 1e-9 else 0,
+                        'target_flux': round(flux, 6),
+                    })
+        # 按目标反应分泌量降序（产量从高到低）
+        single_impact.sort(key=lambda x: -x['target_flux'])
+        # 贪心：依次尝试累加敲除，每次检查最小生长约束
+        from itertools import combinations
+        best_combo = []
+        best_flux = float(model.optimize().fluxes.get(target_reaction, 0))
+        # 单敲最优（如果生长允许）
+        for s in single_impact[:20]:  # 只看 top 20 影响最大的单敲
+            if s['growth'] >= min_growth_abs and s['target_flux'] > best_flux:
+                best_combo = [s['gene']]
+                best_flux = s['target_flux']
+                break
+        # 2 敲除组合
+        if max_knockouts >= 2 and len(best_combo) > 0:
+            top_genes = [s['gene'] for s in single_impact[:10]]
+            for g1, g2 in combinations(top_genes, 2):
+                with model:
+                    model.genes.get_by_id(g1).knock_out()
+                    model.genes.get_by_id(g2).knock_out()
+                    sol = model.optimize()
+                if sol.status == 'optimal' and sol.objective_value >= min_growth_abs:
+                    flux = float(sol.fluxes.get(target_reaction, 0))
+                    if flux > best_flux:
+                        best_combo = [g1, g2]
+                        best_flux = flux
+        # 3 敲除组合
+        if max_knockouts >= 3 and len(best_combo) >= 2:
+            top_genes = [s['gene'] for s in single_impact[:8]]
+            for combo in combinations(top_genes, 3):
+                with model:
+                    for g in combo:
+                        model.genes.get_by_id(g).knock_out()
+                    sol = model.optimize()
+                if sol.status == 'optimal' and sol.objective_value >= min_growth_abs:
+                    flux = float(sol.fluxes.get(target_reaction, 0))
+                    if flux > best_flux:
+                        best_combo = list(combo)
+                        best_flux = flux
+        return {
+            'analysis_type': 'optknock',
+            'model_id': model_id,
+            'target_reaction': target_reaction,
+            'min_growth_fraction': min_growth,
+            'min_growth_absolute': round(min_growth_abs, 6),
+            'max_knockouts_searched': max_knockouts,
+            'wild_type_growth': round(wt_growth, 6),
+            'wild_type_target_flux': round(float(model.optimize().fluxes.get(target_reaction, 0)), 6),
+            'recommended_knockouts': best_combo,
+            'target_flux_after_knockout': round(best_flux, 6),
+            'flux_improvement': round(best_flux - float(model.optimize().fluxes.get(target_reaction, 0)), 6),
+            'top_single_knockouts': single_impact[:5],
+            'note': 'OptKnock（贪心版）：在保持最小生长率约束下最大化目标反应分泌/吸收。cobra 0.32+ 移除了原生 OptKnock，本实现采用贪心枚举替代。',
+        }
+
+    if analysis_type == 'production_envelope':
+        # 生产包络线：扫描目标反应通量 vs 生长率
+        # 这里只做基础版，完整版见 op_production_envelope
+        return {'error': '请使用 bio_production_envelope 工具做生产包络线分析（支持 vary_range 自定义）'}
 
     if not gene:
         return {'error': 'Gene ID required'}
