@@ -17,6 +17,7 @@
 import { existsSync, mkdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { isAbsolute, join, resolve } from 'node:path'
+import { getConfiguredDefaultWorkspace } from './workspace_config.js'
 
 /** dsh 工作区根目录（用户规范 2026-08-25：所有会话工作区统一位于 ~/.dsh/sessions/ 下）。 */
 export function workspaceRoot() {
@@ -60,12 +61,24 @@ export function ensureOutputDirs(cwd) {
 
 /**
  * 解析一次工具调用的工作目录。
+ * 优先级：显式 workdir 参数 > 会话工作区 header.cwd（排除 dsh 框架默认填充的服务器目录）
+ *   > 用户配置的默认工作区 A（设置面板「工作区」tab）> 插件保底 ~/.dsh/sessions/default。
+ *
+ * 说明（2026-08-25 实测）：dsh 对未显式指定 cwd 的会话会把 header.cwd 填充为
+ * 服务器启动目录（process.cwd()），并非 undefined——若直接使用，用户配置的默认
+ * 工作区 A 永远不会生效。因此当 sessionWorkspace 等于 process.cwd() 时视为
+ * 「未指定工作区」，继续走配置/保底链。
+ *
  * @param {object} [exec] 工具执行上下文。
  * @param {string} [workdir] 用户显式指定的工作目录（绝对路径，或相对基准的相对路径）。
  * @returns {string} 解析后的绝对路径。
  */
 export function resolveWorkdir(exec, workdir) {
-  const base = sessionWorkspace(exec) ?? fallbackWorkspace()
+  const serverCwd = process.cwd()
+  const rawSessionCwd = sessionWorkspace(exec)
+  const sessionCwd = rawSessionCwd && rawSessionCwd !== serverCwd ? rawSessionCwd : undefined
+  const configured = sessionCwd ? undefined : getConfiguredDefaultWorkspace()
+  const base = sessionCwd || configured || fallbackWorkspace()
   const cwd = !workdir
     ? base
     : isAbsolute(workdir)

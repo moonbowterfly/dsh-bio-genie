@@ -26,6 +26,7 @@ import { venvPython, resolveEnvDir, bioEnvExists, PYTHON_DIR, manageAddon } from
 
 import { listSkillsForPanel } from './skills.js'
 import { handleConfig } from './config_handler.js'
+import { handleWorkspaceConfig } from './workspace_config.js'
 import { ADDON_MODULES } from './extra-deps.js'
 
 /** 路由前缀（与 @linxin666/dsh-client-ui-web-ui-settings 同风格）。 */
@@ -465,6 +466,7 @@ export function registerApiRoutes(ctx, config = {}) {
     { kind: 'exact', path: `${ROUTE_PREFIX}/python-packages`, handler: guard((req, res) => handlePythonPackages(req, res, config)) },
     { kind: 'exact', path: `${ROUTE_PREFIX}/skills`,          handler: guard((req, res) => handleSkills(req, res)) },
     { kind: 'exact', path: `${ROUTE_PREFIX}/config`,         handler: guard((req, res) => handleConfig(req, res, config)) },
+    { kind: 'exact', path: `${ROUTE_PREFIX}/workspace-config`, handler: guard((req, res) => handleWorkspaceConfig(req, res)) },
     { kind: 'exact', path: `${ROUTE_PREFIX}/tool-schemas`,    handler: guard((req, res) => handleToolSchemas(req, res)) },
     { kind: 'exact', path: `${ROUTE_PREFIX}/execute-tool`,    handler: guard((req, res) => handleExecuteTool(req, res, config)) },
     { kind: 'exact', path: `${ROUTE_PREFIX}/addons`,          handler: guard((req, res) => handleAddons(req, res, config)) },
