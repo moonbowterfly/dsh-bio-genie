@@ -1,5 +1,5 @@
 /**
- * dsh-bio-genie — skill 目录（38 个领域/研究/协议 skill + 1 个 genie 主 skill + 8 份指南，共 47 个）
+ * dsh-bio-genie — skill 目录（38 个领域/研究/协议 skill + 1 个 genie 主 skill + 8 份指南，共 47 个注册条目）
  *
  * 每个 skill body 在插件加载时从 skills/*.md 读入，经 ctx.skills.register
  * 注册为 embedded runtime skill（不依赖文件系统发现，实现"one is all"）。
@@ -283,14 +283,14 @@ export const GUIDE_MANIFEST = [
   {
     name: 'dsh-bio-genie-guide-tools',
     category: 'guide',
-    description: '49 个工具完整参考：每个工具的参数/返回字段/典型触发词 + 愿望→工具选择速查 + 缓存限流说明。',
+    description: '53 个工具完整参考：每个工具的参数/返回字段/典型触发词 + 愿望→工具选择速查 + 缓存限流说明。',
     whenToUse: '不确定某个 bio_* 工具的参数、返回结构或选哪个工具时。',
     file: 'tools.md',
   },
   {
     name: 'dsh-bio-genie-guide-skills',
     category: 'guide',
-    description: '49 个 skill 导航：主 skill + 22 领域 + 17 协议 + 9 指南的加载时机与触发任务表。',
+    description: '全部 skill 导航：主 skill + 17 领域 + 17 协议 + 4 研究方法 + 8 指南的加载时机与触发任务表。',
     whenToUse: '需要决定加载哪个领域/协议 skill 时。',
     file: 'skills.md',
   },

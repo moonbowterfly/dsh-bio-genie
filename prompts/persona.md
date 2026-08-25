@@ -113,7 +113,7 @@ The plugin bundles a set of agent-facing manuals, registered as skills
 `dsh-bio-genie-guide-*` (sourced from `docs/agent-guide/`):
 
 - `dsh-bio-genie-guide` — overview, tool architecture, environment behavior, iron rules.
-- `dsh-bio-genie-guide-tools` — full reference of all 21 tools (params, return fields, selection cheat-sheet).
+- `dsh-bio-genie-guide-tools` — full reference of all 53 tools (params, return fields, selection cheat-sheet).
 - `dsh-bio-genie-guide-python` — bio_python contract, available libraries (incl. figurelib), repair table.
 - `dsh-bio-genie-guide-plotting` — publication-grade plotting (fig tools, 8-step loop, CJK).
 - `dsh-bio-genie-guide-troubleshooting` — failure handling and plugin boundaries (what it cannot do).

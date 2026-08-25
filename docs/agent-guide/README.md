@@ -22,7 +22,7 @@ language: none
 | Python 执行器 | `bio_python`（Python：Biopython 全功能 + 出版级绘图） | 语义化工具覆盖不到的一切，**第二优先** |
 | 元工具 ×3 | `bio_env` / `bio_log` / `bio_memory` | 环境诊断、日志回溯、经验查询 |
 
-合计 49 个工具。完整参数与返回结构 → 加载 `dsh-bio-genie-guide-tools`。
+合计 53 个工具。完整参数与返回结构 → 加载 `dsh-bio-genie-guide-tools`。
 
 ## 3. 环境机制（重要，影响用户体验）
 
@@ -43,8 +43,8 @@ language: none
 
 | 指南 skill | 内容 | 何时加载 |
 |---|---|---|
-| `dsh-bio-genie-guide-tools` | 49 个工具完整参数/返回/示例 | 不确定工具怎么用、参数怎么传时 |
-| `dsh-bio-genie-guide-skills` | 49 个 skill 导航与分类体系 | 选 skill、查协议时 |
+| `dsh-bio-genie-guide-tools` | 53 个工具完整参数/返回/示例 | 不确定工具怎么用、参数怎么传时 |
+| `dsh-bio-genie-guide-skills` | 46 个 skill 导航与分类体系 | 选 skill、查协议时 |
 | `dsh-bio-genie-guide-python` | bio_python 编程指南（可用库/契约/坑） | 写任何非平凡 Python 代码前 |
 | `dsh-bio-genie-guide-workflows` | 端到端工作流（全 Python） | 用户需求命中某场景时 |
 | `dsh-bio-genie-guide-plotting` | 出版级绘图专题（fig 工具+figurelib） | 任何画图需求 |

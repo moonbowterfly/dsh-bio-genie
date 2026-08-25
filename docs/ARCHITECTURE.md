@@ -93,7 +93,7 @@ model ──bio_seq_analyze(seq)──▶ tools.js
 
 R 执行器（bio_r / bio_r_env）及其惰性引导机制已从插件中移除；差异表达与
 GSEA 改由 Python 语义化工具 `bio_deseq2` / `bio_gsea` 提供。
-历史决策与移除细节见 `docs/R_REMOVAL_REPORT.md`。
+（历史决策与移除细节存于仓库外内部文档，不随插件分发。）
 
 ## 6. 工具 schema 约定
 

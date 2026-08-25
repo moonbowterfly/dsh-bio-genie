@@ -67,6 +67,6 @@ publisher_profiles.json、color_palettes.py）吸收自
 ---
 
 <!-- R/Bioconductor 生态许可声明已随 R 引擎移除（2026-08）一并删除；
-     历史决策记录见 docs/R_REMOVAL_REPORT.md。 -->
+     历史决策记录存于仓库外内部文档，不随插件分发。 -->
 
 

@@ -1,12 +1,22 @@
-# Bundled Python environment (lazily bootstrapped — do not commit)
+# ============================================================
+# dsh-bio-genie .gitignore（按仓库实际维护，2026-08-26 重写）
+# 原则：npm 发布物以 package.json 的 files 为准；本文件只负责
+#       把「不该进 git 的本地产物 / 内部文档」挡在门外。
+# ============================================================
+
+# ---- 插件运行时产物（惰性自举/执行时生成，永不入库）----
 python-env/
 python-env-*/
+stdout
+stdout/
 
-# Node / package manager
+# ---- 依赖与包管理 ----
 node_modules/
 .pnpm-store/
+# 本地打包产物（npm/pnpm pack 试装用）
+*.tgz
 
-# Python bytecode
+# ---- Python 构建中间物 ----
 __pycache__/
 *.py[cod]
 *.egg-info/
@@ -14,17 +24,23 @@ __pycache__/
 build/
 dist/
 
-# OS / editor
-.DS_Store
-Thumbs.db
-.idea/
-.vscode/
+# ---- 日志 / 备份 / 临时文件 ----
 *.log
+*.bak
+*.tmp
+tmp/
 
-# 内部审查/调研文档(不入库)
+# ---- 内部开发文档（只存仓库外 dsh-bio-genie-doc，绝不入公开仓库）----
 docs/WB审查报告*.md
 docs/面向WB审查.md
 docs/待吸收报告*.md
 docs/可借鉴工具调研.md
 docs/dsh-bio-genie-功能增进建议*.md
-stdout
+docs/R_REMOVAL_REPORT.md
+
+# ---- 操作系统 / 编辑器 ----
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+.vscode/
