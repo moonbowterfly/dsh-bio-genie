@@ -1067,6 +1067,7 @@ function semanticTools(config) {
       description:
         'SBOL 3 标准化设计写出：组件列表（name/type/sequence/role）→ SBOL 3 XML 文件。' +
         '每个组件生成 Component + 关联 Sequence，role 经 tyto 解析为 SO 本体 URI（如 promoter→SO:0000167）。' +
+        '注意：首次调用 tyto 需解析 SO 本体，耗时可达 1-2 分钟，属正常现象，请耐心等待不要重复调用或改用自写 XML。' +
         '触发词：SBOL、标准化设计、合成生物学数据交换、SBOL 导出。',
       parameters: {
         components: { type: 'array', required: true, description: '组件列表 [{name, type(dna/rna/protein/complex), sequence, role}]', items: { type: 'object', additionalProperties: true } },
@@ -1074,7 +1075,7 @@ function semanticTools(config) {
         namespace: { type: 'string', description: '命名空间 URI，默认 https://dsh-bio-genie.local/design' },
       },
       op: 'sbol_write',
-      timeoutMs: 60_000,
+      timeoutMs: 300_000,
     }),
     bioTool(config, {
       name: 'bio_sbol_read',
@@ -1087,7 +1088,7 @@ function semanticTools(config) {
         include_sequences: { type: 'boolean', description: '是否提取关联序列，默认 true' },
       },
       op: 'sbol_read',
-      timeoutMs: 60_000,
+      timeoutMs: 300_000,
     }),
     // ---- Phase 3：基因回路建模（第二层依赖，首次调用自动安装 biocrnpyler/bioscrape）----
     bioTool(config, {
