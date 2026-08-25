@@ -20,6 +20,7 @@ import {
   codeSignature, errorSignature, rememberSuccess, rememberLesson,
   readPatterns, readLessons, searchMemory,
 } from './memory.js'
+import { stampProvenance } from './provenance.js'
 
 /** 引导可能耗时数分钟；工具执行期间等待引导完成。 */
 const BOOT_WAIT_MS = 600_000
@@ -85,7 +86,9 @@ function bioTool(config, opts) {
       }
       if (!res.ok) throw new Error(res.error ?? 'bio op failed')
       if (cacheKey) cacheSet(cacheKey, res.result)
-      return res.result
+      // 计算防火墙：返回值挂 _provenance 背书字段（台账记录由 rigor-guard 的
+      // tools/post-execute 钩子统一完成，那里拿得到 agent 上下文）
+      return stampProvenance(opts.name, res.result)
     },
   })
 }
@@ -121,6 +124,7 @@ export function registerTools(ctx, config) {
           timedOut: { type: 'boolean', required: true },
           truncated: { type: 'boolean' },
           needs_repair: { type: 'boolean' },
+          _provenance: { type: 'object', additionalProperties: true, description: '计算防火墙背书：本结果由哪个工具产出。' },
         },
       },
       render: renderBioPython,
@@ -173,7 +177,7 @@ export function registerTools(ctx, config) {
           rememberSuccess({ signature: sig, template: preview, tool: 'bio_python' })
         }
       }
-      return canonical
+      return stampProvenance('bio_python', canonical)
     },
   })))
 
@@ -291,6 +295,82 @@ export function registerTools(ctx, config) {
       }
       const res = searchMemory(args.query ?? '')
       return { action, query: args.query ?? '', count: res.patterns.length + res.lessons.length, items: [...res.lessons, ...res.patterns].slice(0, limit) }
+    },
+  })))
+
+  // ============ 目标管理（Autopilot：框架级 goal 持久化） ============
+  // ctx.goals 是框架 Cordis 服务（@deepseek-ai/dsh-goal）。部署缺少该服务时
+  // ctx.get('goals') 返回 undefined，工具优雅降级为提示错误。
+  disposers.push(ctx.tools.register(defineTool({
+    name: 'bio_goal',
+    description:
+      'Autopilot 目标管理：把复杂分析任务注册为框架级持久目标（带轮次预算与状态机），' +
+      '配合 bio-autopilot 协议使用。action=create 创建目标（objective 必填，可选 maxGoalRounds 轮次预算）；' +
+      'status 查看当前目标；pause 暂停；resume 恢复；complete 标记完成；' +
+      'block 标记阻塞（reason 必填，如需用户输入用 code=need-human-input）。' +
+      '触发词：创建目标、任务目标、autopilot、暂停/恢复任务。',
+    parameters: {
+      action: { type: 'string', enum: ['create', 'status', 'pause', 'resume', 'complete', 'block'], required: true, description: '目标操作' },
+      objective: { type: 'string', description: '目标描述（action=create 必填）' },
+      maxGoalRounds: { type: 'number', description: '轮次预算上限（action=create 可选，默认框架配置 256）' },
+      reason: { type: 'string', description: '阻塞原因说明（action=block 必填）' },
+    },
+    output: {
+      schema: { type: 'object', additionalProperties: true },
+      render: (_args, value) => [{ type: 'text', text: JSON.stringify(value, null, 2) }],
+    },
+    async execute(args, exec) {
+      const goals = ctx.get?.('goals')
+      if (!goals) {
+        return { ok: false, error: '当前 dsh 部署未加载 @deepseek-ai/dsh-goal 服务，目标管理不可用；可直接按 bio-autopilot 协议手工推进。' }
+      }
+      const agent = exec?.agent
+      if (!agent) {
+        return { ok: false, error: '无法获取当前 agent 上下文（goal 操作需要活跃 agent）。' }
+      }
+      const view = () => {
+        const v = goals.get(agent)
+        return v === undefined || v === null ? null : v
+      }
+      try {
+        switch (args.action) {
+          case 'create': {
+            if (!args.objective) return { ok: false, error: 'action=create 需要 objective 参数。' }
+            const v = goals.create(agent, {
+              objective: args.objective,
+              ...(args.maxGoalRounds ? { maxGoalRounds: Math.floor(args.maxGoalRounds) } : {}),
+            })
+            return { ok: true, action: 'create', goal: v }
+          }
+          case 'status':
+            return { ok: true, action: 'status', goal: view() }
+          case 'pause':
+          case 'resume':
+          case 'complete': {
+            const cur = view()
+            const g = cur?.goal ?? cur
+            if (!g) return { ok: false, error: '当前没有活跃目标。' }
+            const ref = { id: g.id, revision: g.revision }
+            const v = goals[args.action](agent, ref)
+            return { ok: true, action: args.action, goal: v }
+          }
+          case 'block': {
+            if (!args.reason) return { ok: false, error: 'action=block 需要 reason 参数。' }
+            const cur = view()
+            const g = cur?.goal ?? cur
+            if (!g) return { ok: false, error: '当前没有活跃目标。' }
+            const v = goals.block(agent, { id: g.id, revision: g.revision }, {
+              code: args.reason.startsWith('need-human-input') ? 'need-human-input' : 'execution-blocked',
+              message: args.reason,
+            })
+            return { ok: true, action: 'block', goal: v }
+          }
+          default:
+            return { ok: false, error: `未知 action: ${args.action}` }
+        }
+      } catch (error) {
+        return { ok: false, error: `goal 操作失败: ${error?.message ?? String(error)}` }
+      }
     },
   })))
 

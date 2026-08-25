@@ -4,7 +4,8 @@
  * 注入 tools / skills / systemPrompt，贡献：
  *  - 系统提示词段（许愿式分析指引，persona.md 可编辑）
  *  - skill 目录（17 领域 + 4 研究 + 17 协议 + 8 指南 + 1 主 skill，共 47 个）
- *  - bio_python 执行器 + bio_env + bio_log/bio_memory + 44 个语义化工具（共 48 个工具）
+ *  - bio_python 执行器 + bio_env + bio_log/bio_memory + bio_goal + 44 个语义化工具（共 49 个工具）
+ *  - rigor-guard 计算防火墙（_provenance 台账 + turn-stopping 无溯源数字打回）
  *  - 后台预热 Python 环境（零依赖自举：uv + venv + biopython）
  *
  * @module dsh-bio-genie
@@ -14,6 +15,7 @@ import { fileURLToPath } from 'node:url'
 import { BIO_PROMPT_SECTION } from './prompt.js'
 import { registerSkills } from './skills.js'
 import { registerTools } from './tools.js'
+import { registerRigorGuard } from './rigor-guard.js'
 import { ensureEnvironment } from './runtime.js'
 import { registerApiRoutes } from './server.js'
 
@@ -52,6 +54,10 @@ export function apply(ctx, config) {
   ctx.systemPrompt.section(BIO_PROMPT_SECTION)
   registerSkills(ctx, SKILLS_DIR, GUIDES_DIR)
   registerTools(ctx, cfg)
+
+  // rigor-guard 计算防火墙：工具结果 provenance 台账 + 回合收尾扫描打回。
+  // 内部全部 try/catch，任何异常不影响 agent 循环。
+  registerRigorGuard(ctx)
 
   // 设置面板 RPC 路由（loopback-only）：skill 清单 / Python 包列表。
   // registerApiRoutes 内部用 ctx.webServer.register 注册路由，若 webServer

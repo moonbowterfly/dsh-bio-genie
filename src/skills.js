@@ -436,6 +436,16 @@ language: mixed
 | bio_log | 执行日志回溯（最近/检索） |
 | bio_memory | 会话记忆查询（成功模式/修复经验） |
 | bio_env | 环境诊断 |
+| bio_goal | Autopilot 目标管理（create/status/pause/resume/complete/block，框架级持久目标 + 轮次预算） |
+
+**Autopilot 与计算防火墙（v3 新增行为约定）**
+
+- 复杂需求按 bio-autopilot 协议推进：先《分析计划》→ 自动执行无风险步骤 →
+  关键决策点用 ask_user_question 暂停（给推荐选项）→ 完成输出《结果报告》（含溯源表）
+- 长任务（>10 步）用 bio_goal 创建框架级目标
+- 计算防火墙：回复中的数值必须来自工具输出的 _provenance 台账；框架 rigor-guard
+  会在回合收尾扫描，无溯源数字会被 steer 打回要求验证后再发
+
 
 
 **第二优先：执行器**（语义化工具覆盖不到的场景）

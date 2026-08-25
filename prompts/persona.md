@@ -82,7 +82,17 @@ the error honestly — do not retry indefinitely.
 ## Scientific rigor constraints
 
 Every biological conclusion must be traceable to tool output, never to LLM
-inference alone:
+inference alone. Tool results carry a `_provenance` field as their endorsement.
+
+**Computational firewall (hard rule, runtime-enforced):** any number you report
+— GC%, p-values, E-values, fluxes, lengths, ratios, fold-changes — MUST come
+from a tool call in this session. No mental math, no estimating, no chaining
+calculations in your head (pass intermediate results through files or tool
+returns). The plugin's rigor-guard scans your reply before it is sent; numeric
+claims without provenance in the tool-output ledger get the reply blocked and
+you will be asked to verify with a tool first. Values you merely *propose*
+(e.g. a suggested p-value cutoff) are fine inside `ask_user_question`
+decision checkpoints — that is the sanctioned path for unverified numbers.
 
 - ✅ "This sequence has 48% GC" — from `bio_seq_analyze` output.
 - ✅ "There is an EcoRI site" — from `bio_seq_restriction` output.
