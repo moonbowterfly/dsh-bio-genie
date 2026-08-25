@@ -455,22 +455,53 @@ export async function ensureExtraDeps(op, exe, { timeoutMs = 600_000 } = {}) {
 }
 
 /**
+ * 批量探测 ADDON_MODULES 全部模块的安装状态：单次 Python 子进程用
+ * importlib.metadata 枚举 site-packages 已装发行版元数据（与 uv/pip 的
+ * 「已安装」同口径），不真正 import 目标模块。旧实现逐包 spawnSync
+ * `import X`（4 模块 12 包 = 12 次解释器冷启动 + bokeh/biocrnpyler 等
+ * 重模块的真实导入），设置面板每次打开 >5s；元数据枚举实测 <0.3s，
+ * 且语义更准（import 失败可能只是模块自身损坏，不代表未安装）。
+ * 返回 { [moduleKey]: { installed, packages: [{package, installed}] } }。
+ */
+export function addonsStatus(exe) {
+  // PEP 503 规范化（小写、[-_.] 归一为 -），两侧同规则比较
+  const norm = (name) => name.toLowerCase().replace(/[-_.]+/g, '-').replace(/^-+|-+$/g, '')
+  const baseName = (pkg) => pkg.split('>')[0].split('<')[0].split('=')[0].trim()
+  const script = [
+    'from importlib.metadata import distributions',
+    'import json',
+    'print(json.dumps([(d.metadata.get("Name") or "") for d in distributions()]))',
+  ].join(String.fromCharCode(10))
+  const r = run(exe, ['-I', '-c', script], { timeoutMs: 120_000 })
+  const installedSet = new Set()
+  if (r.code === 0) {
+    try {
+      for (const name of JSON.parse(r.stdout.trim())) {
+        if (name) installedSet.add(norm(String(name)))
+      }
+    } catch { /* 输出异常按全未安装处理，面板仍可展示/安装 */ }
+  }
+  const out = {}
+  for (const [key, mod] of Object.entries(ADDON_MODULES)) {
+    const packages = mod.packages.map((pkg) => ({
+      package: pkg,
+      installed: installedSet.has(norm(baseName(pkg))),
+    }))
+    out[key] = { installed: packages.every((p) => p.installed), packages }
+  }
+  return out
+}
+
+/**
  * 第三层扩展模块（ADDON_MODULES）管理：设置面板/手动触发。
  * action: 'status' | 'install' | 'uninstall'
  */
 export async function manageAddon(moduleKey, action, exe, { timeoutMs = 900_000 } = {}) {
   const mod = ADDON_MODULES[moduleKey]
   if (!mod) return { ok: false, error: `未知模块: ${moduleKey}` }
-  const importNames = mod.packages.map((p) => EXTRA_IMPORT_NAMES[p] ?? p.replace(/-/g, '_'))
-
-  const probeInstalled = () => mod.packages.map((pkg, i) => {
-    const probe = run(exe, ['-I', '-c', `import ${importNames[i]}`], { timeoutMs: 60_000 })
-    return { package: pkg, installed: probe.code === 0 }
-  })
 
   if (action === 'status') {
-    const checks = probeInstalled()
-    return { ok: true, module: moduleKey, installed: checks.every((c) => c.installed), packages: checks }
+    return { ok: true, module: moduleKey, ...addonsStatus(exe)[moduleKey] }
   }
 
   const uv = uvBinary()
@@ -491,11 +522,10 @@ export async function manageAddon(moduleKey, action, exe, { timeoutMs = 900_000 
       const r = uvRun(args)
       if (r.code !== 0) errors.push(`${pkg}: ${r.stderr.slice(0, 200)}`)
     }
-    const checks = probeInstalled()
-    const allOk = checks.every((c) => c.installed)
+    const check = addonsStatus(exe)[moduleKey]
     return {
-      ok: errors.length === 0 && allOk, module: moduleKey, installed: allOk,
-      packages: checks, ...(errors.length ? { error: errors.join(' | ') } : {}),
+      ok: errors.length === 0 && check.installed, module: moduleKey, installed: check.installed,
+      packages: check.packages, ...(errors.length ? { error: errors.join(' | ') } : {}),
     }
   }
 

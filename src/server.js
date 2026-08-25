@@ -22,7 +22,7 @@
  */
 import { spawn } from 'node:child_process'
 import { join as pathJoin } from 'node:path'
-import { venvPython, resolveEnvDir, bioEnvExists, PYTHON_DIR, manageAddon } from './runtime.js'
+import { venvPython, resolveEnvDir, bioEnvExists, PYTHON_DIR, manageAddon, addonsStatus } from './runtime.js'
 
 import { listSkillsForPanel } from './skills.js'
 import { handleConfig } from './config_handler.js'
@@ -377,10 +377,11 @@ async function handleAddons(req, res, config) {
     })
   }
   if (req.method === 'GET') {
+    // 批量元数据探测（单次 Python 子进程），替代旧的逐包 import 探测（>5s → <0.5s）
+    const status = await addonsStatus(py)
     const modules = {}
     for (const key of Object.keys(ADDON_MODULES)) {
-      const st = await manageAddon(key, 'status', py)
-      modules[key] = { ...ADDON_MODULES[key], installed: st.installed, packages: st.packages }
+      modules[key] = { ...ADDON_MODULES[key], installed: status[key].installed, packages: status[key].packages }
     }
     return writeJson(res, 200, { ok: true, value: { modules } })
   }
