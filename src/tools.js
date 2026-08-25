@@ -488,7 +488,8 @@ function semanticTools(config) {
       description:
         '分析 DNA 序列的限制酶切位点。enzymes 指定酶名列表（如 ["EcoRI","BamHI"]），不指定则分析全部酶。' +
         'enzyme_set 控制酶库范围：commonly（默认，商业常用酶）或 all（全量含虚构酶）。' +
-        'linear 表示线性还是环状（默认线性）。cut_positions 是 1-based 切割坐标（切点后第一个碱基）。' +
+        'linear 表示线性还是环状（默认线性）。cut_positions 是 1-based 切割坐标（切点后第一个碱基），' +
+        '返回含 coordinate_base/cut_positions_are 说明（注意：切割位置 ≠ 识别位点起始）。' +
         '触发词：限制酶、酶切位点、restriction。',
       parameters: {
         sequence: { type: 'string', required: true, description: 'DNA 序列' },
@@ -553,7 +554,8 @@ function semanticTools(config) {
       name: 'bio_entrez_search',
       description:
         'NCBI Entrez 检索：esearch + esummary 摘要。db=gene 返回基因元数据（全名/染色体位置/别名/摘要），' +
-        'db=nucleotide/protein 返回序列摘要。触发词：NCBI、检索基因、查基因信息、搜索序列。',
+        'db=nucleotide/protein 返回序列摘要。零命中（count=0）时返回 _hint 字段含放宽查询建议。' +
+        '触发词：NCBI、检索基因、查基因信息、搜索序列。',
       parameters: {
         term: { type: 'string', required: true, description: '检索式，如 "TP53[Gene Name] AND human[Organism]"' },
         db: { type: 'string', description: '数据库，默认 nucleotide（gene/protein 等；gene 有结构化摘要）' },
@@ -858,12 +860,16 @@ function semanticTools(config) {
     bioTool(config, {
       name: 'bio_primer_design',
       description:
-        'PCR 引物设计：输入模板序列，返回正/反向引物对（Tm、GC%、长度、位置、评分）。' +
-        '支持自定义产物大小、引物长度范围、目标 Tm。触发词：引物、PCR、Tm、引物设计。',
+        'PCR 引物设计：输入模板序列，返回正/反向引物对（Tm、GC%、长度、位置、评分、quality/issue 标注）。' +
+        'fwd_position/rev_position 为 0-based 切片索引（1-based = 索引+1）；quality=good 表示 Tm 差≤3 且 GC 40-60。' +
+        '无满意候选时返回 advice 字段调整建议。支持自定义产物大小、引物长度范围、目标 Tm、top_n、tm_diff_max。' +
+        '触发词：引物、PCR、Tm、引物设计。',
       parameters: {
         sequence: { type: 'string', required: true, description: '模板 DNA 序列' },
         product_size: { type: 'number', description: '期望产物大小（bp），默认 500' },
         tm_target: { type: 'number', description: '目标 Tm（°C），默认 60' },
+        top_n: { type: 'number', description: '返回候选引物对数，默认 5' },
+        tm_diff_max: { type: 'number', description: '正反向 Tm 差过滤阈值（°C），默认 5' },
       },
       op: 'primer_design',
       timeoutMs: 60_000,
@@ -895,8 +901,10 @@ function semanticTools(config) {
     bioTool(config, {
       name: 'bio_plasmid_map',
       description:
-        '质粒图谱：特征列表 → 文本注释图；传入 genbank_file 或（features+sequence）时输出' +
-        ' PNG/SVG 图形文件（dna-features-viewer，缺失/渲染失败自动回退文本模式）。' +
+        '质粒图谱：仅传 features → 文本注释图（mode=text，不生成文件，output_file=null）；' +
+        '传 sequence（+features）或 genbank_file → 生成 PNG/SVG 图形文件（mode=graphic，' +
+        '返回 output_file 绝对路径；out_file 可指定，默认工作区 <name>_map.<format>；' +
+        'dna-features-viewer 缺失/渲染失败自动回退文本模式）。' +
         '支持 regulatory/cds/origin/marker 类型与 highlight_regions 高亮。' +
         '触发词：质粒图、质粒图谱、载体图谱、plasmid map。',
       parameters: {
@@ -919,6 +927,7 @@ function semanticTools(config) {
       description:
         '工业级 PCR 引物设计（Primer3 热力学评分）：模板序列 → 候选引物对' +
         '（seq/Tm/GC%/发夹/自互补/二聚体 Tm + penalty 排序，rank 1 为推荐）。' +
+        '位置字段（left/right position）为 0-based（Primer3 约定 [start, length]）。' +
         '与 bio_primer_design（Biopython 简单版）区分：本工具走 Primer3 全套二级结构约束，' +
         '适合需要可投稿级引物质量的场景。触发词：Primer3、工业级引物、qPCR 引物、引物对筛选。',
       parameters: {

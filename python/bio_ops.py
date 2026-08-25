@@ -212,7 +212,10 @@ def op_seq_restriction(args):
                 'recognition_site': enz.site,
                 'count': len(hits),
             }
-    result = {'sites': sites}
+    result = {'sites': sites,
+              'coordinate_base': '1-based',
+              'cut_positions_are': 'cut site position (1-based, first base after the cut; '
+                                   '不等于识别位点起始，offset 由酶切模式决定，如 NdeI 在识别位点后第 3 碱基处切割)'}
     if enzymes:
         result['requested'] = enzymes
         if missing:
@@ -345,7 +348,13 @@ def op_entrez_search(args):
                     })
         except Exception as e:
             summaries = [{'id': i, 'note': f'summary fetch failed: {e}'} for i in ids]
-    return {'db': db, 'count': int(search.get('Count', 0)), 'ids': ids, 'summaries': summaries}
+    out = {'db': db, 'count': int(search.get('Count', 0)), 'ids': ids, 'summaries': summaries}
+    if out['count'] == 0:
+        out['_hint'] = ('无匹配结果。建议：① 简化查询词（去掉过于严格的 field 限定，'
+                        '如 [Organism]/[Gene Name]/AND 组合）；② 改用宽松字段 '
+                        '（如 *[Title] 或 [All Fields]）；③ 减少引号精确匹配与多余括号；'
+                        '④ 或先只检索 keyword 再在本地过滤。')
+    return out
 
 
 def op_entrez_fetch(args):

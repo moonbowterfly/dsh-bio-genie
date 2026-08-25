@@ -72,6 +72,7 @@ def op_primer3_design(args):
     if n == 0:
         explain = res.get('PRIMER_LEFT_EXPLAIN', '') + ' | ' + res.get('PRIMER_RIGHT_EXPLAIN', '')
         return {'pairs': [], 'n_returned': 0,
+                'position_base': '0-based (Primer3 约定, [start, length])',
                 'note': f'Primer3 未找到满足约束的引物对，可放宽 tm/gc/size 范围。{explain.strip()}'}
 
     pairs = []
@@ -108,6 +109,7 @@ def op_primer3_design(args):
         'pairs': pairs,
         'n_returned': n,
         'recommended': pairs[0] if pairs else None,
+        'position_base': '0-based (Primer3 约定, [start, length])',
         'note': '按 Primer3 penalty 升序排列，rank 1 为推荐引物对；'
                 'hairpin/self_any/compl Tm 越低越好（阈值见传入参数）。',
     }

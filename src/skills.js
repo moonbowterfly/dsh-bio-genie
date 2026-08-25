@@ -415,7 +415,7 @@ language: mixed
 | bio_seq_kmer | k-mer 频率 |
 | bio_seq_io_read | 读 FASTA/GenBank |
 | bio_seq_io_write | 写序列文件 |
-| bio_seq_restriction | 限制酶切位点 |
+| bio_seq_restriction | 限制酶切位点（返回 1-based 切割位置 + coordinate_base 说明） |
 | bio_blast_search | 远程 BLAST（NCBI qblast，1-10 分钟，勿重复调用） |
 | bio_msa | 多序列比对（clustalw/muscle，缺二进制会返回提示） |
 | bio_phylo_build | 系统发育树（nj/upgma → Newick，可接 bio_msa 输出） |
@@ -432,7 +432,7 @@ language: mixed
 | bio_crispr_guide / bio_crispr_verify | sgRNA 设计（PAM 扫描+off-target+效率分）/ 编辑验证（两序列比对+indel 定量） |
 | bio_dna_syncheck | DNA 合成约束检查（GC/同聚物/发夹/重复 → 可合成性评分 0-100） |
 | bio_wetlab_design | 湿实验方案设计（PCR/Gibson/Golden Gate/限制酶/CRISPR/菌株构建/转化） |
-| bio_plasmid_map | 质粒图谱（传 genbank_file/sequence 出 PNG/SVG 图形，否则文本模式） |
+| bio_plasmid_map | 质粒图谱（传 genbank_file/sequence 出 PNG/SVG 图形并返回 output_file；否则文本注释图 mode=text） |
 | bio_sbol_write / bio_sbol_read | SBOL 3 标准化设计写出/读取（tyto 本体解析） |
 | bio_production_envelope | 生产包络线（产物理论上限预测） |
 | bio_circuit_compile / bio_circuit_simulate | 基因回路编译（→SBML+网络图）/ ODE/SSA 动力学仿真（首次调用自动装 biocrnpyler/bioscrape） |
@@ -495,7 +495,7 @@ language: mixed
 11. 画统计图/论文图：先 bio_fig_profile 剖析数据再选图型（见 bio-figure skill）；中文图先 bio_fig_qa 查字体；绘制配方见 bio-proto-pub-figure（figurelib 可 import）；投稿前 bio_fig_export 审计。
 12. 统计结论必须跑检验（bio-proto-statistics）：组间比较给 p 值+效应量，多重比较必须校正；误差棒图注写清 SD/SEM/CI + n。
 13. BLAST 用 bio_blast_search（勿在 bio_python 里自己调 qblast）；MSA→建树流水线：bio_msa 的 alignment_fasta 输出直接传给 bio_phylo_build 的 alignment 参数；bio_msa 返回 status=program_missing 时提示用户安装 clustalw/muscle，或改走 bio_python 兜底。
-14. 合成生物学路由：高质量引物用 bio_primer3_design（简单预估才用 bio_primer_design）；多约束序列改造（去酶切位点+密码子优化）用 bio_dna_optimize（简单密码子替换才用 bio_seq_optimize）；克隆可行性/组装模拟用 bio_clone_simulate（首次调用会自动安装 pydna，提示用户等待）；质粒出图传 genbank_file 给 bio_plasmid_map 得出版级 PNG/SVG。
+14. 合成生物学路由：高质量引物用 bio_primer3_design（简单预估才用 bio_primer_design）；多约束序列改造（去酶切位点+密码子优化）用 bio_dna_optimize（简单密码子替换才用 bio_seq_optimize）；克隆可行性/组装模拟用 bio_clone_simulate（首次调用会自动安装 pydna，提示用户等待）；质粒出图传给 bio_plasmid_map（genbank_file 或 sequence+features，确认返回 mode=graphic 且 output_file 为实际路径——仅传 features 只有文本注释图）。
 15. 代谢工程路由：bio_fba 的 analysis_type=fva 做通量可变性分析、pfba 做节俭 FBA、loopless 消除热力学不可行循环、geometric 唯一最小通量解、optionsfva 完整通量范围；bio_gene_knockout 的 analysis_type=double 找合成致死对、essentiality 做全基因必需性扫描、optknock 自动找最大化目标产物分泌的敲除组合（默认乙酸 EX_ac_e）；产物产量上限预测用 bio_production_envelope（target=产物交换反应，vary=生物量反应）。
 16. SBOL 标准化：导出设计用 bio_sbol_write（role 写术语名如 promoter，自动解析为 SO URI）；读取外部 SBOL 文件用 bio_sbol_read（可提取序列对接下游分析）。
 17. 基因回路：组件列表（promoter 可带 regulators）→ bio_circuit_compile 得 SBML + 网络拓扑图 → bio_circuit_simulate 做 ODE/SSA 仿真出浓度曲线。首次调用自动安装 biocrnpyler/bioscrape（~20MB，提示用户等待）；simulation_type=ssa 用于噪声/随机性分析。

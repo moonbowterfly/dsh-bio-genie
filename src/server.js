@@ -161,6 +161,8 @@ const TOOL_SCHEMAS = [
     { key: 'sequence', type: 'text', required: true, placeholder: 'ATGCGATCGATCG...', desc: '模板 DNA 序列' },
     { key: 'product_size', type: 'number', default: 500, desc: '产物大小(bp)' },
     { key: 'tm_target', type: 'number', default: 60, desc: '目标 Tm(°C)' },
+    { key: 'top_n', type: 'number', default: 5, desc: '返回候选数' },
+    { key: 'tm_diff_max', type: 'number', default: 5, desc: 'Tm 差过滤阈值(°C)' },
   ]},
   { name: 'seq_optimize', label: '密码子优化', engine: 'python', params: [
     { key: 'sequence', type: 'text', required: true, placeholder: 'ATGCGTAAAGAT...', desc: '编码序列(CDS)' },
@@ -174,6 +176,9 @@ const TOOL_SCHEMAS = [
     { key: 'name', type: 'text', default: 'plasmid', desc: '质粒名称' },
     { key: 'size', type: 'number', default: 5000, desc: '总大小(bp)' },
     { key: 'features', type: 'text', placeholder: '[{"name":"promoter","start":0,"end":200,"type":"regulatory"}]', desc: '特征列表(JSON)' },
+    { key: 'sequence', type: 'text', placeholder: 'ATGCGTA...', desc: '质粒序列(传了才出图形)' },
+    { key: 'output_format', type: 'select', options: ['png','svg'], default: 'png', desc: '图形格式' },
+    { key: 'out_file', type: 'text', placeholder: 'D:/path/plasmid_map.png', desc: '图形输出路径(可选)' },
   ]},
   { name: 'deseq2', label: '差异表达(Python)', engine: 'python', params: [
     { key: 'counts_file', type: 'text', required: true, placeholder: '/path/to/counts.csv', desc: 'counts 矩阵 CSV' },

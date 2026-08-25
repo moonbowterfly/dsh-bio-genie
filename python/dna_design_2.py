@@ -134,8 +134,15 @@ def _plasmid_graphic(args, features):
                 for f in features
             ]
             cls = CircularGraphicRecord if args.get('circular', True) else GraphicRecord
-            record = cls(sequence=seq or 'N' * max(1, args.get('size', 1000)),
-                         features=gfeatures)
+            seq_len = len(seq) if seq else int(max(1, args.get('size', 1000)))
+            try:
+                # 新版：CircularGraphicRecord 必须 sequence_length（若非零则一并传 sequence）
+                record = cls(sequence_length=seq_len,
+                             sequence=seq or None,
+                             features=gfeatures)
+            except TypeError:
+                # 旧版/Linear 兼容：只收 sequence
+                record = cls(sequence=seq or 'N' * seq_len, features=gfeatures)
         # 高亮区域（可选）
         for hl in args.get('highlight_regions') or []:
             record.features.append(GraphicFeature(
@@ -241,6 +248,17 @@ def op_plasmid_map(args):
         'unannotated_bp': remaining,
         'map_text': '\n'.join(map_lines),
     }
-    if graphic_result:
+    if graphic_result and graphic_result.get('graphic'):
+        result['mode'] = 'graphic'
+        result['output_file'] = graphic_result.get('out_file')
         result.update(graphic_result)
+    else:
+        result['mode'] = 'text'
+        result['output_file'] = None
+        if graphic_result:
+            result['graphic_note'] = graphic_result.get('graphic_note', '')
+        result['note'] = ('未生成图形文件：需传入 sequence（与 features 配合）或 genbank_file '
+                          '才输出 PNG/SVG 图形（dna-features-viewer）；out_file 可指定落盘路径，'
+                          '默认工作区 <name>_map.<format>。当前返回为文本注释图（见 map_text），'
+                          '不要声称已生成图形文件。')
     return result
