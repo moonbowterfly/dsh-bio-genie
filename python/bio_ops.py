@@ -124,7 +124,65 @@ def op_seq_analyze(args):
         from collections import Counter
         result['aa_composition'] = dict(Counter(sequence.upper()))
 
+    if seq_type == 'dna' and args.get('codon_stats'):
+        result['codon_stats'] = _codon_usage_stats(sequence.upper(),
+                                                   args.get('codon_host', 'ecoli'))
+
     return result
+
+
+# 宿主最优密码子表（与 dna_design.op_seq_optimize 保持一致，三处宿主）
+_OPTIMAL_CODON_TABLES = {
+    'ecoli': {
+        'A': 'GCC', 'R': 'CGT', 'N': 'AAC', 'D': 'GAT', 'C': 'TGC',
+        'E': 'GAA', 'Q': 'CAG', 'G': 'GGC', 'H': 'CAT', 'I': 'ATC',
+        'L': 'CTG', 'K': 'AAA', 'M': 'ATG', 'F': 'TTT', 'P': 'CCG',
+        'S': 'AGC', 'T': 'ACC', 'W': 'TGG', 'Y': 'TAT', 'V': 'GTG',
+    },
+    'human': {
+        'A': 'GCC', 'R': 'CGC', 'N': 'AAC', 'D': 'GAC', 'C': 'TGC',
+        'E': 'GAG', 'Q': 'CAG', 'G': 'GGC', 'H': 'CAC', 'I': 'ATC',
+        'L': 'CTG', 'K': 'AAG', 'M': 'ATG', 'F': 'TTC', 'P': 'CCC',
+        'S': 'AGC', 'T': 'ACC', 'W': 'TGG', 'Y': 'TAC', 'V': 'GTG',
+    },
+    'yeast': {
+        'A': 'GCT', 'R': 'AGA', 'N': 'AAT', 'D': 'GAT', 'C': 'TGT',
+        'E': 'GAA', 'Q': 'CAA', 'G': 'GGT', 'H': 'CAT', 'I': 'ATT',
+        'L': 'TTG', 'K': 'AAG', 'M': 'ATG', 'F': 'TTT', 'P': 'CCA',
+        'S': 'TCT', 'T': 'ACT', 'W': 'TGG', 'Y': 'TAT', 'V': 'GTT',
+    },
+}
+
+
+def _codon_usage_stats(sequence, host='ecoli'):
+    """简化密码子使用统计：最优密码子占比（非严格 CAI，供快速评估宿主适配）。"""
+    from collections import Counter
+    import Bio.Data.CodonTable as CT
+
+    table = _OPTIMAL_CODON_TABLES.get(host)
+    if table is None:
+        return {'error': f'unknown codon_host: {host}',
+                'supported': list(_OPTIMAL_CODON_TABLES.keys())}
+    if len(sequence) % 3 != 0:
+        return {'note': f'序列长度 {len(sequence)} 不是 3 的倍数，跳过密码子统计'}
+    codons = [sequence[i:i + 3] for i in range(0, len(sequence), 3)]
+    counter = Counter(codons)
+    std = CT.unambiguous_dna_by_id[1]
+    opt_count = 0
+    for codon, cnt in counter.items():
+        aa = std.forward_table.get(codon)
+        if aa is not None and table.get(aa, '') == codon:
+            opt_count += cnt
+    total = len(codons)
+    return {
+        'host': host,
+        'total_codons': total,
+        'optimal_codons': opt_count,
+        'optimal_codon_ratio': round(opt_count / total * 100, 1),
+        'top_codons': dict(counter.most_common(8)),
+        'note': '最优密码子占比为简化指标（基于宿主最优密码子表，非严格 CAI）；'
+                '需要全基因组建参考的 CAI 时用 bio_python 计算。',
+    }
 
 
 def op_seq_translate(args):
@@ -188,6 +246,7 @@ def op_seq_restriction(args):
     enzymes = args.get('enzymes', None)  # 如 ["EcoRI", "BamHI"]，None = 全部
     enzyme_set = args.get('enzyme_set', 'commonly')  # commonly(商业常用) | all(含虚构)
     linear = args.get('linear', True)  # 线性/环状影响位点计数
+    detail = bool(args.get('detail', False))  # false=摘要（每位点最多 10 个坐标）；true=全部
     s = Seq(sequence)
 
     if enzymes:
@@ -206,16 +265,27 @@ def op_seq_restriction(args):
     for enz in batch:
         hits = enz.search(s, linear=linear)
         if hits:
-            # search 返回切割位点（0-based）；识别序列位置需用酶属性
-            sites[str(enz)] = {
-                'cut_positions': [int(p) for p in hits],
+            positions = [int(p) for p in hits]
+            entry = {
                 'recognition_site': enz.site,
                 'count': len(hits),
             }
+            # 摘要瘦身：detail=false 时——全库扫描只给计数（避免 45KB 级超长输出），
+            # 指定酶列表时给坐标（≤10 个 + truncated 标记）；detail=true 给全部。
+            if detail:
+                entry['cut_positions'] = positions
+            elif enzymes:
+                entry['cut_positions'] = positions[:10]
+                if len(positions) > 10:
+                    entry['cut_positions_truncated'] = True
+            sites[str(enz)] = entry
     result = {'sites': sites,
               'coordinate_base': '1-based',
               'cut_positions_are': 'cut site position (1-based, first base after the cut; '
                                    '不等于识别位点起始，offset 由酶切模式决定，如 NdeI 在识别位点后第 3 碱基处切割)'}
+    if not detail and not enzymes:
+        result['summary_note'] = ('全库扫描摘要模式：每位点仅返回识别位点与计数；'
+                                  '需要坐标请传 detail=true 或指定 enzymes 列表')
     if enzymes:
         result['requested'] = enzymes
         if missing:

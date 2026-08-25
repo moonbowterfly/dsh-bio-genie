@@ -398,10 +398,14 @@ function semanticTools(config) {
       description:
         '分析一条 DNA/RNA/蛋白质序列：长度、GC 含量、反向互补、三框翻译、分子量等。' +
         'seq_type 可选 auto/dna/rna/protein，默认 auto（含 U 判为 RNA）。' +
-        '触发词：GC含量、反向互补、序列特征、翻译、分析序列。',
+        'codon_stats=true 时（DNA 且长度 3 的倍数）返回最优密码子占比/top 密码子，' +
+        'codon_host 可选 ecoli/human/yeast（默认 ecoli）——用于宿主适配快速评估。' +
+        '触发词：GC含量、反向互补、序列特征、翻译、分析序列、密码子适应、CAI。',
       parameters: {
         sequence: { type: 'string', required: true, description: '核酸或蛋白质序列' },
         seq_type: { type: 'string', enum: ['auto', 'dna', 'rna', 'protein'], description: '序列类型，默认 auto' },
+        codon_stats: { type: 'boolean', description: '是否返回密码子使用统计（最优密码子占比），默认 false' },
+        codon_host: { type: 'string', enum: ['ecoli', 'human', 'yeast'], description: '密码子统计宿主，默认 ecoli' },
       },
       op: 'seq_analyze',
     }),
@@ -490,12 +494,16 @@ function semanticTools(config) {
         'enzyme_set 控制酶库范围：commonly（默认，商业常用酶）或 all（全量含虚构酶）。' +
         'linear 表示线性还是环状（默认线性）。cut_positions 是 1-based 切割坐标（切点后第一个碱基），' +
         '返回含 coordinate_base/cut_positions_are 说明（注意：切割位置 ≠ 识别位点起始）。' +
+        'detail=false（默认）摘要模式：未指定酶时每位点仅返回识别位点+计数（避免超长输出，坐标需 detail=true 或指定酶列表）；' +
+        '指定酶时每酶最多 10 个坐标（count 恒为全量，超 10 带 cut_positions_truncated）。' +
+        'detail=true 返回全部坐标。不指定酶时建议先看摘要再按需指定。' +
         '触发词：限制酶、酶切位点、restriction。',
       parameters: {
         sequence: { type: 'string', required: true, description: 'DNA 序列' },
         enzymes: { type: 'array', description: '酶名列表，如 ["EcoRI"]，默认全部', items: { type: 'string' } },
         enzyme_set: { type: 'string', enum: ['commonly', 'all'], description: '酶库范围，默认 commonly（商业常用）' },
         linear: { type: 'boolean', description: '是否线性分子，默认 true' },
+        detail: { type: 'boolean', description: '是否返回全部位点坐标，默认 false（摘要模式，每酶 ≤10 坐标）' },
       },
       op: 'seq_restriction',
       timeoutMs: 120_000,
@@ -890,6 +898,7 @@ function semanticTools(config) {
       name: 'bio_assembly_design',
       description:
         '组装策略设计：输入 DNA 片段列表，推荐组装方法（Gibson/Golden Gate/限制酶）并设计接头。' +
+        '返回 protocol 与 next_step（提示下一步用 bio_clone_simulate 做环化组装模拟）。' +
         '触发词：组装、Gibson、Golden Gate、DNA 组装。',
       parameters: {
         fragments: { type: 'array', required: true, description: 'DNA 片段序列列表', items: { type: 'string' } },

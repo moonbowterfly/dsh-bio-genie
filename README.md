@@ -95,14 +95,14 @@ cp -r src index.js cordis.patch.yml package.json skills prompts python docs \
 
 | 工具 | 功能 | 典型触发词 |
 |------|------|-----------|
-| `bio_seq_analyze` | 长度 / GC% / 反向互补 / **六框翻译**（正负链）/ 分子量 / 蛋白 AA 组成 | GC含量、序列特征、翻译 |
+| `bio_seq_analyze` | 长度 / GC% / 反向互补 / **六框翻译**（正负链）/ 分子量 / 蛋白 AA 组成 / 密码子统计（`codon_stats=true`） | GC含量、序列特征、翻译、密码子适应 |
 | `bio_seq_translate` | DNA→蛋白翻译（可指定密码子表） | 翻译、蛋白序列 |
 | `bio_seq_gc_skew` | GC skew（复制起点识别） | 偏斜、复制起点 |
 | `bio_seq_find_orf` | 最长开放阅读框 | ORF、编码区 |
 | `bio_seq_kmer` | k-mer 频率统计 | k-mer |
 | `bio_seq_io_read` | 读 FASTA/GenBank（UTF-8/GBK 自适应） | 读取fasta、解析文件 |
 | `bio_seq_io_write` | 写序列文件 | 写fasta、保存序列 |
-| `bio_seq_restriction` | 限制酶切位点（CommOnly 默认 / all 可选） | 限制酶、酶切位点 |
+| `bio_seq_restriction` | 限制酶切位点（CommOnly 默认 / all 可选；`detail=false` 未指定酶仅计数、指定酶 ≤10 坐标，`true` 全量） | 限制酶、酶切位点 |
 | `bio_blast_search` | 远程 BLAST（NCBI qblast：blastn/blastp/blastx → 命中 accession/e-value/score/一致性） | BLAST、同源性搜索 |
 | `bio_msa` | 多序列比对（clustalw/muscle；返回 Clustal+FASTA 比对、共识序列、保守性统计；缺二进制返回安装提示） | 多序列比对、MSA |
 | `bio_phylo_build` | 系统发育树构建（nj/upgma → Newick；可接 bio_msa 的 alignment_fasta 输出） | 进化树、建树、NJ |

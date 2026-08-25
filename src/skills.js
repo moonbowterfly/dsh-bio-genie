@@ -408,14 +408,14 @@ language: mixed
 
 | 工具 | 用途 |
 |------|------|
-| bio_seq_analyze | 长度/GC%/反向互补/三框翻译/分子量 |
+| bio_seq_analyze | 长度/GC%/反向互补/三框翻译/分子量（codon_stats=true 时含密码子统计） |
 | bio_seq_translate | DNA→蛋白翻译（密码子表） |
 | bio_seq_gc_skew | GC skew |
 | bio_seq_find_orf | 最长 ORF |
 | bio_seq_kmer | k-mer 频率 |
 | bio_seq_io_read | 读 FASTA/GenBank |
 | bio_seq_io_write | 写序列文件 |
-| bio_seq_restriction | 限制酶切位点（返回 1-based 切割位置 + coordinate_base 说明） |
+| bio_seq_restriction | 限制酶切位点（1-based 切割位置；detail=false 时未指定酶只给计数，指定酶 ≤10 坐标；true 全量） |
 | bio_blast_search | 远程 BLAST（NCBI qblast，1-10 分钟，勿重复调用） |
 | bio_msa | 多序列比对（clustalw/muscle，缺二进制会返回提示） |
 | bio_phylo_build | 系统发育树（nj/upgma → Newick，可接 bio_msa 输出） |

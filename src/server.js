@@ -35,6 +35,8 @@ const TOOL_SCHEMAS = [
   { name: 'seq_analyze', label: '序列分析', engine: 'python', params: [
     { key: 'sequence', type: 'text', required: true, placeholder: 'ATGCGATCGATCG...', desc: '核酸或蛋白质序列' },
     { key: 'seq_type', type: 'select', options: ['auto','dna','rna','protein'], default: 'auto', desc: '序列类型' },
+    { key: 'codon_stats', type: 'boolean', default: false, desc: '返回密码子统计' },
+    { key: 'codon_host', type: 'select', options: ['ecoli','human','yeast'], default: 'ecoli', desc: '统计宿主' },
   ]},
   { name: 'seq_translate', label: '序列翻译', engine: 'python', params: [
     { key: 'sequence', type: 'text', required: true, placeholder: 'ATGCGATCG...', desc: 'DNA/RNA 序列' },
@@ -58,6 +60,7 @@ const TOOL_SCHEMAS = [
     { key: 'sequence', type: 'text', required: true, placeholder: 'ATGCGAATTCGATCG...', desc: 'DNA 序列' },
     { key: 'enzymes', type: 'text', placeholder: 'EcoRI,BamHI', desc: '酶名列表（逗号分隔）' },
     { key: 'linear', type: 'boolean', default: true, desc: '线性分子' },
+    { key: 'detail', type: 'boolean', default: false, desc: '返回全部位点坐标' },
   ]},
   { name: 'entrez_search', label: 'NCBI 检索', engine: 'python', params: [
     { key: 'term', type: 'text', required: true, placeholder: 'TP53[Gene Name] AND human[Organism]', desc: '检索式' },

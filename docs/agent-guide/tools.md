@@ -62,8 +62,10 @@ language: none
 |---|---|
 | sequence ★ | DNA/RNA/蛋白序列字符串 |
 | seq_type | `auto`（默认，自动判断）/ dna / rna / protein |
+| codon_stats | `true` 时返回密码子统计（DNA 且长度 3 的倍数） |
+| codon_host | 统计宿主：`ecoli`（默认）/ human / yeast |
 
-返回：`length / seq_type / gc_fraction / gc_percent / reverse_complement / complement / translations`（DNA 六框 +1~+3、-1~-3；RNA 三框）`/ molecular_weight`（蛋白）/ `aa_composition`（蛋白）。
+返回：`length / seq_type / gc_fraction / gc_percent / reverse_complement / complement / translations`（DNA 六框 +1~+3、-1~-3；RNA 三框）`/ molecular_weight`（蛋白）/ `aa_composition`（蛋白）。`codon_stats=true` 时另附 `codon_stats`（`total_codons`/`optimal_codons`/`optimal_codon_ratio` 最优密码子占比/top_codons——简化指标，非严格 CAI）。
 自动判断规则：含 U 无 T→RNA；含 IUPAC 模糊碱基（RYSWKMBDHVN）、X、gap（-/.）→DNA；出现非核酸字母→蛋白。含 X/gap 的序列安全（翻译前 X/gap→N，不崩溃）。
 
 **bio_seq_translate** — 翻译：`sequence ★`、`table`（密码子表号，默认 1）、`to_stop`（首终止密码子截断）。返回 `{protein, table, to_stop}`。
@@ -78,7 +80,7 @@ language: none
 
 **bio_seq_io_write** — 写序列文件：`path ★`、`records ★`（`[{id, sequence, description?}]`）、`format`（默认 fasta）。返回 `{path, format, written}`。
 
-**bio_seq_restriction** — 限制酶位点：`sequence ★`、`enzymes`（酶名列表，不传=全部商业常用酶 ~700 种）、`enzyme_set`（commonly/all）、`linear`（默认 true）。返回 `{sites: {酶名: {cut_positions, recognition_site, count}}, requested?, missing_enzymes?}`。cut_positions 是 **1-based 切点坐标**（切点后第一个碱基）。
+**bio_seq_restriction** — 限制酶位点：`sequence ★`、`enzymes`（酶名列表，不传=全部商业常用酶 ~700 种）、`enzyme_set`（commonly/all）、`linear`（默认 true）、`detail`（默认 `false` 摘要模式：**未指定酶时每位点仅返回识别位点+计数**（避免全库扫描超长输出），指定酶时每酶最多 10 个坐标 + `cut_positions_truncated` 标记；`true` 返回全部坐标）。返回 `{sites: {酶名: {cut_positions, recognition_site, count}}, coordinate_base, cut_positions_are, requested?, missing_enzymes?}`。cut_positions 是 **1-based 切点坐标**（切点后第一个碱基，≠ 识别位点起始，偏移由酶切模式决定）。
 
 ### 比对与系统发育
 
@@ -164,7 +166,7 @@ language: none
 
 **bio_seq_optimize** — 密码子优化：`sequence`★（CDS）、`organism`（ecoli/human/yeast）。返回优化序列 + GC%。触发词：密码子优化、表达优化。
 
-**bio_assembly_design** — 组装策略：`fragments`★（DNA 片段列表）、`method`（auto/gibson/golden_gate/restriction）。返回组装方案 + 接头设计。触发词：组装、Gibson、Golden Gate。
+**bio_assembly_design** — 组装策略：`fragments`★（DNA 片段列表）、`method`（auto/gibson/golden_gate/restriction）。返回组装方案 + 接头设计 + `next_step`（提示用 bio_clone_simulate 做环化组装模拟）。触发词：组装、Gibson、Golden Gate。
 
 **bio_plasmid_map** — 质粒图谱：`name`、`size`、`features`★（特征列表）。传 `genbank_file` 或 `features`+`sequence` 时输出 PNG/SVG 图形文件（dna-features-viewer，`output_format`/`out_file`/`figure_width`/`highlight_regions` 可控），返回 `mode=graphic` + `output_file`（绝对路径）；**仅传 features 时只有文本注释图（`mode=text`，`output_file=null`，不生成文件）**。触发词：质粒图、载体图谱、plasmid map。
 

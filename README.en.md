@@ -93,14 +93,14 @@ Finally restart the dsh web service.
 
 | Tool | Function | Typical Triggers |
 |------|----------|------------------|
-| `bio_seq_analyze` | Length / GC% / reverse complement / **six-frame translation** (both strands) / molecular weight / protein AA composition | GC content, sequence features, translate |
+| `bio_seq_analyze` | Length / GC% / reverse complement / **six-frame translation** (both strands) / molecular weight / protein AA composition / codon stats (`codon_stats=true`) | GC content, sequence features, translate |
 | `bio_seq_translate` | DNA→protein translation (customizable genetic code table) | translate, protein sequence |
 | `bio_seq_gc_skew` | GC skew (origin-of-replication detection) | skew, replication origin |
 | `bio_seq_find_orf` | Longest open reading frame | ORF, coding region |
 | `bio_seq_kmer` | k-mer frequency statistics | k-mer |
 | `bio_seq_io_read` | Read FASTA/GenBank (UTF-8/GBK adaptive) | read fasta, parse file |
 | `bio_seq_io_write` | Write sequence files | write fasta, save sequence |
-| `bio_seq_restriction` | Restriction enzyme cut sites (CommOnly default / all optional) | restriction enzyme, cut site |
+| `bio_seq_restriction` | Restriction enzyme cut sites (CommOnly default / all optional; `detail=false`: counts only when no enzymes given, ≤10 coords when enzymes given; `true` full) | restriction enzyme, cut site |
 | `bio_blast_search` | Remote BLAST (NCBI qblast: blastn/blastp/blastx → hit accession/e-value/score/identity) | BLAST, homology search |
 | `bio_msa` | Multiple sequence alignment (clustalw/muscle; returns Clustal+FASTA alignment, consensus, conservation stats; friendly hint if binary missing) | MSA, multiple alignment |
 | `bio_phylo_build` | Phylogenetic tree construction (nj/upgma → Newick; accepts bio_msa alignment_fasta output) | phylogenetic tree, NJ |

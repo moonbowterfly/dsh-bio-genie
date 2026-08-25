@@ -96,6 +96,11 @@ def op_assembly_design(args):
         }
         result['note'] = '限制酶克隆需手动选择酶；运行 bio_seq_restriction 检查位点可用性'
 
+    result['next_step'] = (
+        f'组装方案已设计。下一步：用 bio_clone_simulate(method={method}, backbone=载体序列, '
+        'inserts=[{name, sequence}...]) 传入相同片段做环化组装模拟；模拟成功返回的 '
+        'product_sequence 可直接传给 bio_plasmid_map（配合 features）出质粒图。')
+
     return result
 
 
