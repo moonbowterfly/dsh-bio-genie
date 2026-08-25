@@ -35,6 +35,24 @@ export function sessionWorkspace(exec) {
   return cwd
 }
 
+/** 工作区规范子目录（每次解析工作区时自动创建，供产物分类落位）。 */
+export const WORKSPACE_DIRS = ['result', 'figures', 'out']
+
+/**
+ * 幂等创建工作区规范子目录（result=交付物 / figures=出版级图 / out=中间数据）。
+ * @param {string} cwd 工作区绝对路径。
+ */
+export function ensureOutputDirs(cwd) {
+  for (const name of WORKSPACE_DIRS) {
+    try {
+      const dir = join(cwd, name)
+      if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+    } catch {
+      // 只读/权限受限等场景不致命：bridge 会在 chdir 失败时保持原目录并报错
+    }
+  }
+}
+
 /**
  * 解析一次工具调用的工作目录。
  * @param {object} [exec] 工具执行上下文。
@@ -57,5 +75,7 @@ export function resolveWorkdir(exec, workdir) {
       // 只读/权限受限等场景不致命：bridge 会在 chdir 失败时保持原目录并报错
     }
   }
+  // 规范目录：result/figures/out 自动预建
+  ensureOutputDirs(cwd)
   return cwd
 }
