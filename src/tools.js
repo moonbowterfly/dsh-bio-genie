@@ -711,7 +711,9 @@ function semanticTools(config) {
       name: 'bio_fba',
       description:
         '通量平衡分析：预测代谢通量分布。analysis_type=fba（默认，最优生长+影子价格）/ ' +
-        'fva（通量可变性分析，返回每个反应的 [min,max] 范围）/ pfba（节俭 FBA，最小化总通量）/ ' +
+        'fva（通量可变性分析，返回每个反应的 [min,max] 范围；fraction_of_optimum 针对当前目标函数，' +
+        '若 objective 为产物反应则范围是「产物 ≥ fraction×产物最优」而非固定生长率——返回含 fraction_notes 说明）/ ' +
+        'pfba（节俭 FBA，最小化总通量）/ ' +
         'loopless（消除热力学不可行循环）/ geometric（欧几里得通量范数最小化）/ ' +
         'optionsfva（完整通量范围，含固定反应）。' +
         'model_id 指定模型（默认 textbook，COBRApy 内置 E. coli core），objective 可指定目标函数反应。' +

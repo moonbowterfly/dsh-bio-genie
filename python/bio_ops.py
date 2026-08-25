@@ -1007,6 +1007,13 @@ def op_fba(args):
             'n_variable': len(ranges),
             'flux_ranges': ranges,
             'model_id': model_id,
+            'fraction_notes': (
+                f'fraction_of_optimum={fraction} 应用于当前目标函数 '
+                f'({"objective=" + objective if objective else "模型默认目标（biomass）"}) '
+                '——即各反应范围在「目标函数 ≥ fraction×最优值」约束下计算；'
+                '若 objective 为产物反应（如 EX_succ_e），则 biomass 会被压低至 0，'
+                '这不是「固定生长率下的范围」。需要后者请用 production_envelope 或先以 biomass 为目标再 FVA。'
+            ),
             'objective': str(model.objective),
         }
 
@@ -1806,6 +1813,27 @@ class SafeEncoder(json.JSONEncoder):
         return super().default(obj)
 
 
+def _sanitize_json(v):
+    """递归规范化输出值，保证通过 dsh 的 lossless JSON 校验：
+    - NaN/Infinity → None（非法 JSON 字面量，dsh Number.isFinite 校验拒绝）
+    - -0.0 → 0.0（dsh walkJsonValue 显式拒绝 Object.is(v, -0) 的负零）
+      （2026-08-25 实测：optknock 贪心枚举不可生长基因时 growth=-0.0 → 工具报
+       'value is not lossless JSON'，agent 被迫自愈改用 bio_python。）
+    """
+    import math
+    if isinstance(v, float):
+        if math.isnan(v) or math.isinf(v):
+            return None
+        if v == 0.0:
+            return 0.0
+        return v
+    if isinstance(v, dict):
+        return {k: _sanitize_json(x) for k, x in v.items()}
+    if isinstance(v, (list, tuple)):
+        return [_sanitize_json(x) for x in v]
+    return v
+
+
 def main():
     try:
         # binary 读取 + 容错解码：任何输入字节都不会崩溃（与 bridge.py 一致）
@@ -1820,6 +1848,7 @@ def main():
             print(json.dumps({'ok': False, 'error': f'unknown op: {op}'}))
             return
         result = OPS[op](args)
+        result = _sanitize_json(result)
         print(json.dumps({'ok': True, 'result': result}, ensure_ascii=False, cls=SafeEncoder))
     except Exception as e:
         traceback.print_exc(file=sys.stderr)
