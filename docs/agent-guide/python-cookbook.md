@@ -16,20 +16,42 @@ language: python
 - 每次调用是**全新进程**：不能跨调用共享变量，也不能把 matplotlib Figure 对象传给别的工具（fig 工具都是文件级接口）。
 - 隔离模式 `-I`：插件自己的 python 目录（含 `figurelib` 包）已在 sys.path，可直接 import；工作区目录**不在** sys.path（读文件用 open/相对路径没问题）。
 
-## 2. 可用库（全部已预装，无需安装）
+## 2. 可用库矩阵（先调 bio_env 探测，以实际版本为准）
 
-| 库 | 用途 |
-|---|---|
-| `Bio.*` | Biopython 全模块（Seq/SeqIO/Align/Blast/Entrez/Phylo/PDB/motifs/Restriction/PopGen/Graphics/SearchIO…） |
-| `numpy` / `pandas` | 数值/表格（pandas 3.x：read_csv/groupby/corr 均可用） |
-| `scipy` | 统计检验、数值算法（ttest_ind/mannwhitneyu/pearsonr/…） |
-| `matplotlib` | 底层绘图（Agg 后端自动可用，无需 display） |
-| `seaborn` | 高层统计图（barplot/boxplot/violinplot/heatmap/pairplot） |
-| `PIL`（Pillow） | 图像读写（灰度预览、DPI 读取） |
-| `reportlab` + `rlPyCairo` | GenomeDiagram 渲染 PNG 的后端 |
-| `figurelib.*` | **出版级绘图库**（吸收 scipilot）：`setup_style` / `profile_data` / `export_figure` / `check_figure` / `layout_tools` / `visual_qa` |
+> 三层依赖：**builtin**（环境引导时预装）—— **auto**（首次调用对应工具时自动 uv pip install）—— **addon**（需在设置面板手动安装）。不确定某库是否可用时，先调 `bio_env` 查看 `libraries` 字段。
 
-不在环境里、也不要引导用户安装：torch/scanpy/rdkit/ete3/gseapy/plotly 等重依赖——见 troubleshooting 的边界表。
+| 库 | 用途 | 层级 |
+|---|---|---|
+| `Bio.*` | Biopython 全模块（Seq/SeqIO/Align/Blast/Entrez/Phylo/PDB/motifs/Restriction/PopGen/Graphics/SearchIO…） | builtin |
+| `numpy` / `pandas` | 数值/表格（pandas 3.x：read_csv/groupby/corr 均可用） | builtin |
+| `scipy` | 统计检验、数值算法（ttest_ind/mannwhitneyu/pearsonr/…、`scipy.stats.false_discovery_control`） | builtin |
+| `sklearn` / `statsmodels` | 机器学习 / 统计建模 | builtin |
+| `matplotlib` | 底层绘图（Agg 后端自动可用，无需 display） | builtin |
+| `seaborn` | 高层统计图（barplot/boxplot/violinplot/heatmap/pairplot） | builtin |
+| `PIL`（Pillow） | 图像读写（灰度预览、DPI 读取） | builtin |
+| `reportlab` + `rlPyCairo` | GenomeDiagram 渲染 PNG 的后端 | builtin |
+| `cobra` | 代谢建模（FBA/FVA/pFBA/loopless/geometric/OptKnock、`cobra.io.read_sbml_model`） | builtin |
+| `primer3` | 工业级引物设计（`primer3.bindings.design_primers`） | builtin |
+| `dnachisel` | 多约束 DNA 优化（`DnaOptimizationProblem` / `CodonOptimize` / `AvoidPattern`；**V2 与新 Spec 体系不兼容**） | builtin |
+| `dna_features_viewer` | 质粒图（`GraphicRecord` + `from_biopython_record`） | builtin |
+| `sbol3` / `tyto` | SBOL 3 读写 / 本体 URI 解析（`tyto.SO.get_term_by_uri`） | builtin |
+| `requests` | HTTP API（KEGG/Enrichr 等；`Bio.Entrez` 请勿手调——用 bio_entrez_* 工具） | builtin |
+| `pydna` | 克隆模拟（Dseqrecord/Assembly；**注意 pyparsing>=3.1 冲突护栏**） | auto |
+| `biocrnpyler` | 基因回路编译（部件→CRN→SBML；**自动 --no-deps 安装**） | auto |
+| `bioscrape` | 回路动力学仿真（`py_simulate_model`） | auto |
+| `networkx` | 网络/图分析 | auto |
+| `scanpy` / `pysam` | 单细胞 / NGS（设置面板「高级模块」安装后可用） | addon |
+| `figurelib.*` | **出版级绘图库**（吸收 scipilot）：`setup_style` / `profile_data` / `export_figure` / `check_figure` / `layout_tools` / `visual_qa` | builtin |
+
+**不在环境里、也不要引导用户安装**：torch/scanpy(未装时)/rdkit/ete3/gseapy/plotly/esmfold 等重依赖——见 troubleshooting 的边界表。需要时用对应语义化工具（如 `bio_circuit_simulate` 首调自动装 bioscrape）。
+
+### 常见「库存在但 API 变」陷阱
+
+- **Biopython ≥1.88**：`SeqUtils.GC()` 已改名 `gc_fraction()`；`DNA` 类拆到 `Bio.Seq.DNA`；`pydna` 依赖的 `Bio.Seq` 行为可能随版本漂移。
+- **cobra 0.32+**：`optknock` 已从 `cobra.flux_analysis` 移除（插件内部用贪心版）；`flux_variability_analysis` 在 Windows 需 `processes=1`。
+- **dnachisel**：不要用旧 `V2` 入口（v3.x 用 `DnaOptimizationProblem`，`resolve_constraints()` + `optimize()`）。
+- **pydna**：传递依赖会把 `pyparsing` 降级到 2.4.7 破坏 matplotlib——若你写 bio_python 同时 import pydna 和 matplotlib，先确认 `pip show pyparsing` ≥3.1。
+
 
 ## 3. 代码模板速查
 

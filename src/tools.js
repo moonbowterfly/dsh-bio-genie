@@ -185,42 +185,50 @@ export function registerTools(ctx, config) {
   disposers.push(ctx.tools.register(defineTool({
     name: 'bio_env',
     description:
-      '检查内置 Biopython 环境：解释器路径、Python/Biopython/numpy 版本、环境目录。' +
-      '用于诊断 import 失败。reinstall=true 时重新引导环境。触发词：环境、biopython版本、环境状态。',
+      '检查内置 Biopython 环境：解释器路径、Python/Biopython 版本、环境目录、' +
+      '**核心库可用性清单**（libraries: bio/cobra/primer3/dnachisel/sbol3/pydna 等的安装状态与层级 builtin/auto/addon）。' +
+      '写 bio_python 代码前先调本工具确认哪些库可用；某库未装时看其层级：auto=首次调用对应工具会自动安装，addon=需在设置面板安装。' +
+      'reinstall=true 时重新引导环境。触发词：环境、库清单、有哪些库、库版本、环境状态、import 失败。',
     parameters: {
       reinstall: { type: 'boolean', description: '重新引导/升级环境（默认 false）' },
     },
     output: {
-      schema: {
-        type: 'object',
-        additionalProperties: false,
-        properties: {
-          ready: { type: 'boolean', required: true },
-          python: { type: 'string' },
-          pythonVersion: { type: 'string' },
-          biopython: { type: 'string' },
-          numpy: { type: 'string' },
-          envDir: { type: 'string', required: true },
-          bootstrapped: { type: 'boolean', required: true },
-        },
-      },
+      schema: { type: 'object', additionalProperties: true },
       render: (_args, value) => [{
         type: 'text',
         text: value.ready
-          ? `Biopython 环境就绪（Python ${value.pythonVersion ?? '?'} / biopython ${value.biopython ?? '?'} / numpy ${value.numpy ?? '?'}）：${value.python}`
+          ? `Biopython 环境就绪（Python ${value.pythonVersion ?? '?'} / biopython ${value.biopython ?? '?'}）：${value.python}\n` +
+            `可用库 ${value.n_libraries_installed ?? 0}/${(value.n_libraries_installed ?? 0) + (value.n_libraries_missing ?? 0)}` +
+            (value.missing_libraries?.length ? `；未装: ${value.missing_libraries.join(', ')}` : '；全部核心库可用')
           : 'Biopython 环境未就绪，请检查网络后重试或查看 dsh 日志。',
       }],
     },
     async execute(args) {
       const env = await ensureEnvironment(config, { force: args.reinstall === true })
+      if (!env.ready) {
+        return {
+          ready: false,
+          python: env.python ?? null,
+          pythonVersion: env.pythonVersion ?? null,
+          envDir: env.envDir,
+          bootstrapped: env.bootstrapped === true,
+        }
+      }
+      // 环境就绪：追加核心库可用性清单（env_status op）
+      let libs = null
+      try {
+        const res = await callBio(env.python, 'env_status', {}, { timeoutMs: 60_000 })
+        if (res.ok && res.result) libs = res.result
+      } catch { /* 探测失败不阻塞环境状态返回 */ }
       return {
-        ready: env.ready === true,
+        ready: true,
         python: env.python ?? null,
         pythonVersion: env.pythonVersion ?? null,
         biopython: env.biopython ?? null,
         numpy: env.numpy ?? null,
         envDir: env.envDir,
         bootstrapped: env.bootstrapped === true,
+        ...(libs ?? {}),
       }
     },
   })))

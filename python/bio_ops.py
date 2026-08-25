@@ -626,8 +626,62 @@ def op_ref_genome(args):
 
 
 def op_env_status(args):
-    """环境状态：Python 版本、Biopython 版本。"""
+    """环境状态：Python 版本 + 核心库可用性探测。
+    让 agent 先调本工具确认 venv 有哪些库可用，再决定用哪个工具/怎么写 bio_python 代码。
+    """
     import sys
+    import importlib.util as ilu
+
+    # 核心库探测：模块名 → (pip 包名, 层级, 用途)
+    CORE_LIBS = [
+        ('Bio',        'biopython',               'builtin', '序列/比对/BLAST/Entrez/PDB/Phylo/motifs/Restriction'),
+        ('numpy',      'numpy',                   'builtin', '数值计算'),
+        ('pandas',     'pandas',                  'builtin', '表格数据'),
+        ('scipy',      'scipy',                   'builtin', '统计/数值（含 scipy.stats.false_discovery_control）'),
+        ('sklearn',    'scikit-learn',            'builtin', '机器学习'),
+        ('statsmodels','statsmodels',             'builtin', '统计建模'),
+        ('matplotlib', 'matplotlib',              'builtin', '绘图'),
+        ('seaborn',    'seaborn',                 'builtin', '统计图'),
+        ('PIL',        'Pillow',                  'builtin', '图像'),
+        ('reportlab',  'reportlab',               'builtin', 'PDF/GenomeDiagram 后端'),
+        ('cobra',      'cobra',                   'builtin', '代谢建模 FBA/FVA/OptKnock'),
+        ('primer3',    'primer3-py',              'builtin', '工业级引物设计'),
+        ('dnachisel',  'dnachisel',               'builtin', '多约束 DNA 优化'),
+        ('dna_features_viewer', 'dna-features-viewer', 'builtin', '质粒图'),
+        ('sbol3',      'sbol3',                   'builtin', 'SBOL 3 读写'),
+        ('tyto',       'tyto',                    'builtin', '本体查询'),
+        ('requests',   'requests',                'builtin', 'HTTP API'),
+        ('pydna',      'pydna',                   'auto',   '克隆模拟（首调自动装）'),
+        ('biocrnpyler','biocrnpyler',             'auto',   '基因回路编译（首调自动装）'),
+        ('bioscrape',  'bioscrape',               'auto',   '回路仿真（首调自动装）'),
+        ('networkx',   'networkx',                'auto',   '网络图'),
+        ('scanpy',     'scanpy',                  'addon',  '单细胞（设置面板安装）'),
+        ('pysam',      'pysam',                   'addon',  'NGS（设置面板安装）'),
+    ]
+
+    def version(mod_name):
+        try:
+            mod = __import__(mod_name)
+            v = getattr(mod, '__version__', None)
+            return v if v else 'present'
+        except ImportError:
+            return None
+        except Exception:
+            return 'present'
+
+    libs = []
+    for mod, pip, layer, purpose in CORE_LIBS:
+        v = version(mod)
+        libs.append({
+            'import_name': mod,
+            'pip_package': pip,
+            'layer': layer,
+            'installed': v is not None,
+            'version': v,
+            'purpose': purpose,
+        })
+    installed = [l for l in libs if l['installed']]
+    missing = [l for l in libs if not l['installed']]
     try:
         import Bio
         bio_version = Bio.__version__
@@ -637,6 +691,11 @@ def op_env_status(args):
         'python': sys.version.split()[0],
         'python_path': sys.executable,
         'biopython': bio_version,
+        'n_libraries_installed': len(installed),
+        'n_libraries_missing': len(missing),
+        'libraries': libs,
+        'missing_libraries': [l['pip_package'] for l in missing],
+        'note': 'builtin=环境引导时内置；auto=首次调用对应药工具时自动 uv pip install；addon=需在设置面板手动安装。',
     }
 
 
