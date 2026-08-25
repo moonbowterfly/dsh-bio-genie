@@ -987,6 +987,24 @@ function semanticTools(config) {
       op: 'crispr_verify',
       timeoutMs: 30_000,
     }),
+    // ---- DNA 合成约束检查（2026-08-25 新增）----
+    bioTool(config, {
+      name: 'bio_dna_syncheck',
+      description:
+        'DNA 合成约束检查：检测序列是否可被合成公司（Twist/IDT/GeneScript）成功合成。' +
+        '检查项：长度上限、全局/窗口 GC、同聚物（≥8bp）、连续重复、潜在发夹结构、常用限制性位点（信息提示）。' +
+        '输出可合成性评分（0-100）+ critical/warning/info 分级问题列表。' +
+        '触发词：DNA 合成检查、可合成性评估、序列能不能合成、合成约束、Twist 兼容性。',
+      parameters: {
+        sequence: { type: 'string', required: true, description: 'DNA 序列' },
+        min_gc_window: { type: 'number', description: '窗口 GC 下限%，默认 25' },
+        max_gc_window: { type: 'number', description: '窗口 GC 上限%，默认 65' },
+        homopolymer_threshold: { type: 'number', description: '同聚物报警阈值 bp，默认 8' },
+        poly_run_min: { type: 'number', description: '连续重复报警阈值 bp，默认 6' },
+      },
+      op: 'dna_syncheck',
+      timeoutMs: 30_000,
+    }),
     // ---- Phase 2：SBOL 3 标准化读写 ----
     bioTool(config, {
       name: 'bio_sbol_write',

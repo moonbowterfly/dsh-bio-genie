@@ -161,7 +161,7 @@ X 与 gap 在翻译时按未知碱基处理（Biopython 标准行为），含 X/
 
 ### 它是什么
 
-- **人设文件**（`preset/bio-genie/preset.yml` + `agent.cordis.yml`）——覆盖 base persona，告诉 AI「你手头有 51 个工具 + 49 个 skill」。
+- **人设文件**（`preset/bio-genie/preset.yml` + `agent.cordis.yml`）——覆盖 base persona，告诉 AI「你手头有 52 个工具 + 49 个 skill」。
 - **入门口诀**（`skills/dsh-bio-genie-expert.md`）——一个 meta-skill：「先看工作区 → 二选一（语义化工具 / `bio_python`） → 失败按 ACR 三层修 → 报告带可追溯链」。
 - **一键安装**：`pnpm install` 跑 postinstall 钩子会自动把 preset 复制到 `~/.dsh/.agent-presets/bio-genie/`；无需手动操作。
 
