@@ -33,6 +33,8 @@ pwd && ls -la && ls -la data/ 2>/dev/null
 | **通路搜索/设计** | `bio_pathway_search` / `bio_pathway_design` | KEGG 通路查询 |
 | **ML 分析** | `bio_ml_pipeline` / `bio_ml_reduce` / `bio_ml_cluster` / `bio_ml_feature` / `bio_stats_test` | 分类/回归/降维/聚类/统计 |
 | **DNA/质粒设计** | `bio_primer_design` / `bio_seq_optimize` / `bio_assembly_design` / `bio_plasmid_map` | 引物/密码子优化/组装/图谱 |
+| **克隆/合成验证** | `bio_clone_simulate` / `bio_crispr_guide` / `bio_crispr_verify` / `bio_dna_syncheck` | 组装模拟/向导设计/编辑验证/合成检查 |
+| **湿实验方案** | `bio_wetlab_design`（干实验产物 → protocol；**拿到 generation_contract 后结合现实场景发挥，不要手写模板**） | 事实锚点由代码生成，杜绝手感拍体积 |
 | BLAST/多序列比对/建树 | `bio_blast_search` / `bio_msa` / `bio_phylo_build` | MSA 输出可直接建树 |
 | 差异表达/GSEA | `bio_deseq2` / `bio_gsea`（Python 实现） | — |
 | 复杂 Biopython（PDB/Phylo/motif） | `bio_python`（写 Python 代码） | — |

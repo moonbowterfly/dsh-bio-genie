@@ -1,6 +1,6 @@
 {
   "name": "@dsh-bio/dsh-bio-genie",
-  "version": "0.6.21",
+  "version": "0.6.22",
   "description": "生物信息学「许愿式分析」插件：Python 执行器（bio_python：Biopython 全功能 + 出版级绘图）+ 46 个高频语义化工具（差异表达/GSEA、代谢建模/FBA、合成生物学设计、CRISPR、ML、文献检索等）+ 47 个 skill（1 主 skill + 17 领域配方 + 17 协议 + 4 研究方法 + 8 agent 指南）+ 零依赖自举 Python 环境（uv+venv 自动下载到插件私有目录）。用户下载安装即可许愿式分析。",
   "type": "module",
   "main": "index.js",

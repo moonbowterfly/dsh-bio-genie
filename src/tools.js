@@ -1045,13 +1045,17 @@ function semanticTools(config) {
     bioTool(config, {
       name: 'bio_wetlab_design',
       description:
-        '湿实验方案设计：把干实验结论转化为可执行的湿实验 protocol。' +
-        '支持 7 种方案类型：pcr_amplification（PCR 扩增）、gibson_assembly（Gibson 组装）、' +
-        'golden_gate（Golden Gate 组装）、restriction_cloning（限制酶克隆）、' +
-        'crispr_editing（CRISPR 编辑）、strain_construction（菌株构建）、transformation（转化）。' +
-        '输入上游工具输出（bio_primer3_design/bio_clone_simulate/bio_crispr_guide/bio_gene_knockout optknock 等），' +
-        '输出完整 protocol（试剂/条件/预期结果/质量控制/注意事项）。' +
-        '触发词：湿实验方案、PCR protocol、克隆方案、CRISPR 实验方案、菌株构建方案、转化方案。',
+              '湿实验方案设计：把干实验结论转化为可执行的湿实验 protocol。**生成湿实验方案时必须用本工具**（不要手写 protocol 模板）。' +
+              '返回结果自带 generation_contract（两层生成契约）：layer1_facts=代码计算的数值与领域常数（引用时标注来源）；' +
+              'assumptions=模板隐含前提（须逐条对照用户现实核验，不成立则修正并标 [推断]）；adapt_points=鼓励结合场景具体化的位置；' +
+              'hard_constraints=不可突破的硬约束（酶反应温度/同源臂区间/上游推导值）。' +
+              '你负责结合用户现实条件（试剂库存/设备/浓度/时间/菌株）在 adapt_points 上发挥，禁止突破 hard_constraints。' +
+              '支持 7 种方案类型：pcr_amplification（PCR 扩增）、gibson_assembly（Gibson 组装）、' +
+              'golden_gate（Golden Gate 组装）、restriction_cloning（限制酶克隆）、' +
+              'crispr_editing（CRISPR 编辑）、strain_construction（菌株构建）、transformation（转化）。' +
+              '输入上游工具输出（bio_primer3_design/bio_clone_simulate/bio_crispr_guide/bio_gene_knockout optknock 等），' +
+              '输出完整 protocol（试剂/条件/预期结果/质量控制/注意事项）。' +
+              '触发词：湿实验方案、PCR protocol、克隆方案、CRISPR 实验方案、菌株构建方案、转化方案。',
       parameters: {
         protocol_type: { type: 'string', required: true, enum: ['pcr_amplification', 'gibson_assembly', 'golden_gate', 'restriction_cloning', 'crispr_editing', 'strain_construction', 'transformation'], description: '方案类型' },
         input_data: { type: 'object', required: true, additionalProperties: true, description: '上游工具输出（dict）' },

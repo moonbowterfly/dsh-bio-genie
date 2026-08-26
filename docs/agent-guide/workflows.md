@@ -2,7 +2,7 @@
 language: mixed
 ---
 
-# 端到端工作流（13 个场景）
+# 端到端工作流（14 个场景）
 
 > 每个场景：用户愿望 → 工具调用序列 → 产出 → 注意点。命中场景按序列执行，不要跳步、不要发明步骤。**全部场景走 Python 引擎**（差异表达/GSEA 用语义化工具 bio_deseq2 / bio_gsea）。
 >
@@ -161,4 +161,21 @@ bio_gsea de_results_file=<de_results.csv> gene_sets=hallmark
 bio_python 跑：pandas 组装 → Shannon/Observed α 多样性 → wilcox 检验 → Bray-Curtis PCoA → PERMANOVA
 产出：alpha 表 + pcoa.png + R²/p 值 + 解读（效应方向、每组 n 小时标探索性）
 注意：丰度表行列方向（taxa 在行/列）必须先确认；中文图用 figurelib
+```
+
+## 14. 干实验 → 湿实验方案（两层生成契约）
+
+愿望："设计一份能直接做的 Gibson/PCR/CRISPR 湿实验方案。"
+
+```
+1. 先完成干实验事实层（列出上游工具输出：bio_clone_simulate 组装结果 / bio_primer3_design 引物 /
+   bio_crispr_guide 向导 / bio_gene_knockout optknock 敲除清单——缺失时先跑对应工具）
+2. bio_wetlab_design protocol_type=对应类型 input_data=<上游输出 dict>
+3. 读取返回的 generation_contract：
+   - assumptions 逐条对照用户现实（浓度/设备/菌株/库存/时间），不成立的提出修正并标 [推断]
+   - adapt_points 上结合场景具体化（体积换算、稀释、QC 数量、转化方式）
+   - hard_constraints 绝不突破（酶反应温度、同源臂区间、Tm 必须来自实算）
+4. 产出：完整 protocol md（事实锚点溯源 → 适应性调整[推断] → 可执行步骤），覆盖反应体系/条件/转化/验证/风险
+产出：result/<任务名>-protocol.md
+注意：禁止手写 protocol 模板绕过 bio_wetlab_design——事实层必须由代码生成
 ```
