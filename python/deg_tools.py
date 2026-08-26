@@ -46,7 +46,16 @@ def op_deseq2_python(args):
         return {'error': f'Invalid contrast format: {contrast}. Use "group1_vs_group2"'}
     group1, group2 = parts
     
-    # 获取样本分组
+    # 获取样本分组（友好守卫：meta 缺 sample/condition 列时给出可操作的引导，
+    # 而非裸 KeyError——用户 meta 常习惯用 group/treatment 等列名）
+    for col in ('sample', 'condition'):
+        if col not in meta.columns:
+            return {
+                'error': f"meta_file 缺少必需列 '{col}'，实际列: {list(meta.columns)}。"
+                         f"要求两列：sample（样本名，与 counts 列名一致）+ condition（分组，如 ctrl/trt）。"
+                         f"若你的分组列叫 group/treatment 等，请重命名为 condition 后重试。",
+                'hint': f'期望的 meta.csv 形如：sample,condition\\n s1,ctrl\\n s2,trt',
+            }
     groups = meta['condition'].unique()
     if group1 not in groups or group2 not in groups:
         return {'error': f'Groups not found: {group1}, {group2}. Available: {list(groups)}'}

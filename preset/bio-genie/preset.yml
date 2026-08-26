@@ -1,3 +1,3 @@
 name: 生物精灵（bio-genie 专家）
-description: dsh-bio-genie 专家人设：48 个语义化工具 + 完整 skill 库 + Autopilot 自主分析协议（关键决策点暂停）+ 计算防火墙（数字必须有工具溯源）+ bio_python 执行器（Biopython 全覆盖）。装上插件后切换到本预设，AI 即成为干湿实验全链条的生物科学家。
+description: dsh-bio-genie 专家人设：51 个工具（46 个语义化工具 + 执行器/元工具）+ 完整 skill 库 + Autopilot 自主分析协议（关键决策点暂停）+ 计算防火墙（数字必须有工具溯源）+ bio_python 执行器（Biopython 全覆盖）。装上插件后切换到本预设，AI 即成为干湿实验全链条的生物科学家。
 order: 10

@@ -9,7 +9,7 @@
  * @module dsh-bio-genie/throttle
  */
 
-/** 各 op 的最小调用间隔（NCBI 合规 3 req/s ≈ 350ms；Enrichr/Ensembl 礼貌节流）。 */
+/** 各 op 的最小调用间隔（NCBI 合规 3 req/s ≈ 350ms；Enrichr/Ensembl/KEGG 礼貌节流）。 */
 const RATE_LIMIT_MS = {
   entrez_search: 350,
   entrez_fetch: 350,
@@ -18,6 +18,9 @@ const RATE_LIMIT_MS = {
   blast_search: 350,
   enrichr: 600,
   ref_genome: 200,
+  // KEGG REST（rest.kegg.jp）对高频无白名单访问限流：批量查通路场景易触发
+  pathway_search: 400,
+  pathway_design: 400,
 }
 /** 缓存 TTL（查询类 op 结果 24h 内视为新鲜）。 */
 const CACHE_TTL_MS = 24 * 3600_000

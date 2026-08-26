@@ -45,10 +45,16 @@ def _entrez():
 
     Bio.Entrez 默认 3 试 × 15s 间隔，最坏 3×30+30=120s 恰好顶满工具层超时；
     收紧后最坏 2×20+5=45s，保留一次重试应对瞬断。
+    同时设置默认 email/tool 声明：匿名流量更易被 NCBI 限流，且无法溯源。
+    调用方传了 email 参数时会被覆盖为调用方的值。
     """
     from Bio import Entrez
     Entrez.max_tries = 2
     Entrez.sleep_between_tries = 5
+    if not getattr(Entrez, 'email', None):
+        # 插件级默认声明（NCBI 建议提供联系方式；用户可在调用参数里覆盖）
+        Entrez.email = 'dsh-bio-genie@users.noreply.github.com'
+        Entrez.tool = 'dsh-bio-genie'
     return Entrez
 
 # ---- 序列分析 ----
