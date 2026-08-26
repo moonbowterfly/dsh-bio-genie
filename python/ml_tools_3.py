@@ -63,15 +63,24 @@ def op_stats_test(args):
             cohens_d = (np.mean(data_groups[0]) - np.mean(data_groups[1])) / pooled_std
             effect_size = {'cohens_d': round(float(cohens_d), 4)}
 
-    # 各组描述统计
+    # 各组描述统计（仅数值列；chi2 场景 value_col 是分类变量，mean/std 无意义且会炸）
     desc = {}
+    numeric = all(pd.api.types.is_numeric_dtype(d) for d in data_groups)
     for g, d in zip(groups, data_groups):
-        desc[str(g)] = {
-            'n': len(d),
-            'mean': round(float(d.mean()), 4),
-            'std': round(float(d.std()), 4),
-            'median': round(float(d.median()), 4),
-        }
+        entry = {'n': len(d)}
+        if numeric:
+            entry.update({
+                'mean': round(float(d.mean()), 4),
+                'std': round(float(d.std()), 4),
+                'median': round(float(d.median()), 4),
+            })
+        else:
+            vc = d.value_counts()
+            entry.update({
+                'categories': {str(k): int(v) for k, v in vc.items()},
+                'note': 'value_col 为分类变量：仅计数，无数值统计',
+            })
+        desc[str(g)] = entry
 
     return {
         'test': test_name,

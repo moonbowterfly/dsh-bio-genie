@@ -152,7 +152,13 @@ def op_circuit_simulate(args):
     tp = args.get('timepoints') or {}
     if isinstance(tp, list):
         timepoints = np.array(tp, dtype=float)
+    elif isinstance(tp, (int, float)):
+        # 容错：agent 常把「点数」直接传成数字（tools.md 示例即如此）——
+        # 按总时长 [0, tp] 均分 200 点，而非裸 AttributeError
+        timepoints = np.linspace(0.0, float(tp), 200)
     else:
+        if not isinstance(tp, dict):
+            raise ValueError(f'timepoints 须为 {{start,end,points}} 对象、数字（总时长）或列表，收到: {type(tp).__name__}')
         timepoints = np.linspace(float(tp.get('start', 0)),
                                  float(tp.get('end', 200)),
                                  int(tp.get('points', 200)))

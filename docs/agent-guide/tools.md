@@ -2,7 +2,7 @@
 language: none
 ---
 
-# 工具全参考（53 个）
+# 工具全参考（51 个）
 
 > 每个工具：功能 → 参数（★=必填）→ 返回关键字段 → 典型触发词。**选工具第一优先，`bio_python` 执行器第二优先**。
 
@@ -52,6 +52,17 @@ language: none
 | limit | 条数（默认 10） |
 
 写非平凡代码前查 patterns 有无现成模板；bio_python 失败时查 lessons 命中错误签名直接套 fix_hint。经验会自动沉淀（失败→修复成功的配对）。
+
+### bio_goal — Autopilot 目标管理
+
+| 参数 | 说明 |
+|---|---|
+| action ★ | `create` 创建目标 / `status` 查看当前目标 / `pause` 暂停 / `resume` 恢复 / `complete` 标记完成 / `block` 标记阻塞 |
+| objective | 目标描述（action=create 必填） |
+| maxGoalRounds | 轮次预算上限（action=create 可选，默认框架配置 256） |
+| reason | 阻塞原因说明（action=block 必填，需用户输入用 code=need-human-input） |
+
+把复杂分析任务注册为框架级持久目标（带轮次预算与状态机），配合 bio-autopilot 协议使用。触发词：创建目标、任务目标、autopilot、暂停/恢复任务。
 
 ## 二、语义化工具
 
@@ -116,7 +127,7 @@ language: none
 
 ### 组学分析
 
-**bio_deseq2** — 差异表达分析（Python 实现）：`counts_file ★`（counts 矩阵 CSV）、`meta_file ★`（样本信息 CSV）、`contrast`（对比组，默认 `trt_vs_ctrl`）。返回差异基因表。触发词：差异表达。
+**bio_deseq2** — 差异表达分析（Python 实现）：`counts_file ★`（counts 矩阵 CSV，行=基因列=样本）、`meta_file ★`（样本信息 CSV，**必须含 `sample` 与 `condition` 两列**——condition 为分组列，取值如 ctrl/trt；用其他列名会报 KeyError）、`contrast`（对比组，格式 `trt_vs_ctrl`）。返回差异基因表。触发词：差异表达。
 
 **bio_gsea** — GSEA 富集分析（Python 实现）：`de_results_file ★`（差异表达结果 CSV）、`gene_sets`（基因集，默认 `hallmark`）。返回富集通路。触发词：GSEA、富集。
 
@@ -146,7 +157,7 @@ language: none
 
 **bio_fba** — 通量平衡分析（FBA）：`model_id`（默认 `textbook`）、`objective`（目标函数反应，可选）。返回最优生长速率、主要反应通量、代谢物影子价格。触发词：FBA、通量平衡、生长速率预测。
 
-**bio_gene_knockout** — 基因敲除分析：`model_id`（默认 `textbook`）、`gene`★（基因 ID 如 `b2779`）。返回敲除后生长速率、变化百分比、必需性判断。触发词：基因敲除、必需基因。
+**bio_gene_knockout** — 基因敲除分析：`model_id`（默认 `textbook`）、`analysis_type`（`single` 默认，此时 `gene`★ 必填，基因 ID 如 `b2779` / `essentiality` / `double` / `optknock` 模式下无需传 gene）。返回敲除后生长速率、变化百分比、必需性判断。触发词：基因敲除、必需基因。
 
 **bio_pathway_search** — 代谢通路搜索（KEGG）：`target_metabolite`★（目标代谢物/关键词）、`organism`（默认 `eco`）、`limit`（默认 10）。触发词：代谢通路、KEGG 通路。
 
@@ -172,13 +183,21 @@ language: none
 
 ### 合成生物学（Phase 1）
 
+**bio_crispr_guide** — CRISPR 向导 RNA 设计：`sequence ★`（靶序列）、`cas`（Cas 变体）、`gc_min`/`gc_max`（GC% 区间）、`max_offtargets`、`max_mismatches`、`top_n`。返回候选 gRNA 列表（GC%/脱靶风险评分排序）。触发词：CRISPR、gRNA、向导 RNA、基因编辑。
+
+**bio_crispr_verify** — CRISPR 编辑验证：`wild_type ★`（编辑前序列）、`edited ★`（编辑后序列）。返回比对长度/一致性/编辑摘要/突变清单/编辑效率估计。触发词：编辑验证、敲入敲除确认、测序结果核对。
+
+**bio_dna_syncheck** — DNA 合成可行性检查：`sequence ★`、`min_gc_window`/`max_gc_window`（窗口 GC 上下限）、`homopolymer_threshold`、`poly_run_min`。返回不可合成区域/需改序位点。触发词：合成可行性、gene synthesis、合成难度。
+
+**bio_wetlab_design** — 湿实验方案生成：`protocol_type ★`（pcr_amplification / gibson_assembly / golden_gate / restriction_cloning / crispr_editing / strain_construction / transformation）、`input_data ★`（上游工具输出的 **dict 对象**，如 bio_primer3_design / bio_clone_simulate 的返回）、`host_organism`、`scale`（small/medium/large）。返回完整 protocol（试剂体系/反应条件/QC）。触发词：实验方案、protocol、湿实验步骤。
+
 **bio_primer3_design** — 工业级引物设计（Primer3）：`sequence ★`、`target_region [start,len]`、`primer_size`/`tm_range`/`gc_range`、`max_hairpin_tm`/`max_self_any_tm`、`num_return`（默认 5）。返回候选引物对（Tm/GC%/发夹/二聚体评分 + penalty 排序，rank 1 推荐；`position` 为 **0-based** Primer3 约定）。与 bio_primer_design（简单版）区分：需要可投稿级引物质量时用本工具。触发词：Primer3、工业级引物、qPCR 引物。依赖说明：primer3-py 属第二层按需依赖（auto），首次调用本工具时运行时自动补装，无需手动操作。
 
 **bio_dna_optimize** — 多约束 DNA 优化（DNA Chisel）：`protein_sequence` 或 `dna_sequence`（二选一）、`host_organism`（默认 e_coli）、`constraints`（remove_restriction_sites/gc_range/avoid_motifs）、`codon_optimize`（默认 true）。保持氨基酸不变，多约束满足后做密码子优化，返回优化序列 + 修改报告。与 bio_seq_optimize（简单替换）区分。触发词：多约束优化、去除酶切位点、DNA Chisel。依赖说明：dnachisel 属第二层按需依赖（auto），首次调用时自动补装（PyPI 上限 3.2.16，安装约束 >=3.2,<4）。
 
 **bio_clone_simulate** — 克隆模拟（pydna，**第二层依赖，首次调用自动安装**）：`backbone ★`、`inserts ★`（[{name,sequence}]）、`method`（gibson/golden_gate/restriction/ligation）、`overlap`（Gibson 同源臂下限，默认 20）、`restriction_enzymes`。Gibson 返回预期产物序列；Golden Gate/酶切做位点可行性检查。触发词：克隆模拟、Gibson 组装模拟、质粒构建验证。
 
-**bio_sbol_write** — SBOL 3 写出：`components ★`（[{name,type,sequence,role}]）、`output_file ★`、`namespace`。role 经 tyto 解析为 SO 本体 URI。返回写入路径 + 组件数。触发词：SBOL、标准化设计导出。
+**bio_sbol_write** — SBOL 3 写出：`components ★`（[{name,type,sequence,role}]）、`output_file ★`（**必须用 `.xml`/`.rdf`/`.ttl`/`.json` 扩展名**——pySBOL3 按扩展名识别格式，其他扩展名报 "Unable to determine file format"）、`namespace`。role 经 tyto 解析为 SO 本体 URI。返回写入路径 + 组件数。触发词：SBOL、标准化设计导出。
 
 **bio_sbol_read** — SBOL 3 读取：`sbol_file ★`、`include_sequences`（默认 true）。返回组件列表（types/roles URI + 关联序列）。触发词：SBOL 读取、SBOL 解析。
 
@@ -192,6 +211,6 @@ language: none
 
 ### 基因回路建模（Phase 3，第二层按需安装）
 
-**bio_circuit_compile** — 基因回路编译（BioCRNpyler，**第二层依赖，首次调用自动安装**）：`components ★`（[{type: promoter|rbs|cds|terminator, name, regulators?}]）、`extract`（默认 txtl_extract）、`output_sbml`（输出路径）、`plot_network`（默认 true）。组装 DNA_construct → TxTlExtract → compile_crn()，返回 SBML 路径 + 物种数/反应数 + networkx 网络图 PNG。触发词：基因回路、回路编译、repressilator、CRN。
+**bio_circuit_compile** — 基因回路编译（BioCRNpyler，**第二层依赖，首次调用自动安装**）：`components ★`（[{type: promoter|rbs|cds|terminator, name, regulators?}]）、`extract`（默认 txtl_extract）、`out_file`（SBML 输出路径，可选，默认工作区 `<name>.xml`；⚠️ 参数名是 `out_file`，无 `output_sbml` 参数）、`plot_network`（默认 true）。组装 DNA_construct → TxTlExtract → compile_crn()，返回 SBML 路径 + 物种数/反应数 + networkx 网络图 PNG。触发词：基因回路、回路编译、repressilator、CRN。
 
 **bio_circuit_simulate** — 回路动力学仿真（Bioscrape，**第二层依赖，首次调用自动安装**）：`sbml_file ★`（bio_circuit_compile 的输出）、`simulation_type`（ode 默认 / ssa 随机模拟）、`time_end`/`timepoints`、`param_overrides`（参数覆盖 dict）。返回动力学曲线图 PNG（matplotlib，物种浓度 vs 时间）+ 稳态值 + 峰值时间。触发词：回路仿真、动力学模拟、SSA 随机模拟。

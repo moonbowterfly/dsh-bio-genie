@@ -24,7 +24,7 @@ import { fileURLToPath } from 'node:url'
 import { pipeline } from 'node:stream/promises'
 import { Readable } from 'node:stream'
 import os from 'node:os'
-import { EXTRA_DEPS, EXTRA_IMPORT_NAMES, EXTRA_NO_DEPS, ADDON_MODULES } from './extra-deps.js'
+import { EXTRA_DEPS, EXTRA_NO_DEPS, ADDON_MODULES } from './extra-deps.js'
 
 /** Absolute path to the installed plugin root (parent of this src/ dir). */
 export const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -417,18 +417,19 @@ async function repairPackages(exe, missing) {
 
 /**
  * 第二层按需依赖（src/extra-deps.js 的 EXTRA_DEPS）：op 首次调用前检测
- * 其声明的额外包是否可 import，缺失则用已下载的 uv 就地补装（幂等、镜像回退）。
- * 返回 { ok, missing[], installed[], error? }；op 无额外依赖时直接 ok。
+ * 其声明的额外包是否已安装且满足版本约束，缺失/不满足则用已下载的 uv
+ * 就地补装（幂等、镜像回退）。返回 { ok, missing[], installed[], error? }；
+ * op 无额外依赖时直接 ok。
+ *
+ * ⚠️ 探测必须是「发行版元数据 + 版本约束」双检查（v0.6.19 教训）：纯 `import X`
+ * 探测不看版本——pyparsing 2.4.7 能成功 import，导致 `pyparsing>=3.1` 护栏被判
+ * 「不缺」；随后安装 pydna 时其传递依赖把全局 pyparsing 拉低到 2.4.7，静默毒害
+ * matplotlib（_fontconfig_pattern 需要 pyparsing3 的 one_of）。
  */
 export async function ensureExtraDeps(op, exe, { timeoutMs = 600_000 } = {}) {
   const extra = EXTRA_DEPS[op]
   if (!extra || extra.length === 0) return { ok: true, missing: [], installed: [] }
-  const missing = []
-  for (const pkg of extra) {
-    const mod = EXTRA_IMPORT_NAMES[pkg] ?? pkg.replace(/-/g, '_')
-    const probe = run(exe, ['-I', '-c', `import ${mod}`], { timeoutMs: 60_000 })
-    if (probe.code !== 0) missing.push(pkg)
-  }
+  let missing = await probeSpecs(exe, extra)
   if (missing.length === 0) return { ok: true, missing: [], installed: [] }
   const uv = uvBinary()
   if (!existsSync(uv)) {
@@ -437,6 +438,10 @@ export async function ensureExtraDeps(op, exe, { timeoutMs = 600_000 } = {}) {
   const pipMirror = pypiMirrorEnv()
   const errors = []
   const installed = []
+  // 带版本约束的护栏包排到最后安装：先装主体包（可能拉低传递依赖），再装护栏
+  // 把最终态扳回约束区间。顺序反了会被后续安装再次覆盖。
+  const rank = (pkg) => (hasVersionConstraint(pkg) ? 1 : 0)
+  missing = [...missing].sort((a, b) => rank(a) - rank(b))
   // 逐包安装：个别包需 --no-deps（EXTRA_NO_DEPS，如 biocrnpyler 的 fa2-modified
   // 无 Windows wheel），整批安装会让可装包被不可装包拖死
   for (const pkg of missing) {
@@ -454,7 +459,78 @@ export async function ensureExtraDeps(op, exe, { timeoutMs = 600_000 } = {}) {
   if (errors.length > 0) {
     return { ok: false, missing, installed, error: `自动安装失败: ${errors.join(' | ')}` }
   }
+  // 安装后复核：全部 spec 必须满足才放行。安装过程本身可能引入版本冲突
+  // （传递依赖降级），静默放行会毒害第一层栈——响亮失败让 agent/用户看到。
+  const stillBad = await probeSpecs(exe, extra)
+  if (stillBad.length > 0) {
+    return {
+      ok: false,
+      missing,
+      installed,
+      error: `自动安装后版本约束仍不满足: ${stillBad.join(', ')} —— 存在依赖冲突，请人工核查（如 uv pip install '${stillBad[0]}' 后重试）`,
+    }
+  }
   return { ok: true, missing, installed }
+}
+
+/** spec 是否带版本约束（如 'pyparsing>=3.1' vs 裸 'pydna'）。 */
+function hasVersionConstraint(pkg) {
+  return /[<>=!~]/.test(pkg)
+}
+
+/**
+ * 批量探测一组 spec（如 ['sbol3>=1.0', 'tyto>=1.4']）在目标解释器中的安装与
+ * 约束满足情况。单次子进程用 importlib.metadata 枚举（与 addonsStatus 同口径，
+ * 不真正 import 目标模块），返回未满足的 spec 列表。
+ */
+async function probeSpecs(exe, specs) {
+  const payload = JSON.stringify(specs)
+  const NL = String.fromCharCode(10)
+  const code = [
+    'import json, re',
+    'from importlib.metadata import version, PackageNotFoundError',
+    'SPECS = json.loads(r"""' + payload + '""")',
+    'def _vkey(v):',
+    '    parts = []',
+    '    for piece in re.split(r"[.]", str(v)):',
+    '        m = re.match(r"\\d+", piece)',
+    '        parts.append(int(m.group()) if m else 0)',
+    '    while len(parts) < 4:',
+    '        parts.append(0)',
+    '    return tuple(parts[:8])',
+    '_OPS = {">=": lambda a, b: a >= b, "<=": lambda a, b: a <= b,',
+    '        "==": lambda a, b: a == b, "!=": lambda a, b: a != b,',
+    '        ">": lambda a, b: a > b, "<": lambda a, b: a < b}',
+    'def _satisfied(spec):',
+    '    m = re.match(r"^([A-Za-z0-9][A-Za-z0-9._-]*)\\s*(.*)$", spec)',
+    '    name, rest = (m.group(1), m.group(2).strip()) if m else (spec, "")',
+    '    canon = re.sub(r"[-_.]+", "-", name.lower())',
+    '    try:',
+    '        ver = version(canon)',
+    '    except PackageNotFoundError:',
+    '        return False',
+    '    if not rest:',
+    '        return True',
+    '    for clause in [c.strip() for c in rest.split(",")]:',
+    '        cm = re.match(r"^(>=|<=|==|!=|>|<)\\s*(.+)$", clause)',
+    '        if not cm:',
+    '            return False',
+    '        if not _OPS[cm.group(1)](_vkey(ver), _vkey(cm.group(2))):',
+    '            return False',
+    '    return True',
+    'print(json.dumps({s: _satisfied(s) for s in SPECS}))',
+  ].join(NL)
+  const r = run(exe, ['-I', '-c', code], { timeoutMs: 60_000 })
+  if (r.code !== 0) {
+    // 元数据探测自身失败（解释器异常等）：保守起见按旧口径全量判缺，交给安装路径处理
+    return [...specs]
+  }
+  try {
+    const table = JSON.parse(r.stdout.trim().split('\n').pop())
+    return Object.entries(table).filter(([, ok]) => !ok).map(([spec]) => spec)
+  } catch {
+    return [...specs]
+  }
 }
 
 /**

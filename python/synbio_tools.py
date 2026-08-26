@@ -138,6 +138,10 @@ def op_dna_optimize(args):
     protein = args.get('protein_sequence')
     host = str(args.get('host_organism', 'e_coli'))
     constraints = args.get('constraints') or {}
+    if not isinstance(constraints, dict):
+        raise ValueError(
+            'constraints 须为对象 {"remove_restriction_sites": [...], "gc_range": [min,max], "avoid_motifs": [...]}，'
+            f'收到: {type(constraints).__name__}——如需约束请传 {{"gc_range": [40, 60]}} 形式')
     do_codon_opt = bool(args.get('codon_optimize', True))
 
     if dna:
