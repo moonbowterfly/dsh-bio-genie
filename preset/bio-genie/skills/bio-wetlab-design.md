@@ -20,6 +20,16 @@ category: guide
 | 代谢工程改造 | `bio_fba`/`bio_fva` 预测通量变化，锁定靶点后 `bio_pathway_design` 确认通路 |
 | 基因回路构建 | `bio_circuit_compile` + `bio_circuit_simulate` 仿真动力学，确认稳定态/切换行为 |
 
+## 方案生成契约（两层，2026-08-26 确立）
+
+`bio_wetlab_design` 返回值自带 `generation_contract` 字段，把「事实」与「发挥」的边界写明：
+
+- **Layer 1 事实锚点**（代码计算 + 领域常数查表）：酶反应条件、同源臂长度区间、上游工具推导数值——**原样引用并标注来源工具，不可擅改**。
+- **Layer 2 agent 适应层**：对照 `assumptions` 逐条核验用户现实场景（试剂库存/设备型号/片段浓度/样本特性），在 `adapt_points` 上具体化；改动处标注 `[推断]` 并给理由。
+- **硬约束 `hard_constraints`**：任何一层都不可突破（如 Gibson 组装温度恒定 50°C、退火温度必须来自 primer3 实算）。
+
+输出方案时按此结构组织：「事实锚点（溯源）→ 你的适应性调整（[推断] 标注）→ 最终可执行 protocol」。禁止把 Layer 1 模板当最终答案原样转述。
+
 ## 方案输出模板
 
 ```

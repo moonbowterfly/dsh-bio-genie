@@ -45,7 +45,60 @@ def op_wetlab_design(args):
     }
     if protocol_type not in dispatch:
         return {'error': f'未知 protocol_type: {protocol_type}，支持: {list(dispatch.keys())}'}
-    return dispatch[protocol_type](input_data, host, scale)
+    result = dispatch[protocol_type](input_data, host, scale)
+    if isinstance(result, dict) and 'error' not in result:
+        # 两层生成契约：Layer 1 代码事实锚点（本返回值）+ Layer 2 agent 适应性发挥。
+        # assumptions 列出本模板隐含的前提，agent 必须逐条对照用户现实核验；
+        # adapt_points 是鼓励 agent 结合场景具体化的位置；hard_constraints 任何层不可动。
+        result['generation_contract'] = {
+            'layer1_facts': '本返回值中的数值为代码计算/领域常数查表结果（事实锚点），引用时标注来源',
+            'layer2_agent': '结合用户实际场景（试剂库存、设备型号、片段实测浓度、样本特性）具体化方案；改动处标注 [推断] 并说明理由',
+            'assumptions': [
+                '试剂为常规在保库存（酶活性正常，未反复冻融）',
+                'DNA 片段浓度可用 Nanodrop/Qubit 实测（未提供时按典型浓度估算）',
+                '常规热循环仪/金属浴（无特殊设备要求）',
+                '标准实验室菌株与培养基体系',
+            ],
+            'adapt_points': [
+                '试剂体积按实测浓度换算（等摩尔比的质量比需片段长度）',
+                '转化方式（化学 vs 电转）按实验室既有条件选择',
+                'QC 克隆数按连接效率预期调整',
+                '抗性标记/培养条件按载体实际标记确认',
+            ],
+            'hard_constraints': HARD_CONSTRAINTS.get(protocol_type, []),
+        }
+    return result
+
+
+# 各 protocol 的硬约束（任何层不可突破的领域常数/上游推导值）
+HARD_CONSTRAINTS = {
+    'pcr_amplification': [
+        '退火温度必须来自 primer3 实算 Tm（min(左Tm,右Tm)−3°C），禁止手估',
+        '延伸温度恒定 72°C（高保真聚合酶）',
+    ],
+    'gibson_assembly': [
+        '组装反应温度恒定 50°C',
+        '同源臂长度必须在 15-40bp 区间',
+        '线性化载体末端不得有 3\' 突出',
+    ],
+    'golden_gate': [
+        '反应温度循 BsaI/BsmBI 标准循环（37°C/16°C 循环）',
+        '同义突出端不得互相兼容（防自连）',
+    ],
+    'restriction_cloning': [
+        '连接比例（载体:插入 摩尔比 1:3~1:10）按片段大小换算质量',
+        '酶切位点不得存在于插入序列内部（上游 bio_seq_restriction 已验证）',
+    ],
+    'crispr_editing': [
+        'sgRNA 序列必须来自 bio_crispr_guide 输出，不可手改',
+        'PAM（NGG）紧邻靶序列，编辑窗口位置不可移',
+    ],
+    'strain_construction': [
+        '敲除基因清单必须来自 bio_gene_knockout optknock 输出',
+        '必需基因（essentiality=essential）不可作为敲除靶点',
+    ],
+    'transformation': [],
+}
 
 
 def _design_pcr(data, host, scale):
@@ -133,6 +186,30 @@ def _design_gibson(data, host, scale):
     if not inserts:
         return {'error': '需要 inserts 参数（来自 bio_clone_simulate 输出）'}
 
+    # 等摩尔比的质量比换算（Layer 1 事实计算）：质量比 = 长度比。
+    # backbone/inserts 可传 str（序列）或 dict({sequence})，取不到序列时长度记 None。
+    def _seq_len(frag):
+        if isinstance(frag, str):
+            return len(frag.replace(' ', '').strip())
+        if isinstance(frag, dict):
+            s = frag.get('sequence') or ''
+            return len(s) if s else frag.get('length')
+        return None
+
+    bb_len = _seq_len(backbone) if backbone else None
+    ins_lens = [_seq_len(f) for f in inserts]
+    known = [L for L in ([bb_len] + ins_lens) if isinstance(L, int) and L > 0]
+    molar_mix = None
+    if len(known) == 1 + len(ins_lens) and all(isinstance(L, int) for L in [bb_len] + ins_lens):
+        base = bb_len
+        ratios = [round(L / base, 2) for L in ins_lens]
+        molar_mix = {
+            'basis': '等摩尔比 → 质量比 = 片段长度比（以载体为 1）',
+            'backbone_ratio': 1.0,
+            'insert_mass_ratios': ratios,
+            'note': f'载体 {base}bp 时，各插入片段按质量的 {ratios} 倍加入（相对载体量）',
+        }
+
     n_fragments = len(inserts) + 1  # backbone + inserts
     # Gibson 反应体系
     volumes = {
@@ -141,7 +218,7 @@ def _design_gibson(data, host, scale):
     }
     v = volumes.get(scale, volumes['small'])
 
-    return {
+    result = {
         'protocol_type': 'gibson_assembly',
         'reagents': {
             'backbone': f'{v["backbone"]} μL（~50 ng）',
@@ -156,6 +233,7 @@ def _design_gibson(data, host, scale):
         },
         'overlap_design': {
             'overlap_length': f'{overlap} bp',
+            'in_range': 15 <= int(overlap or 0) <= 40,
             'note': '每个片段两端需有 15-40bp 同源臂（与相邻片段重叠）',
         },
         'transformation': {
@@ -172,9 +250,14 @@ def _design_gibson(data, host, scale):
         'notes': [
             '片段等摩尔比混合（质量比 = 片段大小比）',
             'Gibson 组装效率随片段数增加而下降，>5 片段建议分步组装',
-            '线性化载体末端避免有 3\' 突出（外切酶活性会降解）',
+            "线性化载体末端避免有 3' 突出（外切酶活性会降解）",
         ],
     }
+    if molar_mix:
+        result['molar_to_mass'] = molar_mix
+    else:
+        result['notes'].append('未提供全部片段长度——等摩尔比的质量换算需各片段 bp 数（agent 可向上游 bio_clone_simulate 输出回查）')
+    return result
 
 
 def _design_golden_gate(data, host, scale):
