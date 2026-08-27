@@ -2,7 +2,7 @@
 language: none
 ---
 
-# Skill 体系导航（46 个）
+# Skill 体系导航（47 个注册条目）
 
 > skill 是插件内置的可加载知识库（配方/工作流/坑）。加载方式：用 skill 工具按名字加载。**写非平凡代码前先加载对应领域 skill；命中协议场景直接加载协议。**
 
@@ -116,3 +116,14 @@ language: none
 | `dsh-bio-genie-guide-plotting` | 绘图专题 |
 | `dsh-bio-genie-guide-troubleshooting` | 故障排查与边界 |
 | `dsh-bio-genie-guide-rigor` | 严谨性与报告规范 |
+
+## 六、preset 自带 skill（`preset/bio-genie/skills/`，随 bio-genie 预设安装，不走 SKILL_MANIFEST）
+
+| skill | 用途 |
+|---|---|
+| `dsh-bio-genie-expert` | preset 入门口诀（meta-skill）：先看工作区 → 二选一（语义化工具 / bio_python）→ ACR 修复 → 可追溯报告 |
+| `bio-autopilot` | Autopilot 自主分析协议：分析计划、自动执行、关键决策检查点（配合 `bio_goal` 工具） |
+| `bio-project-chain` | 项目链式管理：多步骤分析项目的状态串联 |
+| `bio-wetlab-design` | 湿实验方案引导（配合 `bio_wetlab_design` 工具与两层生成契约） |
+
+> 注意：`bio-survival-analysis` / `bio-variant-analysis` / `bio-literature-review` / `bio-paper-writing` 4 个研究方法 skill 同时存在于 `skills/`（SKILL_MANIFEST 注册）与 preset 目录，内容以 `skills/` 为准。

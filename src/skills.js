@@ -283,7 +283,7 @@ export const GUIDE_MANIFEST = [
   {
     name: 'dsh-bio-genie-guide-tools',
     category: 'guide',
-    description: '51 个工具完整参考：每个工具的参数/返回字段/典型触发词 + 愿望→工具选择速查 + 缓存限流说明。',
+    description: '53 个工具完整参考：每个工具的参数/返回字段/典型触发词 + 愿望→工具选择速查 + 缓存限流说明。',
     whenToUse: '不确定某个 bio_* 工具的参数、返回结构或选哪个工具时。',
     file: 'tools.md',
   },

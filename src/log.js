@@ -11,7 +11,7 @@
  *
  * @module dsh-bio-genie/log
  */
-import { appendFile, mkdir, readFileSync, readdirSync, existsSync } from 'node:fs'
+import { appendFile, mkdir, readFileSync, readdirSync, existsSync, statSync, unlinkSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 import { bioRoot } from './runtime.js'
@@ -24,6 +24,47 @@ export function logDir(base) {
 function logFileFor(dateStr, base) {
   return join(logDir(base), `${dateStr}.jsonl`)
 }
+
+/** 日志保留天数：超过 30 天的 *.jsonl 自动清理。 */
+export const LOG_RETENTION_DAYS = 30
+
+/**
+ * 30 天轮转：删除日志目录中修改时间早于 retentionDays 的 *.jsonl。
+ * 防竞态：删除前二次 stat 复核 mtime（若并发实例刚写入导致 mtime 更新则跳过），
+ * 单文件失败与整体失败均静默——日志清理绝不影响分析主流程。
+ * @param {string} [base] 覆盖日志根目录（测试用）
+ * @param {number} [retentionDays]
+ * @returns {string[]} 实际删除的文件名
+ */
+export function rotateLogs(base, retentionDays = LOG_RETENTION_DAYS) {
+  const removed = []
+  try {
+    const dir = logDir(base)
+    if (!existsSync(dir)) return removed
+    const cutoff = Date.now() - retentionDays * 24 * 3600 * 1000
+    for (const f of readdirSync(dir)) {
+      if (!f.endsWith('.jsonl')) continue
+      const p = join(dir, f)
+      try {
+        const st = statSync(p)
+        if (!st.isFile() || st.mtimeMs >= cutoff) continue
+        // 删除前再次 stat 复核：mtime 变化（并发写入）则放弃删除
+        const st2 = statSync(p)
+        if (!st2.isFile() || st2.mtimeMs !== st.mtimeMs || st2.mtimeMs >= cutoff) continue
+        unlinkSync(p)
+        removed.push(f)
+      } catch {
+        /* 单文件失败静默 */
+      }
+    }
+  } catch {
+    /* 轮转整体失败静默 */
+  }
+  return removed
+}
+
+/** 每进程只轮转一次，避免每次写日志都扫描目录。 */
+let rotatedThisProcess = false
 
 /** 代码 sha256（16 位短哈希，够用于去重/回溯且不泄全文）。 */
 export function codeHash(code) {
@@ -39,6 +80,10 @@ let writeChain = Promise.resolve()
  * @param {string} [base] 覆盖日志根目录（测试用）
  */
 export function appendLog(entry, base) {
+  if (!rotatedThisProcess) {
+    rotatedThisProcess = true
+    rotateLogs(base) // 30 天轮转（每进程一次，内部失败静默）
+  }
   const dir = logDir(base)
   const dateStr = new Date().toISOString().slice(0, 10)
   const record = { ts: new Date().toISOString(), ...entry }

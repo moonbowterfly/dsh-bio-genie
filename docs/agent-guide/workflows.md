@@ -171,6 +171,8 @@ bio_python 跑：pandas 组装 → Shannon/Observed α 多样性 → wilcox 检�
 1. 先完成干实验事实层（列出上游工具输出：bio_clone_simulate 组装结果 / bio_primer3_design 引物 /
    bio_crispr_guide 向导 / bio_gene_knockout optknock 敲除清单——缺失时先跑对应工具）
 2. bio_wetlab_design protocol_type=对应类型 input_data=<上游输出 dict>
+   （选型前提：strain_construction 仅用于敲除增产——input_data 必须含 knockouts/recommended_knockouts，
+   否则返回 guidance 引导而非方案；非敲除场景如过表达/异源表达改用 transformation 或 crispr_editing）
 3. 读取返回的 generation_contract：
    - assumptions 逐条对照用户现实（浓度/设备/菌株/库存/时间），不成立的提出修正并标 [推断]
    - adapt_points 上结合场景具体化（体积换算、稀释、QC 数量、转化方式）

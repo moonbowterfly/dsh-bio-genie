@@ -238,7 +238,7 @@ export function registerTools(ctx, config) {
     name: 'bio_log',
     description:
       '查询 dsh-bio-genie 执行日志：回溯之前 bio_python 跑过什么代码（哈希/预览/耗时/结果类型）' +
-      '和语义化工具的调用记录（op/成功/耗时/错误）。' +
+      '和语义化工具的调用记录（op/成功/耗时/错误）。日志按天落盘为 JSONL，自动 30 天轮转清理。' +
       'action=recent 返回最近 N 条；action=search 按关键词检索（如错误信息、op 名、代码片段）。' +
       '触发词：执行日志、回溯、之前跑过什么、查错误记录。',
     parameters: {
@@ -717,12 +717,15 @@ function semanticTools(config) {
         'loopless（消除热力学不可行循环）/ geometric（欧几里得通量范数最小化）/ ' +
         'optionsfva（完整通量范围，含固定反应）。' +
         'model_id 指定模型（默认 textbook，COBRApy 内置 E. coli core），objective 可指定目标函数反应。' +
+        '全库 FVA 输出约 95 反应、45KB 级；只关心少数反应时务必传 reactions（逗号分隔 reaction id，' +
+        '如 "EX_succ_e,PPC"）缩小输出，不存在的 id 会返回 hint 提示。' +
         '触发词：FBA、FVA、pFBA、loopless、geometric、通量平衡、通量可变性、代谢通量、生长速率预测。',
       parameters: {
         model_id: { type: 'string', description: '模型标识，默认 textbook（COBRApy 内置）' },
         objective: { type: 'string', description: '目标函数反应 ID（可选，默认使用模型目标）' },
         analysis_type: { type: 'string', enum: ['fba', 'fva', 'pfba', 'loopless', 'geometric', 'optionsfva'], description: '分析类型，默认 fba' },
         fraction_of_optimum: { type: 'number', description: 'FVA 专用：最优性比例，默认 1.0' },
+        reactions: { type: 'string', description: '可选：逗号分隔的 reaction id 列表（如 "EX_succ_e,PPC"），传参时 flux/flux_ranges 输出只包含这些反应；不存在的 id 返回带 hint 的提示' },
       },
       op: 'fba',
       timeoutMs: 300_000,
@@ -1053,6 +1056,9 @@ function semanticTools(config) {
               '支持 7 种方案类型：pcr_amplification（PCR 扩增）、gibson_assembly（Gibson 组装）、' +
               'golden_gate（Golden Gate 组装）、restriction_cloning（限制酶克隆）、' +
               'crispr_editing（CRISPR 编辑）、strain_construction（菌株构建）、transformation（转化）。' +
+              '各 protocol_type 适用前提：strain_construction 仅用于基因敲除增产场景——input_data 必须含 knockouts/' +
+              'recommended_knockouts（来自 bio_gene_knockout optknock）；非敲除场景（过表达/异源表达）请用 ' +
+              'transformation（质粒转化）或 crispr_editing（敲入/定点编辑），误选 strain_construction 会返回 guidance 引导而非方案。' +
               '输入上游工具输出（bio_primer3_design/bio_clone_simulate/bio_crispr_guide/bio_gene_knockout optknock 等），' +
               '输出完整 protocol（试剂/条件/预期结果/质量控制/注意事项）。' +
               '触发词：湿实验方案、PCR protocol、克隆方案、CRISPR 实验方案、菌株构建方案、转化方案。',
@@ -1103,6 +1109,8 @@ function semanticTools(config) {
         '基因回路编译（BioCRNpyler，第二层依赖首次调用自动安装）：组件列表' +
         '（promoter/rbs/cds/terminator，promoter 可带 regulators 调控因子）组装为 DNA 构建体，' +
         '编译为 CRN 并写出 SBML 模型，返回物种/反应数与网络拓扑图 PNG。' +
+        '构建体 DNA 模板物种（dna_part_*）初始浓度默认设为 1.0（相对体系 RNAP=0.5/Ribo=10/RNase=0.25），' +
+        '避免默认仿真全零；显式设置的正值不会被覆盖。' +
         'SBML 路径可直接传给 bio_circuit_simulate。触发词：基因回路、回路编译、repressilator、遗传线路。',
       parameters: {
         components: { type: 'array', required: true, description: '组件列表 [{type: promoter/rbs/cds/terminator, name, regulators?, leak?, protein?}]', items: { type: 'object', additionalProperties: true } },
@@ -1117,7 +1125,10 @@ function semanticTools(config) {
       name: 'bio_circuit_simulate',
       description:
         '基因回路动力学仿真（Bioscrape）：加载 SBML 模型做 ODE/SSA 仿真，' +
-        '返回各物种稳态浓度、达峰时间与浓度-时间曲线图 PNG。支持 parameter_overrides 覆盖参数。' +
+        '返回各物种稳态浓度、达峰时间与浓度-时间曲线图 PNG。' +
+        'parameter_overrides 只能覆盖**参数**（速率常数等），不能覆盖物种初始浓度；' +
+        '覆盖键不是 SBML parameter id 时返回 invalid_overrides + hint（不报错）。' +
+        '稳态全零时 note 附诊断提示（检查 DNA 模板/物种初始浓度）。' +
         '触发词：回路仿真、动力学模拟、浓度曲线、SSA 随机模拟。',
       parameters: {
         sbml_file: { type: 'string', required: true, description: 'SBML 文件路径（bio_circuit_compile 的输出）' },

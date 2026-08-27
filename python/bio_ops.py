@@ -969,7 +969,8 @@ def op_metabolic_model(args):
 
 
 def op_fba(args):
-    """通量平衡分析：fba（默认）/ fva（通量可变性分析）/ pfba（节俭 FBA）。"""
+    """通量平衡分析：fba（默认）/ fva（通量可变性分析）/ pfba（节俭 FBA）。
+    可选 reactions="EX_succ_e,PPC"（逗号分隔 reaction id）只输出指定反应，缩小返回体积。"""
     import cobra
 
     model_id = args.get('model_id', 'ecoli_core_model')
@@ -996,6 +997,31 @@ def op_fba(args):
         else:
             return {'error': f'Objective reaction not found: {objective}'}
 
+    # 可选：reactions="EX_succ_e,PPC" 时只输出指定反应，缩小返回体积
+    rxn_filter = None
+    missing_reactions = None
+    reactions_arg = args.get('reactions')
+    if reactions_arg:
+        requested = [r.strip() for r in str(reactions_arg).split(',') if r.strip()]
+        known_ids = {r.id for r in model.reactions}
+        found = [r for r in requested if r in known_ids]
+        missing = [r for r in requested if r not in known_ids]
+        if not found:
+            return {
+                'hint': (
+                    f'未找到反应: {", ".join(missing)}。这些 reaction id 在模型 {model_id} 中不存在；'
+                    'reactions 参数需为逗号分隔的 reaction id（如 "EX_succ_e,PPC"），'
+                    '可先用 bio_model_info 查看模型反应列表。'
+                ),
+                'missing_reactions': missing,
+                'flux_ranges': {},
+                'fluxes': {},
+                'model_id': model_id,
+            }
+        rxn_filter = set(found)
+        if missing:
+            missing_reactions = missing
+
     if analysis_type == 'fva':
         # 通量可变性分析：每个反应在最优解附近的 [min, max] 范围
         from cobra.flux_analysis import flux_variability_analysis
@@ -1003,10 +1029,12 @@ def op_fba(args):
         fva_df = flux_variability_analysis(model, fraction_of_optimum=fraction, processes=1)
         ranges = {}
         for rid, row in fva_df.iterrows():
+            if rxn_filter is not None and rid not in rxn_filter:
+                continue
             lo, hi = float(row['minimum']), float(row['maximum'])
-            if abs(lo) > 1e-10 or abs(hi) > 1e-10:
+            if rxn_filter is not None or abs(lo) > 1e-10 or abs(hi) > 1e-10:
                 ranges[rid] = [round(lo, 6), round(hi, 6)]
-        return {
+        result = {
             'analysis_type': 'fva',
             'fraction_of_optimum': fraction,
             'n_reactions': len(fva_df),
@@ -1022,6 +1050,10 @@ def op_fba(args):
             ),
             'objective': str(model.objective),
         }
+        if missing_reactions:
+            result['missing_reactions'] = missing_reactions
+            result['hint'] = f'以下 reaction id 不存在已跳过: {", ".join(missing_reactions)}'
+        return result
 
     if analysis_type == 'pfba':
         # 节俭 FBA：在最优生长下最小化总通量
@@ -1030,7 +1062,7 @@ def op_fba(args):
         if solution.status != 'optimal':
             return {'error': f'pFBA failed: {solution.status}'}
         fluxes = {r.id: round(float(solution.fluxes[r.id]), 6)
-                  for r in model.reactions if abs(solution.fluxes[r.id]) > 1e-10}
+                  for r in model.reactions if (rxn_filter is not None and r.id in rxn_filter) or (rxn_filter is None and abs(solution.fluxes[r.id]) > 1e-10)}
         # pFBA 的 objective_value 是最小化后的总通量；生长率需从目标反应通量取
         # （目标表达式含 forward/reverse 两个变量，取正系数且存在于通量表的反应）
         growth = None
@@ -1070,7 +1102,7 @@ def op_fba(args):
         if ll_sol.status != 'optimal':
             return {'error': f'Loopless FBA 不可行: {ll_sol.status}'}
         fluxes = {r.id: round(float(ll_sol.fluxes[r.id]), 6)
-                  for r in model.reactions if abs(ll_sol.fluxes[r.id]) > 1e-10}
+                  for r in model.reactions if (rxn_filter is not None and r.id in rxn_filter) or (rxn_filter is None and abs(ll_sol.fluxes[r.id]) > 1e-10)}
         growth = None
         try:
             coefs = model.objective.get_linear_coefficients(model.objective.variables)
@@ -1101,7 +1133,7 @@ def op_fba(args):
         if g_sol.status != 'optimal':
             return {'error': f'Geometric FBA 不可行: {g_sol.status}'}
         fluxes = {r.id: round(float(g_sol.fluxes[r.id]), 6)
-                  for r in model.reactions if abs(g_sol.fluxes[r.id]) > 1e-10}
+                  for r in model.reactions if (rxn_filter is not None and r.id in rxn_filter) or (rxn_filter is None and abs(g_sol.fluxes[r.id]) > 1e-10)}
         growth = None
         try:
             coefs = model.objective.get_linear_coefficients(model.objective.variables)
@@ -1129,10 +1161,12 @@ def op_fba(args):
         # 所有 FVA 范围 [min, max]，包括固定的
         ranges = {}
         for rid, row in fva_df.iterrows():
+            if rxn_filter is not None and rid not in rxn_filter:
+                continue
             lo, hi = float(row['minimum']), float(row['maximum'])
             ranges[rid] = {'min': round(lo, 6), 'max': round(hi, 6), 'range': round(hi - lo, 6)}
         fixed_count = sum(1 for v in ranges.values() if abs(v['range']) < 1e-9)
-        return {
+        result = {
             'analysis_type': 'optionsfva',
             'fraction_of_optimum': fraction,
             'n_reactions': len(fva_df),
@@ -1142,6 +1176,10 @@ def op_fba(args):
             'model_id': model_id,
             'note': 'optionsFVA 返回所有反应的完整 [min, max] 范围（含固定反应），n_fixed 为通量固定的反应数。',
         }
+        if missing_reactions:
+            result['missing_reactions'] = missing_reactions
+            result['hint'] = f'以下 reaction id 不存在已跳过: {", ".join(missing_reactions)}'
+        return result
 
 
     # 运行FBA
@@ -1154,7 +1192,7 @@ def op_fba(args):
     fluxes = {}
     for r in model.reactions:
         flux = solution.fluxes[r.id]
-        if abs(flux) > 1e-10:  # 只返回非零通量
+        if (rxn_filter is not None and r.id in rxn_filter) or (rxn_filter is None and abs(flux) > 1e-10):
             fluxes[r.id] = round(flux, 6)
     
     # 影子价格（代谢物）
@@ -1164,7 +1202,7 @@ def op_fba(args):
         if abs(price) > 1e-10:
             shadow_prices[m.id] = round(price, 6)
     
-    return {
+    result = {
         'objective_value': round(solution.objective_value, 6),
         'status': solution.status,
         'fluxes': fluxes,
@@ -1172,6 +1210,10 @@ def op_fba(args):
         'model_id': model_id,
         'objective': str(model.objective),
     }
+    if missing_reactions:
+        result['missing_reactions'] = missing_reactions
+        result['hint'] = f'以下 reaction id 不存在已跳过: {", ".join(missing_reactions)}'
+    return result
 
 
 def _load_cobra_model(model_id):

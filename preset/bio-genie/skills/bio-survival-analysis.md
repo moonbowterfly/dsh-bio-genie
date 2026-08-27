@@ -51,7 +51,7 @@ median_expr = df['gene_expression'].median()
 df['group'] = (df['gene_expression'] >= median_expr).map({True: 'High', False: 'Low'})
 
 # ⚠️ 不要「试切点直到显著」——必须在分析前确定切点方法
-# 如果要优化切点，可用 maximally selected rank statistics（maxstat 方法）
+# 如果要优化切点，用 maximally selected rank statistics（maxstat 方法）
 ```
 
 ### 3. Kaplan-Meier + log-rank

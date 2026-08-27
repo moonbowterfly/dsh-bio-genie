@@ -410,7 +410,28 @@ def _design_strain_construction(data, host, scale):
     host_organism = data.get('host_organism', host)
 
     if not knockouts:
-        return {'error': '需要 knockouts 参数（来自 bio_gene_knockout optknock 输出）'}
+        # 不硬报错：明确引导 agent 该 protocol_type 的预期搭配，并建议更合适的类型
+        return {
+            'protocol_type': 'strain_construction',
+            'status': 'guidance',
+            'guidance': (
+                'strain_construction 预期搭配基因敲除方案使用：input_data 应包含 knockouts / '
+                'recommended_knockouts（来自 bio_gene_knockout analysis_type=optknock 的输出）。'
+                '当前 input_data 未提供敲除清单。'
+            ),
+            'how_to_fix': [
+                '若目标是代谢工程敲除增产：先用 bio_gene_knockout analysis_type=optknock '
+                '（target_reaction 指定产物外泌反应）得到 recommended_knockouts，再回本工具。',
+                '若场景是非敲除（过表达/异源表达/质粒导入）：请改用更合适的 protocol_type——'
+                'transformation（质粒转化宿主）、crispr_editing（CRISPR 敲入/定点编辑）、'
+                'gibson_assembly / golden_gate / restriction_cloning（先构建表达载体再 transformation）。',
+            ],
+            'recommended_protocol_types': {
+                '过表达/异源表达（质粒导入）': 'transformation',
+                'CRISPR 敲入/定点编辑': 'crispr_editing',
+                '敲除增产（先跑 optknock）': 'strain_construction（带 knockouts 重试）',
+            },
+        }
 
     return {
         'protocol_type': 'strain_construction',

@@ -71,6 +71,30 @@ def op_circuit_compile(args):
     out_file = args.get('out_file') or os.path.join(os.getcwd(), f'{name}.xml')
     crn.write_sbml_file(out_file)
 
+    # P1：构建体 DNA 物种（id 以 dna_part_ 开头）初始浓度 <=0 或未设置时默认 1.0，
+    # 否则 simulate 默认跑出全零（E2E 实证）。显式设置的正值不覆盖。
+    dna_defaults = []
+    try:
+        import libsbml
+        doc = libsbml.readSBML(out_file)
+        sbml_model = doc.getModel()
+        if sbml_model is not None:
+            changed = False
+            for sp in sbml_model.getListOfSpecies():
+                if not sp.getId().startswith('dna_part_'):
+                    continue
+                cur = sp.getInitialConcentration() if sp.isSetInitialConcentration() else 0.0
+                if cur <= 0:
+                    sp.setInitialConcentration(1.0)
+                    dna_defaults.append(sp.getId())
+                    changed = True
+            if changed:
+                libsbml.SBMLWriter().writeSBML(doc, out_file)
+    except Exception as e:
+        dna_note = f'DNA 初始浓度默认值设置失败（不影响 SBML 产物）: {e}'
+    else:
+        dna_note = None
+
     # networkx 二部图：species 节点 ↔ reaction 节点
     network_plot = None
     try:
@@ -126,6 +150,12 @@ def op_circuit_compile(args):
     if network_note:
         result['network_note'] = network_note
     result['note'] = 'SBML 模型可直接传给 op_circuit_simulate 做 ODE/SSA 动力学仿真。'
+    if dna_defaults:
+        result['note'] += ('DNA 模板初始浓度默认 1.0（相对体系：RNAP=0.5/Ribo=10/RNase=0.25），'
+                           '若需调整请改 SBML 或联系仿真层覆盖。')
+        result['dna_initial_concentration_defaulted'] = dna_defaults
+    if dna_note:
+        result['dna_note'] = dna_note
     return result
 
 
@@ -165,9 +195,36 @@ def op_circuit_simulate(args):
 
     model = import_sbml(sbml_file)
 
-    # 参数覆盖（可选）：{参数名: 值}
+    # P2：参数覆盖（可选）：{参数名: 值}。以 SBML 模型的 parameter id 集合为准校验——
+    # 不存在的 key（如物种 id）不抛错，收进 invalid_overrides 并附 hint。
+    valid_params = set()
+    init_conc = {}
+    try:
+        import libsbml
+        doc = libsbml.readSBML(sbml_file)
+        sm = doc.getModel()
+        if sm is not None:
+            valid_params.update(p.getId() for p in sm.getListOfParameters())
+            for rxn in sm.getListOfReactions():
+                kl = rxn.getKineticLaw()
+                if kl is not None:
+                    valid_params.update(p.getId() for p in kl.getListOfParameters())
+                    valid_params.update(p.getId() for p in kl.getListOfLocalParameters())
+            # 记录各物种初始浓度：初始 <=0 的物种是「产物侧」，
+            # 机器蛋白（RNAP=0.5/Ribo=10/RNase=0.25）靠预置初始浓度维持，不参与全零判定
+            init_conc = {s.getId(): (s.getInitialConcentration() if s.isSetInitialConcentration()
+                                     else (s.getInitialAmount() if s.isSetInitialAmount() else 0.0))
+                         for s in sm.getListOfSpecies()}
+    except Exception:
+        valid_params = set()  # 校验失败则退化为旧行为（盲覆盖）
+        init_conc = {}
+
     overridden = []
+    invalid = []
     for k, v in (args.get('parameter_overrides') or {}).items():
+        if valid_params and k not in valid_params:
+            invalid.append(k)
+            continue
         try:
             model.set_parameter(k, float(v))
             overridden.append(k)
@@ -205,7 +262,18 @@ def op_circuit_simulate(args):
     fig.savefig(plot_file, bbox_inches='tight', dpi=200)
     plt.close(fig)
 
-    return {
+    note = ('steady_state 为末时间点浓度；peak_times 为各物种达峰时间。'
+            '曲线图默认只画峰值最高的前 8 个物种。')
+    # P3：全零稳态诊断（只追加提示，不改数据）。
+    # 判定只看「初始浓度 <=0 的产物侧物种」——机器蛋白（RNAP=0.5/Ribo=10/RNase=0.25）
+    # 靠预置初始浓度维持恒正，若纳入判定该检查永远不触发。产物侧全零即诊断。
+    product_side = [c for c in species_cols if init_conc.get(c, 0.0) <= 0]
+    if product_side and all(steady.get(c, 0) == 0 for c in product_side):
+        note += ('检测到稳态全零——请检查 SBML 中 DNA 模板/物种初始浓度是否合理'
+                 '（bio_circuit_compile 输出默认 DNA 初始浓度为 1.0；'
+                 '蛋白/RNA 无初始来源时需预置或诱导）。')
+
+    result = {
         'sbml_file': os.path.abspath(sbml_file),
         'simulation_type': sim_type,
         'n_timepoints': len(df),
@@ -215,6 +283,13 @@ def op_circuit_simulate(args):
         'plotted_species': top,
         'plot_file': os.path.abspath(plot_file),
         'overridden_parameters': overridden,
-        'note': 'steady_state 为末时间点浓度；peak_times 为各物种达峰时间。'
-                '曲线图默认只画峰值最高的前 8 个物种。',
+        'invalid_overrides': invalid,
+        'note': note,
     }
+    if invalid:
+        result['hint'] = (
+            f'parameter_overrides 只能覆盖**参数**（速率常数等），不能覆盖**物种初始浓度**；'
+            f'以下 key 不是 SBML 模型的 parameter id，未生效: {", ".join(invalid)}。'
+            '物种浓度请在 SBML 中修改或用 compile 的默认值（DNA 模板默认 1.0）。'
+        )
+    return result

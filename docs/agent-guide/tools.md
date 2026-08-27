@@ -2,7 +2,7 @@
 language: none
 ---
 
-# 工具全参考（51 个）
+# 工具全参考（53 个）
 
 > 每个工具：功能 → 参数（★=必填）→ 返回关键字段 → 典型触发词。**选工具第一优先，`bio_python` 执行器第二优先**。
 
@@ -155,7 +155,7 @@ language: none
 
 **bio_metabolic_model** — 代谢模型管理：`action`（`list` 列出可用模型 / `load` 加载模型 / `info` 显示详情）、`model_id`（默认 `textbook`，COBRApy 内置 E. coli core）。触发词：代谢模型、SBML、代谢网络。
 
-**bio_fba** — 通量平衡分析（FBA）：`model_id`（默认 `textbook`）、`objective`（目标函数反应，可选）。返回最优生长速率、主要反应通量、代谢物影子价格。触发词：FBA、通量平衡、生长速率预测。
+**bio_fba** — 通量平衡分析（FBA）：`model_id`（默认 `textbook`）、`objective`（目标函数反应，可选）、`reactions`（可选，逗号分隔 reaction id 如 `"EX_succ_e,PPC"`，传参时 flux/flux_ranges 只返回这些反应；全库 FVA 约 95 反应、45KB 级，只关心少数反应时务必传它缩小输出；不存在的 id 返回带 hint 的提示）。返回最优生长速率、主要反应通量、代谢物影子价格。触发词：FBA、通量平衡、生长速率预测。
 
 **bio_gene_knockout** — 基因敲除分析：`model_id`（默认 `textbook`）、`analysis_type`（`single` 默认，此时 `gene`★ 必填，基因 ID 如 `b2779` / `essentiality` / `double` / `optknock` 模式下无需传 gene）。返回敲除后生长速率、变化百分比、必需性判断。触发词：基因敲除、必需基因。
 
@@ -189,7 +189,7 @@ language: none
 
 **bio_dna_syncheck** — DNA 合成可行性检查：`sequence ★`、`min_gc_window`/`max_gc_window`（窗口 GC 上下限）、`homopolymer_threshold`、`poly_run_min`。返回不可合成区域/需改序位点。触发词：合成可行性、gene synthesis、合成难度。
 
-**bio_wetlab_design** — 湿实验方案生成：`protocol_type ★`（pcr_amplification / gibson_assembly / golden_gate / restriction_cloning / crispr_editing / strain_construction / transformation）、`input_data ★`（上游工具输出的 **dict 对象**，如 bio_primer3_design / bio_clone_simulate 的返回）、`host_organism`、`scale`（small/medium/large）。返回完整 protocol（试剂体系/反应条件/QC）。触发词：实验方案、protocol、湿实验步骤。
+**bio_wetlab_design** — 湿实验方案生成：`protocol_type ★`（pcr_amplification / gibson_assembly / golden_gate / restriction_cloning / crispr_editing / strain_construction / transformation）、`input_data ★`（上游工具输出的 **dict 对象**，如 bio_primer3_design / bio_clone_simulate 的返回）、`host_organism`、`scale`（small/medium/large）。返回完整 protocol（试剂体系/反应条件/QC）。选型前提：`strain_construction` 仅用于敲除增产场景，`input_data` 须含 knockouts/recommended_knockouts（来自 optknock），否则返回 guidance 引导；非敲除场景（过表达/异源表达）用 `transformation` 或 `crispr_editing`。触发词：实验方案、protocol、湿实验步骤。
 
 **bio_primer3_design** — 工业级引物设计（Primer3）：`sequence ★`、`target_region [start,len]`、`primer_size`/`tm_range`/`gc_range`、`max_hairpin_tm`/`max_self_any_tm`、`num_return`（默认 5）。返回候选引物对（Tm/GC%/发夹/二聚体评分 + penalty 排序，rank 1 推荐；`position` 为 **0-based** Primer3 约定）。与 bio_primer_design（简单版）区分：需要可投稿级引物质量时用本工具。触发词：Primer3、工业级引物、qPCR 引物。依赖说明：primer3-py 属第二层按需依赖（auto），首次调用本工具时运行时自动补装，无需手动操作。
 
@@ -203,7 +203,7 @@ language: none
 
 ### 代谢工程增强（Phase 2）
 
-**bio_fba** 增强 — 新增 `analysis_type`：`fba`（默认，行为不变）/ `fva`（通量可变性，返回每反应 [min,max] 范围，`fraction_of_optimum` 可调）/ `pfba`（节俭 FBA，最小化总通量）。
+**bio_fba** 增强 — 新增 `analysis_type`：`fba`（默认，行为不变）/ `fva`（通量可变性，返回每反应 [min,max] 范围，`fraction_of_optimum` 可调）/ `pfba`（节俭 FBA，最小化总通量）。另支持 `reactions`（逗号分隔 reaction id）过滤输出反应，避免全库 FVA 45KB 级输出。
 
 **bio_gene_knockout** 增强 — 新增 `analysis_type`：`single`（默认，行为不变，`gene` 必填）/ `double`（top_n 候选两两双敲，找合成致死对）/ `essentiality`（全基因必需性扫描）。
 
@@ -211,6 +211,6 @@ language: none
 
 ### 基因回路建模（Phase 3，第二层按需安装）
 
-**bio_circuit_compile** — 基因回路编译（BioCRNpyler，**第二层依赖，首次调用自动安装**）：`components ★`（[{type: promoter|rbs|cds|terminator, name, regulators?}]）、`extract`（默认 txtl_extract）、`out_file`（SBML 输出路径，可选，默认工作区 `<name>.xml`；⚠️ 参数名是 `out_file`，无 `output_sbml` 参数）、`plot_network`（默认 true）。组装 DNA_construct → TxTlExtract → compile_crn()，返回 SBML 路径 + 物种数/反应数 + networkx 网络图 PNG。触发词：基因回路、回路编译、repressilator、CRN。
+**bio_circuit_compile** — 基因回路编译（BioCRNpyler，**第二层依赖，首次调用自动安装**）：`components ★`（[{type: promoter|rbs|cds|terminator, name, regulators?}]）、`name`（构建体名称，默认 circuit）、`context`（表达体系，txtl_extract/expression，默认 txtl_extract）、`out_file`（SBML 输出路径，可选，默认工作区 `<name>.xml`；⚠️ 参数名是 `out_file`，无 `output_sbml` 参数）。组装 DNA_construct → TxTlExtract → compile_crn()，返回 SBML 路径 + 物种数/反应数 + networkx 网络图 PNG。构建体 DNA 模板物种（`dna_part_*`）初始浓度默认设为 1.0（相对体系 RNAP=0.5/Ribo=10/RNase=0.25），避免默认仿真全零；显式设置的正值不会被覆盖。触发词：基因回路、回路编译、repressilator、CRN。
 
-**bio_circuit_simulate** — 回路动力学仿真（Bioscrape，**第二层依赖，首次调用自动安装**）：`sbml_file ★`（bio_circuit_compile 的输出）、`simulation_type`（ode 默认 / ssa 随机模拟）、`time_end`/`timepoints`、`param_overrides`（参数覆盖 dict）。返回动力学曲线图 PNG（matplotlib，物种浓度 vs 时间）+ 稳态值 + 峰值时间。触发词：回路仿真、动力学模拟、SSA 随机模拟。
+**bio_circuit_simulate** — 回路动力学仿真（Bioscrape，**第二层依赖，首次调用自动安装**）：`sbml_file ★`（bio_circuit_compile 的输出）、`simulation_type`（ode 默认 / ssa 随机模拟）、`timepoints`（{start, end, points}，默认 0-200 共 200 点）、`parameter_overrides`（参数覆盖 dict；**只能覆盖参数**（速率常数等），不能覆盖物种初始浓度——覆盖键不是 SBML parameter id 时返回 `invalid_overrides` + `hint`，不报错）、`out_file`（曲线图输出路径，可选）。返回动力学曲线图 PNG（matplotlib，物种浓度 vs 时间）+ 稳态值 + 峰值时间；稳态全零时 `note` 附诊断提示（检查 DNA 模板/物种初始浓度）。触发词：回路仿真、动力学模拟、SSA 随机模拟。
