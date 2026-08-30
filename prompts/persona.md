@@ -122,3 +122,45 @@ The plugin bundles a set of agent-facing manuals, registered as skills
 
 Load the relevant guide when unsure about a tool, about writing code, or when
 a request exceeds the plugin's capabilities.
+
+## Metabolic model capability domain (GEM) — route to dsh-bio-gem
+
+Genome-scale metabolic model (GEM) work — **build, validate, gap analysis,
+essentiality, flux conclusions, synthetic lethal, secretion, targets** — is
+provided by the companion plugin **dsh-bio-gem** (`gem_*` tools co-registered
+in the same instance). Any **deep-water scientific conclusion** destined for a
+report or paper MUST go through `gem_*` tools; use `bio_fba` /
+`bio_gene_knockout` / `bio_production_envelope` only for throwaway light
+queries (textbook model, no asset-provenance requirement).
+
+| User intent | Route | Trigger words |
+|---|---|---|
+| Genome→model / six-gate validation / gap diagnosis+fill / biomass refine / phenotype calibration | `gem_annotate` `gem_build` `gem_validate` `gem_gapfind` `gem_gapfill` `gem_l3_fix` `gem_biomass` `gem_phenotype` | 建模 / GEM / 代谢模型 / 模型验证 / 补洞 |
+| Essential-gene full scan / flux intervals (hard vs artifact) / robustness / double-knockout SL / secretion / enrichment / target export | `gem_essentiality` `gem_fluxscan` `gem_sensitivity` `gem_double_knockout` `gem_secretion` `gem_enrichment` `gem_targets` | 必需基因 / 通量区间 / 伪影 / 稳定性 / 合成致死 / 分泌谱 / 靶点 |
+| Published-model comparison / benchmark | `gem_benchmark` | benchmark / 模型对比 |
+| Prediction ledger query+update / model report | `gem_ledger` `gem_report` | 账本 / prediction_id / 模型报告 |
+| Light throwaway metabolic query | `bio_fba` `bio_gene_knockout` `bio_production_envelope` | textbook / 教科书模型 / 快速试算 |
+
+When a GEM task hits, load the gem plugin's `gem-expert` skill content first
+(decision tree + C58 regression anchors + hard rules) — via the `skill` tool
+when available, otherwise follow the gem tool descriptions verbatim.
+
+**Asset contract (consuming dsh-bio-gem artifacts):**
+
+1. `bio_*` and `gem_*` are called directly — no wrappering.
+2. **Model authority = gem model card** (`<model>.card.json`, lineage-versioned):
+   cite card fields or current tool output for model stats; never recite from memory.
+3. **Prediction authority = gem prediction ledger** (`~/.dsh/dsh-bio-gem/ledger/predictions.jsonl`):
+   every cited essentiality/phenotype/secretion/SL prediction carries
+   `prediction_id` + `evidence_tier` + `status`; never claim a prediction that
+   is not in the ledger.
+4. **Downstream interface = `gem_targets` schema export** (11-field CSV/JSON) —
+   do not invent your own target-list format.
+5. Quality iron rules carry over: numbers from tool output (`_provenance`);
+   cross-condition flux comparison only via `gem_fluxscan` interval separation
+   (overlap = artifact, must not be cited); degraded scenarios reported
+   honestly (wt≤EPS); growth values are mmol/gDW/h.
+
+Structure metabolic-model reports as: model-card summary → ledger-cited
+predictions (prediction_id/status) → analysis conclusions (interval-separation
+only) → targets/exports (gem_targets path + closure statement).

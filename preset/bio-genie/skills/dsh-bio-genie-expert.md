@@ -30,6 +30,7 @@ pwd && ls -la && ls -la data/ 2>/dev/null
 | 参考基因组 | `bio_ref_genome` | — |
 | 出版级图表 | `bio_fig_export` / `bio_fig_qa` / `bio_fig_profile` | — |
 | **代谢分析** | `bio_metabolic_model` / `bio_fba` / `bio_gene_knockout` | 代谢建模一步到位 |
+| **代谢模型能力域（GEM 全链）** | `gem_build` / `gem_validate` / `gem_fluxscan` / `gem_essentiality` 等 gem_* 工具（详见 §7 路由段） | 深水区科学结论走 dsh-bio-gem（模型卡/账本可溯源） |
 | **通路搜索/设计** | `bio_pathway_search` / `bio_pathway_design` | KEGG 通路查询 |
 | **ML 分析** | `bio_ml_pipeline` / `bio_ml_reduce` / `bio_ml_cluster` / `bio_ml_feature` / `bio_stats_test` | 分类/回归/降维/聚类/统计 |
 | **DNA/质粒设计** | `bio_primer_design` / `bio_seq_optimize` / `bio_assembly_design` / `bio_plasmid_map` | 引物/密码子优化/组装/图谱 |
@@ -125,3 +126,41 @@ bio_plasmid_map name="pET28a" features=[...]               # 质粒图谱
 - 表/序列 → `out/` 目录
 - 不要倾倒 MB 级文本到 stdout
 - 先 `ls` 确认目录存在，再写文件
+
+## 7. 代谢模型能力域路由（dsh-bio-gem 接入 · 契约 v1）
+
+代谢模型（GEM）的**建-验-析-测**全链由同系列插件 **dsh-bio-gem** 提供（`gem_*` 工具与本插件 `bio_*` 同实例共存）。
+凡是**要写进报告/论文的深水区科学结论**（模型验证、必需基因、通量硬结论、合成致死、分泌谱、靶点），一律走 gem_*；
+`bio_fba`/`bio_gene_knockout`/`bio_production_envelope` 只承接**临时轻量试算**（textbook 模型、无资产溯源需求的快速估算）。
+
+### 7.1 路由决策表
+
+| 用户意图 | 路由 | 触发词 |
+|---|---|---|
+| 基因组→建模 / 六关验证 / 缺口诊断补洞 / biomass 精修 / 表型回填 | `gem_annotate` / `gem_build` / `gem_validate` / `gem_gapfind` / `gem_gapfill` / `gem_l3_fix` / `gem_biomass` / `gem_phenotype` | 建模 / GEM / 代谢模型 / 模型验证 / 补洞 |
+| 必需基因全扫 / 通量区间（硬结论 vs 伪影）/ 鲁棒性 / 双敲 SL / 分泌谱 / 富集 / 靶点导出 | `gem_essentiality` / `gem_fluxscan` / `gem_sensitivity` / `gem_double_knockout` / `gem_secretion` / `gem_enrichment` / `gem_targets` | 必需基因 / 通量区间 / 伪影 / 稳定性 / 合成致死 / 分泌谱 / 富集 / 靶点 |
+| 已发表模型对比 / benchmark | `gem_benchmark` | benchmark / 模型对比 |
+| 预测账本查询更新 / 模型报告 | `gem_ledger` / `gem_report` | 账本 / prediction_id / 模型报告 |
+| 轻量代谢快查（临时、无模型资产溯源需求） | `bio_fba` / `bio_gene_knockout` / `bio_production_envelope` | textbook / 教科书模型 / 快速试算 |
+
+命中代谢模型需求时，先加载 gem 插件的 `gem-expert` skill（决策树 + C58 回归锚 + 硬规则）再动手。
+
+### 7.2 资产契约五条（消费 dsh-bio-gem 产物时必须遵守）
+
+1. **命名空间共存**：`bio_*` 与 `gem_*` 直接调用，不做封装。
+2. **模型权威源 = gem 模型卡**（`<模型名>.card.json`，lineage 版本化）：汇报模型规模/验证/必需基因时
+   provenance 指向模型卡字段或当次工具输出，**禁止凭印象重述**。
+3. **预测权威源 = gem 预测账本**（`~/.dsh/dsh-bio-gem/ledger/predictions.jsonl`）：引用必需/表型/分泌/合成致死
+   预测必须带 `prediction_id` + `evidence_tier` + `status`；**未入账的预测不得谎称已有**。
+4. **下游接口 = gem_targets 规范导出**（11 字段 CSV/JSON）：靶点清单一律用 `gem_targets`，不自行编格式。
+5. **质量铁律**：数字来自工具输出（_provenance）；跨条件通量对比只认 `gem_fluxscan` 区间分离判定
+   （overlap=伪影禁止引用）；退化场景如实报告（wt≤EPS）；生长值单位 mmol/gDW/h。
+
+### 7.3《代谢模型分析报告》模板
+
+```
+1. 模型卡摘要：模型文件（绝对路径）、引擎/lineage 版本、规模、验证关卡结果（引 gem_report/gem_validate 输出或模型卡字段）
+2. 预测引用：每条预测带 prediction_id + evidence_tier + status（与 gem_ledger 一致）
+3. 分析结论：通量对比只引区间分离判定；单点 diff 标注伪影
+4. 靶点/导出：gem_targets 产物路径 + 与账本计数闭合声明
+```

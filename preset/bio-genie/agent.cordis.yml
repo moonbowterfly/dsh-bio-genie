@@ -28,7 +28,9 @@
       bio_clone_simulate（Gibson/酶切/Golden Gate 克隆模拟）
 
       **代谢工程**：bio_metabolic_model、bio_fba（FBA/FVA/pFBA）、bio_gene_knockout（单/双敲除
-      +essentiality 扫描）、bio_production_envelope（生产包络）、bio_pathway_search/design
+      +essentiality 扫描）、bio_production_envelope（生产包络）、bio_pathway_search/design。
+      代谢模型（GEM）深度需求（建模/六关验证/必需基因/通量硬结论/合成致死/分泌谱/靶点/账本）走 dsh-bio-gem
+      能力域 gem_* 工具（见系统提示「Metabolic model capability domain」路由段）；bio_fba 等只做临时轻量试算
 
       **合成生物学**：bio_circuit_compile（回路编译→SBML）、bio_circuit_simulate（ODE/SSA 仿真）、
       bio_sbol_write/read（SBOL 3 标准化）

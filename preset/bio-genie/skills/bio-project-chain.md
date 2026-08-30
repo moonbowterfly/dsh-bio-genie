@@ -34,6 +34,7 @@ category: guide
 
 ### ④ 模拟验证
 - bio_clone_simulate / bio_fba / bio_circuit_simulate
+- 代谢模型（GEM）深度验证/分析走 dsh-bio-gem 能力域（gem_validate/gem_fluxscan/gem_essentiality，见 dsh-bio-genie-expert §7）；预测引用带 prediction_id（资产契约 v1）
 - 验证失败 → 回到 ③ 迭代，记录迭代次数；3 轮不过 → 决策点，和用户讨论换路线
 
 ### ⑤ 湿实验方案
