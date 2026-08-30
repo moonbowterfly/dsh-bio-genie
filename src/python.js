@@ -15,7 +15,7 @@ import { join } from 'node:path'
 const BRIDGE_PATH = join(import.meta.dirname, '..', 'python', 'bridge.py')
 const OPS_PATH = join(import.meta.dirname, '..', 'python', 'bio_ops.py')
 
-function spawnPython(exe, script, payload, { cwd, timeoutMs, signal } = {}) {
+export function spawnPython(exe, script, payload, { cwd, timeoutMs, signal } = {}) {
   return new Promise((resolvePromise) => {
     const child = spawn(exe, ['-I', script], {
       cwd: cwd || process.cwd(),
@@ -51,6 +51,18 @@ function spawnPython(exe, script, payload, { cwd, timeoutMs, signal } = {}) {
       let parsed = null
       try { parsed = JSON.parse(stdout.trim()) } catch { /* fallthrough */ }
       if (parsed && typeof parsed === 'object' && 'ok' in parsed) {
+        // P2-1 exitCode 校验：桥/ops 脚本所有合法出口都返回 exit 0（代码级失败也是
+        // ok:true+stderr traceback 或 ok:false+exit 0）。close code!==0（非超时）说明
+        // 进程未走正常出口（外部 kill/崩溃/输出中断），即便 stdout 有合法 JSON 也不可信，
+        // 按失败处理并保留现场供诊断。
+        if (code !== 0 && !didTimeout) {
+          settle({
+            ok: false, stdout, stderr,
+            error: `python exited abnormally (code ${code}) after producing output; output not trusted`,
+            exitCode: code, timedOut: false,
+          })
+          return
+        }
         // 超时后 kill 与进程自行退出存在竞态：即便 kill 前恰好输出了合法 JSON，
         // 只要超时已发生就如实标记，让上层知道执行未完整
         settle({ ...parsed, exitCode: code, timedOut: didTimeout })
