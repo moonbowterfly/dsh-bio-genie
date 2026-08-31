@@ -51,7 +51,7 @@
 ## 4. 资产路径（dsh-bio-gem v0.1.0 基线）
 
 - 模型卡：模型文件同目录 `<name>.card.json`（schema v3：lineage / verified_phenotypes / essential_genes / robustness）
-- 预测账本：`~/.dsh/dsh-bio-gem/ledger/predictions.jsonl`（四类型：essentiality / phenotype / secretion / synthetic_lethal）
+- 预测账本：`~/.dsh/dsh-bio-gem/ledger/<模型名>.jsonl`（**一个模型一个账本**：账本文件按模型名分，如 C58.jsonl / LBA9402.jsonl；四类型：essentiality / phenotype / secretion / synthetic_lethal；具体路径以 gem_report/gem_ledger 输出为准，旧全局 predictions.jsonl 已弃用）
 - 靶点导出：`~/.dsh/dsh-bio-gem/exports/targets_<ts>.csv|json`
 - 接入方主指引：gem 插件 `skills/gem-expert.md`（决策树 + C58 回归锚）
 

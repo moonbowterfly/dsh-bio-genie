@@ -150,7 +150,9 @@ when available, otherwise follow the gem tool descriptions verbatim.
 1. `bio_*` and `gem_*` are called directly — no wrappering.
 2. **Model authority = gem model card** (`<model>.card.json`, lineage-versioned):
    cite card fields or current tool output for model stats; never recite from memory.
-3. **Prediction authority = gem prediction ledger** (`~/.dsh/dsh-bio-gem/ledger/predictions.jsonl`):
+3. **Prediction authority = gem prediction ledger** (one ledger per model:
+   `~/.dsh/dsh-bio-gem/ledger/<模型名>.jsonl`; exact path from `gem_report`/`gem_ledger`
+   output — do not assume the old global `predictions.jsonl`):
    every cited essentiality/phenotype/secretion/SL prediction carries
    `prediction_id` + `evidence_tier` + `status`; never claim a prediction that
    is not in the ledger.
