@@ -10,12 +10,22 @@ def op_assembly_design(args):
     """组装策略设计：输入片段列表，推荐组装方法并计算接头/overhang。"""
     from Bio.Seq import Seq
 
-    fragments = args.get('fragments', [])
+    fragments = list(args.get('fragments', []) or [])
     method = args.get('method', 'auto')  # auto | gibson | golden_gate | restriction
     vector = args.get('vector', None)  # 可选载体序列
 
-    if not fragments or len(fragments) < 2:
-        return {'error': 'at least 2 fragments required'}
+    # vector 真正参与组装：把线性化载体并入片段列表（作为环化起点）。
+    # 此前 vector 是声明了却从未使用的死参数，导致「单个插入片段 + 载体」这种最常见的
+    # 组装表达被 len<2 直接拒掉——v0.6.26 E2E 实测 agent 连续两次撞
+    # 'at least 2 fragments required' 且无法从错误里自救。
+    if vector:
+        fragments = [vector] + fragments
+
+    if len(fragments) < 2:
+        return {'error': f'需要 ≥2 个片段用于组装（收到 {len(fragments)} 个）。'
+                         '只有单个插入片段时：① 要算克隆接头与最终产物，用 bio_clone_simulate'
+                         '（backbone + inserts）；② 或把线性化载体序列作为 vector 参数传入，'
+                         '本工具会将其并入片段列表一起设计组装。'}
 
     # 计算总长度
     total_len = sum(len(f) for f in fragments)
@@ -223,9 +233,25 @@ def op_plasmid_map(args):
             f'  {start:>6}..{end:<6} │{symbol}│ {arrow} {feat_name} ({feat_type}, {size}bp)'
         )
 
-    # 统计
-    total_feature_bp = sum(f.get('end', 0) - f.get('start', 0) for f in features)
-    remaining = max_pos - total_feature_bp
+    # 统计：按区间并集算覆盖碱基数，避免重叠特征被重复计数。
+    # （E2E 实测：eGFP 720bp 图上有 CDS(0-720) + 两端引物 + 起始/终止密码子等
+    #   子区间，简单求和得 776bp > 720bp → unannotated_bp = -56 这种无意义的负值。）
+    spans = sorted((max(0, int(f.get('start', 0))), min(max_pos, int(f.get('end', 0))))
+                   for f in features
+                   if int(f.get('end', 0)) > int(f.get('start', 0)))
+    covered = 0
+    cur_start = cur_end = None
+    for s, e in spans:
+        if cur_end is None or s > cur_end:
+            if cur_end is not None:
+                covered += cur_end - cur_start
+            cur_start, cur_end = s, e
+        elif e > cur_end:
+            cur_end = e
+    if cur_end is not None:
+        covered += cur_end - cur_start
+    feature_bp = covered
+    remaining = max(0, max_pos - feature_bp)
 
     map_lines.extend([
         '',
@@ -249,7 +275,7 @@ def op_plasmid_map(args):
         'size': max_pos,
         'features': features_sorted,
         'n_features': len(features),
-        'feature_bp': total_feature_bp,
+        'feature_bp': feature_bp,
         'unannotated_bp': remaining,
         'map_text': '\n'.join(map_lines),
     }

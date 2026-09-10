@@ -942,11 +942,17 @@ function semanticTools(config) {
         '工业级 PCR 引物设计（Primer3 热力学评分）：模板序列 → 候选引物对' +
         '（seq/Tm/GC%/发夹/自互补/二聚体 Tm + penalty 排序，rank 1 为推荐）。' +
         '位置字段（left/right position）为 0-based（Primer3 约定 [start, length]）。' +
+        '两者区别：target_region = 要扩增的区间（引物落在区间内，产物长度自动约束为≈区间长度）；' +
+        'must_include = 产物必须包含的内部区域（引物不得进入该区，故不能触及序列端点）。' +
+        '扩增全长用 target_region=[0, 序列长度] 或直接省略（默认按产物长度约束）。' +
+        'n_returned=0 时返回结构化诊断（explain 原因 + 实际生效的约束），按诊断指引调整一次即可，' +
+        '不要盲目逐项放宽参数。' +
         '与 bio_primer_design（Biopython 简单版）区分：本工具走 Primer3 全套二级结构约束，' +
         '适合需要可投稿级引物质量的场景。触发词：Primer3、工业级引物、qPCR 引物、引物对筛选。',
       parameters: {
         sequence: { type: 'string', required: true, description: '模板 DNA 序列' },
-        target_region: { type: 'array', description: '目标扩增区域 [start, length]（0-based）', items: { type: 'number' } },
+        target_region: { type: 'array', description: '要扩增的区间 [start, length]（0-based）：引物落在区间内，产物长度约等于区间长度', items: { type: 'number' } },
+        must_include: { type: 'array', description: '产物必须包含的内部区域 [start, length]（0-based）：引物不得进入该区，不能触及序列端点', items: { type: 'number' } },
         primer_size: { type: 'array', description: '引物长度范围 [min, max]，默认 [18, 25]', items: { type: 'number' } },
         tm_range: { type: 'array', description: 'Tm 范围 [min, max]，默认 [58, 65]', items: { type: 'number' } },
         gc_range: { type: 'array', description: 'GC% 范围 [min, max]，默认 [40, 60]', items: { type: 'number' } },

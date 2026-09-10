@@ -9,7 +9,7 @@
 - id: persona
   name: '@deepseek-ai/dsh-persona'
   config:
-    text: >-
+    prefix: >-
       你是 **生物精灵**（bio-genie 专家），运行在 DeepSeek Harness + @dsh-bio/dsh-bio-genie 插件上。
       你的定位：**一位真正擅长干湿实验全链条的生物科学家**。用户用自然语言许愿，你自主完成分析，
       用户只需要在关键决策点拍板。

@@ -161,7 +161,12 @@ export function findUnverifiedNumbers(agent, text) {
     if (before === '.' && /\d/.test(before2 ?? '')) continue
     // 软件版本豁免：小数紧跟在拉丁字母词后（Python 3.12 / Biopython 1.83 等）
     if (/[A-Za-z]\s*$/.test(clean.slice(Math.max(0, numStart - 32), numStart))) continue
-    if (!isVerified(agent, n)) {
+    // 百分比换算容忍：工具常以小数给出比例（如 metabolite_formula_coverage 0.6835），
+    // agent 以百分数表达（68.35%）。只比原值会把合法的换算引用判成无溯源
+    //（E2E 实测：agent 引用 68.35% 被拦两次，最终靠把 68.35 打印成工具输出才通过，
+    // 白烧 3 轮 bio_python）。
+    const isPercent = after === '%'
+    if (!isVerified(agent, n) && !(isPercent && isVerified(agent, n / 100))) {
       violations.push(raw)
       if (violations.length >= MAX_VIOLATIONS) break
     }

@@ -22,6 +22,41 @@ def _clean_seq(seq):
     return ''.join(str(seq).upper().split())
 
 
+# Primer3 explain 短语 → 中文可操作建议。
+# n=0 时只回传英文统计（如 "considered 548, overlap target 548, ok 0"）时，
+# agent 只能靠猜测逐个放宽参数试错（v0.6.26 E2E：连续 3 次无效调用后才放弃）。
+_PRIMER3_EXPLAIN_HINTS = (
+    ('overlap target',
+     '候选引物与 SEQUENCE_TARGET 重叠被排除——该参数（本工具的 must_include）要求引物落在'
+     '目标区之外，目标区覆盖到序列端点时必然无解；要扩增某区间请用 target_region，'
+     '要扩增全长请省略 must_include'),
+    ('no target', '没有候选引物能覆盖要求的 must_include 区域'),
+    ('gc content failed', 'GC% 落在 gc_range 之外（高 GC / 低 GC 模板常见）→ 放宽 gc_range'),
+    ('gc clamp', "3' 端 GC 钳不足 → 放宽 gc_range 或加长引物"),
+    ('tm too high', 'Tm 高于 tm_range 上限 → 抬高 tm_range 上限'),
+    ('tm too low', 'Tm 低于 tm_range 下限 → 压低 tm_range 下限'),
+    ('hairpin', '发夹结构 Tm 超限 → 提高 max_hairpin_tm'),
+    ('self any', '自互补 Tm 超限 → 提高 max_self_any_tm'),
+    ('self end', "3' 端自互补超限 → 提高 max_self_any_tm"),
+    ('poly x', '出现长同聚碱基串 → 放宽 primer_size'),
+    ('primer size', '引物长度落在 primer_size 之外 → 放宽 primer_size'),
+    ('too many ns', '候选区含过多 N 碱基'),
+)
+
+
+def _primer3_explain_hint(explain):
+    """把 Primer3 的英文 explain 统计翻成可操作建议（命中原因去重后串联）。"""
+    low = (explain or '').lower()
+    hits = []
+    for key, hint in _PRIMER3_EXPLAIN_HINTS:
+        if key in low and hint not in hits:
+            hits.append(hint)
+    if not hits:
+        return ('未能从 explain 定位单一原因；可先放宽 tm_range / gc_range / primer_size，'
+                '或省略 target_region 只按产物长度约束设计。')
+    return '；'.join(hits)
+
+
 def op_primer3_design(args):
     """工业级 PCR 引物设计（primer3-py）：模板 → 候选引物对（Tm/GC/二级结构评分）。
 
@@ -49,12 +84,42 @@ def op_primer3_design(args):
         'SEQUENCE_ID': str(args.get('name', 'target')),
         'SEQUENCE_TEMPLATE': sequence,
     }
-    target_region = args.get('target_region')  # [start, length]（0-based）
+    # target_region 语义 = 「要扩增的区间」（引物落在区间内）→ 映射到 Primer3 的
+    # SEQUENCE_INCLUDED_REGION。绝不能映射到 SEQUENCE_TARGET：后者要求引物位于
+    # 目标区之外，扩增全长（如 [0, 720]）时引物无处可放 → 恒返回 ok 0，且与
+    # 放宽 tm/gc/二级结构约束完全无关（v0.6.26 E2E 实测：eGFP 720bp 全长扩增
+    # 连续 3 次失败，agent 无法靠调参自救）。
+    target_region = args.get('target_region')
     if target_region:
         start, length = int(target_region[0]), int(target_region[1])
         if not (0 <= start < len(sequence)) or length <= 0 or start + length > len(sequence):
             raise ValueError(f'target_region [{start}, {length}] 超出模板范围（{len(sequence)} bp）')
-        seq_args['SEQUENCE_TARGET'] = [start, length]
+        seq_args['SEQUENCE_INCLUDED_REGION'] = [start, length]
+
+    # must_include = 产物必须包含、且引物不得进入的内部区域（Primer3 SEQUENCE_TARGET）。
+    # 触及序列端点时无解（引物须在其之外），故前置拒绝并引导到 target_region。
+    must_include = args.get('must_include')
+    if must_include:
+        mstart, mlen = int(must_include[0]), int(must_include[1])
+        if not (0 <= mstart < len(sequence)) or mlen <= 0 or mstart + mlen > len(sequence):
+            raise ValueError(f'must_include [{mstart}, {mlen}] 超出模板范围（{len(sequence)} bp）')
+        if mstart == 0 or mstart + mlen == len(sequence):
+            raise ValueError(
+                'must_include 触及序列端点 → Primer3 SEQUENCE_TARGET 要求引物位于该区域之外，'
+                '端点处无引物可放，恒无解。要扩增某个区间请用 target_region；'
+                '要扩增全长请省略 must_include，直接靠 PRIMER_PRODUCT_SIZE_RANGE 限定产物长度。')
+        seq_args['SEQUENCE_TARGET'] = [mstart, mlen]
+
+    # 产物长度约束：给了 target_region 就必须让产物真正覆盖该区间，否则 Primer3
+    # 会在区间内部挑最短产物（实测 target_region=[0,720] 全长扩增返回 315bp 短产物）。
+    max_primer = int(primer_size[1])
+    if target_region:
+        tlen = int(target_region[1])
+        product_range = [[max(60, tlen), min(len(sequence) + 2 * max_primer, tlen + 2 * max_primer)]]
+    else:
+        product_range = [[max(60, len(sequence) // 4), len(sequence)]]
+    if must_include:
+        product_range[0][0] = max(product_range[0][0], int(must_include[1]))
 
     global_args = {
         'PRIMER_NUM_RETURN': num_return,
@@ -68,16 +133,28 @@ def op_primer3_design(args):
         'PRIMER_MAX_GC': float(gc_range[1]),
         'PRIMER_MAX_HAIRPIN_TH': float(args.get('max_hairpin_tm', 47.0)),
         'PRIMER_MAX_SELF_ANY_TH': float(args.get('max_self_any_tm', 47.0)),
-        'PRIMER_PRODUCT_SIZE_RANGE': [[max(60, len(sequence) // 4), len(sequence)]],
+        'PRIMER_PRODUCT_SIZE_RANGE': product_range,
     }
 
     res = primer3.bindings.design_primers(seq_args, global_args)
     n = int(res.get('PRIMER_PAIR_NUM_RETURNED', 0))
     if n == 0:
-        explain = res.get('PRIMER_LEFT_EXPLAIN', '') + ' | ' + res.get('PRIMER_RIGHT_EXPLAIN', '')
+        explain = (res.get('PRIMER_LEFT_EXPLAIN', '') + ' | '
+                   + res.get('PRIMER_RIGHT_EXPLAIN', '')).strip()
         return {'pairs': [], 'n_returned': 0,
                 'position_base': '0-based (Primer3 约定, [start, length])',
-                'note': f'Primer3 未找到满足约束的引物对，可放宽 tm/gc/size 范围。{explain.strip()}'}
+                'note': f'Primer3 未找到满足约束的引物对。诊断：{_primer3_explain_hint(explain)}',
+                'explain_raw': explain,
+                'applied_included_region': seq_args.get('SEQUENCE_INCLUDED_REGION'),
+                'applied_must_include': seq_args.get('SEQUENCE_TARGET'),
+                'effective_constraints': {
+                    'primer_size': [int(primer_size[0]), int(primer_size[1])],
+                    'tm_range': [float(tm_range[0]), float(tm_range[1])],
+                    'gc_range': [float(gc_range[0]), float(gc_range[1])],
+                    'max_hairpin_tm': float(args.get('max_hairpin_tm', 47.0)),
+                    'max_self_any_tm': float(args.get('max_self_any_tm', 47.0)),
+                    'product_size_range': global_args['PRIMER_PRODUCT_SIZE_RANGE'][0],
+                }}
 
     pairs = []
     for i in range(n):

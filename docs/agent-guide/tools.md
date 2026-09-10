@@ -177,7 +177,7 @@ language: none
 
 **bio_seq_optimize** — 密码子优化：`sequence`★（CDS）、`organism`（ecoli/human/yeast）。返回优化序列 + GC%。触发词：密码子优化、表达优化。
 
-**bio_assembly_design** — 组装策略：`fragments`★（DNA 片段列表）、`method`（auto/gibson/golden_gate/restriction）。返回组装方案 + 接头设计 + `next_step`（提示用 bio_clone_simulate 做环化组装模拟）。触发词：组装、Gibson、Golden Gate。
+**bio_assembly_design** — 组装策略：`fragments`★（DNA 片段列表，含载体共需 ≥2 个）、`vector`（可选线性化载体序列，**会被并入片段列表**——只有单个插入片段时传它即可，无需自己拼接）、`method`（auto/gibson/golden_gate/restriction）。返回组装方案 + 接头设计 + `next_step`（提示用 bio_clone_simulate 做环化组装模拟）。触发词：组装、Gibson、Golden Gate。
 
 **bio_plasmid_map** — 质粒图谱：`name`、`size`、`features`★（特征列表）。传 `genbank_file` 或 `features`+`sequence` 时输出 PNG/SVG 图形文件（dna-features-viewer，`output_format`/`out_file`/`figure_width`/`highlight_regions` 可控），返回 `mode=graphic` + `output_file`（绝对路径）；**仅传 features 时只有文本注释图（`mode=text`，`output_file=null`，不生成文件）**。触发词：质粒图、载体图谱、plasmid map。
 
@@ -191,7 +191,7 @@ language: none
 
 **bio_wetlab_design** — 湿实验方案生成：`protocol_type ★`（pcr_amplification / gibson_assembly / golden_gate / restriction_cloning / crispr_editing / strain_construction / transformation）、`input_data ★`（上游工具输出的 **dict 对象**，如 bio_primer3_design / bio_clone_simulate 的返回）、`host_organism`、`scale`（small/medium/large）。返回完整 protocol（试剂体系/反应条件/QC）。选型前提：`strain_construction` 仅用于敲除增产场景，`input_data` 须含 knockouts/recommended_knockouts（来自 optknock），否则返回 guidance 引导；非敲除场景（过表达/异源表达）用 `transformation` 或 `crispr_editing`。触发词：实验方案、protocol、湿实验步骤。
 
-**bio_primer3_design** — 工业级引物设计（Primer3）：`sequence ★`、`target_region [start,len]`、`primer_size`/`tm_range`/`gc_range`、`max_hairpin_tm`/`max_self_any_tm`、`num_return`（默认 5）。返回候选引物对（Tm/GC%/发夹/二聚体评分 + penalty 排序，rank 1 推荐；`position` 为 **0-based** Primer3 约定）。与 bio_primer_design（简单版）区分：需要可投稿级引物质量时用本工具。触发词：Primer3、工业级引物、qPCR 引物。依赖说明：primer3-py 属第二层按需依赖（auto），首次调用本工具时运行时自动补装，无需手动操作。
+**bio_primer3_design** — 工业级引物设计（Primer3）：`sequence ★`、`target_region [start,len]`（**要扩增的区间**：引物落在区间内，产物长度自动约束为≈区间长度）、`must_include [start,len]`（产物必须包含的内部区域：引物不得进入该区，**不可触及序列端点**）、`primer_size`/`tm_range`/`gc_range`、`max_hairpin_tm`/`max_self_any_tm`、`num_return`（默认 5）。返回候选引物对（Tm/GC%/发夹/二聚体评分 + penalty 排序，rank 1 推荐；`position` 为 **0-based** Primer3 约定）。**扩增全长**用 `target_region=[0, 序列长度]` 或直接省略。`n_returned=0` 时返回结构化诊断（`explain_raw` 的 Primer3 原因 + `effective_constraints` 实际生效约束），按其指引调整一次即可，不要盲目逐项放宽参数。与 bio_primer_design（简单版）区分：需要可投稿级引物质量时用本工具。触发词：Primer3、工业级引物、qPCR 引物。依赖说明：primer3-py 属第二层按需依赖（auto），首次调用本工具时运行时自动补装，无需手动操作。
 
 **bio_dna_optimize** — 多约束 DNA 优化（DNA Chisel）：`protein_sequence` 或 `dna_sequence`（二选一）、`host_organism`（默认 e_coli）、`constraints`（remove_restriction_sites/gc_range/avoid_motifs）、`codon_optimize`（默认 true）。保持氨基酸不变，多约束满足后做密码子优化，返回优化序列 + 修改报告。与 bio_seq_optimize（简单替换）区分。触发词：多约束优化、去除酶切位点、DNA Chisel。依赖说明：dnachisel 属第二层按需依赖（auto），首次调用时自动补装（PyPI 上限 3.2.16，安装约束 >=3.2,<4）。
 

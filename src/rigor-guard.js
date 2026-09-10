@@ -107,7 +107,16 @@ export function registerRigorGuard(ctx) {
       if (violations.length === 0) return
       s.steers += 1
       const list = violations.map((v) => `\`${v}\``).join('、')
+      // ⚠️ 必须传完整 message 记录：dsh 0.1.5-rc.1 的会话持久化校验
+      // （dsh-session assertMessageEventShape）要求 user/message 的 data 自带
+      // 非空 `id` 与 `role: 'user'`，否则存盘后 resume 直接失败
+      // （"session event at seq N lacks an identified message" → 会话被判损坏、
+      //  永久无法恢复）。旧版引擎自动补齐字段，故此前从未暴露；引擎自有路径
+      // 用 createUserMessage() 生成同样的字段。
       agent.steer({
+        id: `plugin-msg-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+        role: 'user',
+        source: { kind: 'plugin', plugin: 'dsh-bio-genie' },
         content: [{
           type: 'text',
           text:
@@ -116,7 +125,6 @@ export function registerRigorGuard(ctx) {
             `实际计算/验证这些数值后再回复；若它们只是计划中的提议值（而非结论），` +
             `请改用 ask_user_question 向用户确认，或在文本中明确标注 [提议-待验证]。`,
         }],
-        source: { kind: 'plugin', plugin: 'dsh-bio-genie' },
       })
       ctx.logger?.info?.(`dsh-bio-genie rigor-guard: blocked ${violations.length} unverified claim(s): ${violations.join(', ')}`)
     } catch (error) {
