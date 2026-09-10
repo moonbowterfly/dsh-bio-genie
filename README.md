@@ -37,18 +37,22 @@
 
 ## 📦 安装
 
-本插件已发布为 npm 包 `@dsh-bio/dsh-bio-genie`，使用 dsh 官方标准的 `dsh plugin` 命令安装：
+本插件已发布为 npm 包 `@dsh-bio/dsh-bio-genie`，使用 dsh 官方标准的 `dsh plugin` 命令安装
+（下面统一写 `npx -y @deepseek-ai/dsh`：**无需全局安装 dsh CLI，只要机器上有 Node/npm**。
+若你已全局装过 dsh CLI，把 `npx -y @deepseek-ai/dsh` 整体换成 `dsh` 即可）：
 
 ```sh
 # 方式一：从 npm 安装（推荐，安装预构建代码）
-dsh plugin --profile web add @dsh-bio/dsh-bio-genie
+npx -y @deepseek-ai/dsh plugin --profile web add @dsh-bio/dsh-bio-genie
 
 # 方式二：从 GitHub 安装（拉取源码；本插件为纯 ESM 无构建步骤，可直接加载）
-dsh plugin --profile web add github:moonbowterfly/dsh-bio-genie
+npx -y @deepseek-ai/dsh plugin --profile web add github:moonbowterfly/dsh-bio-genie
 
 # 方式三：从本地目录安装（开发调试）
-dsh plugin --profile web add ./dsh-bio-genie
+npx -y @deepseek-ai/dsh plugin --profile web add ./dsh-bio-genie
 ```
+
+`--profile <name>` 是**必填选项**（不传报 `required option '--profile <name>' not specified`），Web 端固定用 `web`。
 
 安装后重启 dsh web 服务，插件即被加载。首次启动时插件会在后台自动引导 Python
 环境（下载 uv → Python 3.12 → venv → biopython，约 1-2 分钟），之后秒级就绪。
@@ -56,7 +60,7 @@ dsh plugin --profile web add ./dsh-bio-genie
 验证插件层是否生效（无需启动）：
 
 ```sh
-dsh --profile web --dump-config   # 输出中应包含 "# == dsh-bio-genie" 层
+npx -y @deepseek-ai/dsh --profile web --dump-config   # 输出中应包含 "# == dsh-bio-genie" 层
 ```
 
 ### 安装后必须批准构建脚本（否则没有 agent preset）
