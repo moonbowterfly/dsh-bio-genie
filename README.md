@@ -59,6 +59,26 @@ dsh plugin --profile web add ./dsh-bio-genie
 dsh --profile web --dump-config   # 输出中应包含 "# == dsh-bio-genie" 层
 ```
 
+### 安装后必须批准构建脚本（否则没有 agent preset）
+
+pnpm v11 默认拦截依赖的 lifecycle 脚本，而本包的 `postinstall` 正是**把 agent preset 复制到
+`~/.dsh/.agent-presets/bio-genie/`**。安装时若打印：
+
+```
+[ERR_PNPM_IGNORED_BUILDS] Ignored build scripts: @dsh-bio/dsh-bio-genie@0.6.25
+```
+
+表示 preset 没装上——工具都在，但 dsh 预设选择器里**没有「生物基因精灵」**。在 profile 目录批准一次即可：
+
+```sh
+cd ~/.dsh/profiles/web && pnpm approve-builds     # 或 pnpm approve-builds --all 全批准
+```
+
+批准后 pnpm 会把确切的键写进 `~/.dsh/profiles/web/pnpm-workspace.yaml` 的 `allowBuilds`。
+注意键会随安装方式变化：**从 GitHub 源安装时键含 commit 哈希，仓库每更新一次 commit 就得重新批准一次**；从 npm 安装的键是版本号，只在升版本时变。
+
+兜底：`node scripts/install-preset.js` 手动复制（见下文「手动安装 / 卸载」）。
+
 ### 故障排除：profile 已有本地包导致 pnpm 校验失败
 
 若你的 profile 里已装过**不在 npm registry 的本地包**（如皮肤插件），`dsh plugin add`
