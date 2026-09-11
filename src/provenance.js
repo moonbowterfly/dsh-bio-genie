@@ -14,6 +14,8 @@
 
 /** 每个 agent 台账的数值容量上限（防膨胀）。 */
 const LEDGER_CAP = 2000
+/** 单次工具结果最多贡献的数值数（防单个超大输出独占台账容量，见 recordResult）。 */
+const PER_RESULT_CAP = Math.floor(LEDGER_CAP / 2)
 /** 回复扫描时单次最多报告的违规数。 */
 const MAX_VIOLATIONS = 5
 /** 数值匹配相对容差：允许 agent 做末位四舍五入（52.3 匹配 52.28）。 */
@@ -35,9 +37,9 @@ function ledgerFor(agent) {
   return l
 }
 
-/** 递归收集 JSON 值中的有限数值（裁剪到台账容量）。 */
-function collectNumbers(value, out, depth) {
-  if (depth > 8 || out.length >= LEDGER_CAP) return
+/** 递归收集 JSON 值中的有限数值（裁剪到本次采集上限 limit）。 */
+function collectNumbers(value, out, depth, limit = LEDGER_CAP) {
+  if (depth > 8 || out.length >= limit) return
   if (typeof value === 'number') {
     if (Number.isFinite(value)) out.push(value)
     return
@@ -47,16 +49,16 @@ function collectNumbers(value, out, depth) {
     for (const m of value.matchAll(/-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g)) {
       const n = Number(m[0])
       if (Number.isFinite(n)) out.push(n)
-      if (out.length >= LEDGER_CAP) return
+      if (out.length >= limit) return
     }
     return
   }
   if (Array.isArray(value)) {
-    for (const v of value) collectNumbers(v, out, depth + 1)
+    for (const v of value) collectNumbers(v, out, depth + 1, limit)
     return
   }
   if (value && typeof value === 'object') {
-    for (const v of Object.values(value)) collectNumbers(v, out, depth + 1)
+    for (const v of Object.values(value)) collectNumbers(v, out, depth + 1, limit)
   }
 }
 
@@ -87,7 +89,17 @@ export function stampProvenance(tool, result) {
  */
 export function recordResult(agent, tool, result) {
   const ledger = ledgerFor(agent ?? FALLBACK_AGENT)
-  collectNumbers(result, ledger.numbers, 0)
+  // ⚠️ 必须先腾空间再收集（2026-09-11 缺陷修复）：
+  // collectNumbers 遇到 out.length >= limit 会**整体跳过**，而末尾的 splice 只删旧的
+  // 救不回已跳过的采集。若台账被某个超大输出（实测 96K 字符级）一次填满，
+  // 之后**所有**工具的数字都进不来 → 该会话的防火墙永久误伤每一个新数字
+  // （现场：seq 56 的 46K 输出填满台账，seq 73 的 521 无法入账，agent 在 seq 82
+  //  引用它时被判无溯源）。
+  if (ledger.numbers.length >= LEDGER_CAP) {
+    ledger.numbers.splice(0, ledger.numbers.length - Math.floor(LEDGER_CAP / 2))
+  }
+  // 单次结果贡献上限：防止单个超大输出独占全部容量（保证至少两个工具的贡献能共存）
+  collectNumbers(result, ledger.numbers, 0, ledger.numbers.length + PER_RESULT_CAP)
   if (ledger.numbers.length > LEDGER_CAP) {
     ledger.numbers.splice(0, ledger.numbers.length - LEDGER_CAP)
   }
