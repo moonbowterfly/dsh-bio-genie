@@ -60,6 +60,34 @@ sources:
           代码块可执行性）与 scripts/skill-standards-baseline.json 的棘轮机制，参考其
           「否决门 + 分级评分 + P0/P1/P2 建议」结构；未引入其运行时（9 步流水线不落地）。
 
+  - repo: jaechang-hits/SciAgent-Skills
+    url: https://github.com/jaechang-hits/SciAgent-Skills
+    commit: fe505cae14d20b6c33be2e49666425be98f005bb
+    license: "根 CC-BY-4.0；per-skill 混杂 23 种（含 GPL/AGPL/LGPL/CC-BY-SA/CC-BY-NC-SA/Proprietary）"
+    audit: "208 条逐条筛选：166 可吸收 / 11 需谨慎 / 31 禁止；本次只取 CC-BY-4.0 的期刊规格与统计标注两类"
+    upstream_status: active
+    absorbed_on: "2026-09-11"
+    absorbed:
+      - target: "skills/bio-figure.md（期刊规格速查节）"
+        source_skills: "scientific-writing/{nature,science,cell,pnas,lancet,nejm,elife,cancer-research,general}-figure-guide"
+        license: CC-BY-4.0
+        mode: "改造（事实层重写 + 官方页复核）"
+        summary: >
+          取 9 刊的宽度/DPI/字体/panel 标签约定/格式/色彩模式事实；**逐条对官方页复核**，
+          复核发现其 Science 栏宽（3.4/5.0/7.0 in）与 PNAS 栏宽与官方页不符，已改用官方值；
+          宽度与格式以 python/figurelib/assets/publisher_profiles.json 的带源快照为准。
+      - target: "skills/protocols/pub-figure.md（显著性标注配方）"
+        source_skills: "data-visualization/statistical-significance-annotation"
+        license: CC-BY-4.0
+        mode: "改造（重写为可执行配方）"
+        summary: >
+          取星号约定表（ns/*/**/***/****）、校正后 p 值纪律、比较选择规则；重写实现配方
+          并补 y 轴留白与 dodge 坐标两个实测坑；多面板一节（9b）为自写（外部 multipanel 为 Proprietary，未用）。
+    reference_only:
+      - target: "data-visualization/multipanel"
+        mode: "不可用（Proprietary, HITS Inc.）"
+        summary: "多面板配方由本仓库自写（GridSpec + sharex/sharey + add_panel_labels）。"
+
   - repo: Haojae/scipilot-figure-skill
     url: https://github.com/Haojae/scipilot-figure-skill
     commit: 43098ddb9e6a6d142218540c114f9ed38922fc42

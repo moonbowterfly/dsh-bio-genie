@@ -44,7 +44,7 @@ print('saved:', paths)
 result = {'files': paths, 'qa_issues': issues}
 ```
 
-## 九类配方
+## 十类配方
 
 ### 1. 折线图（时间/剂量，含误差带）
 
@@ -141,16 +141,47 @@ add_panel_labels(fig, style='nature')   # a b c d 自动横竖对齐；IEEE 用 
 # 再 export_figure(fig, 'figs/fig1', size_inches=(7.2, 5.4), ...)
 ```
 
-### 显著性标注（配方 4 之后）
+### 9b. 不等宽多面板（GridSpec）与共享轴
 
 ```python
-from matplotlib.lines import Line2D
-x1, x2 = 0, 1                                  # 组在 x 轴的位置
-y, h = df['value'].max() * 1.05, df['value'].max() * 0.02
-ax.plot([x1, x1, x2, x2], [y, y+h, y+h, y], lw=.8, color='black')
-ax.text((x1+x2)/2, y+h, '**', ha='center', va='bottom')
-# 检验方法与校正必须在图注交代（见 bio-proto-statistics）
+import matplotlib.pyplot as plt
+from figurelib.layout_tools import add_panel_labels
+fig = plt.figure(figsize=(7.2, 5.4), constrained_layout=True)  # 别叠用 tight_layout
+gs = fig.add_gridspec(2, 3, height_ratios=[1, 1.4], width_ratios=[1.6, 1, 1])
+ax_top = fig.add_subplot(gs[0, :])                      # 通栏面板（时间序列/热图）
+ax_bl = fig.add_subplot(gs[1, 0])
+ax_bc = fig.add_subplot(gs[1, 1], sharey=ax_bl)         # 共享轴：只共刻度，不用重复标签
+add_panel_labels(fig, style='nature')
 ```
+
+**要点**：不等宽用 `gridspec` 的 `width_ratios`/`height_ratios`；**共享轴**（`sharex=`/`sharey=`）
+省掉重复轴标签——Science 明确要求「共同轴标签不要重复」；panel 标签统一走 `add_panel_labels`
+（手摆 `ax.text` 必错位，见 bio-figure P18）；`constrained_layout=True` 与 `tight_layout()` 不可叠用。
+
+### 10. 显著性标注（配配方 2/4，必须先有检验）
+
+```python
+def p_to_stars(p):
+    """标准星号约定：ns >0.05 / * ≤0.05 / ** ≤0.01 / *** ≤0.001 / **** ≤0.0001"""
+    return 'ns' if p > .05 else '*' if p > .01 else '**' if p > .001 else '***' if p > .0001 else '****'
+
+def bracket(ax, x1, x2, y, text='*', h=None, lw=.8):
+    h = h if h is not None else (ax.get_ylim()[1] - ax.get_ylim()[0]) * .02
+    ax.plot([x1, x1, x2, x2], [y, y + h, y + h, y], lw=lw, color='black')
+    ax.text((x1 + x2) / 2, y + h, text, ha='center', va='bottom')
+
+# pairs = [(x1, x2, p_adj), ...]  ← 先跑检验拿**校正后** p 值（bio_stats_test / bio-proto-statistics）
+ymax = df['value'].max()
+for k, (x1, x2, p) in enumerate(pairs):
+    bracket(ax, x1, x2, y=ymax * (1.05 + 0.08 * k), text=p_to_stars(p))
+ax.set_ylim(0, ymax * (1.05 + 0.08 * len(pairs) + 0.05))   # 给标注留空间，防被裁
+```
+
+**纪律**：① **每个星号背后必须有一次真实检验**——没检验就没有星号（bio-figure P11）；
+② 多重比较用**校正后** p 值（BH-FDR 优先，见 `bio-proto-statistics` §三）；
+③ 只标与结论相关的比较（≥3 组全两两会淹没图面；>6 对只标关键对）；
+④ 桥逐层抬高 + 先 `set_ylim` ——「标注被 y 轴裁掉」是最高频事故；
+⑤ x 坐标对 dodge 后实际位置（seaborn 分组柱需手算偏移）。
 
 ## 常见坑
 
@@ -162,3 +193,7 @@ ax.text((x1+x2)/2, y+h, '**', ha='center', va='bottom')
 - plotly 交互图不在插件范围——多面板/静态图用 matplotlib 足够。
 - 显著性桥的 x 坐标对应 dodge 后实际位置，改了分组要同步改。
 - 每张图只讲一个核心结论；>2 个分类维度先查 bio-figure 的拆图标准。
+
+<!-- absorbed (significance-annotation recipe) from jaechang-hits/SciAgent-Skills@fe505cae14d20b6c33be2e49666425be98f005bb (CC-BY-4.0), 2026-09-11.
+     改造：只取星号约定表与「校正后 p 值 / 比较选择」纪律，重写为实现配方（含 y 轴留白与 dodge 坐标两个实测坑）；
+     多 panel 一节（9b）为自写配方——外部 multipanel skill 为 Proprietary (HITS Inc.)，未使用其任何内容。 -->

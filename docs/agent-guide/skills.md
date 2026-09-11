@@ -93,7 +93,7 @@ language: none
 | `bio-proto-codon-optimization` | 密码子优化：宿主频率表回译/验证 |
 | `bio-proto-enrichment-workflow` | 富集解读：多库交叉/背景集/冗余消除/OLS4 消歧 |
 | `bio-proto-literature-review` | 文献调研：PubMed 检索式/批量摘要/OpenAlex 补充 |
-| `bio-proto-pub-figure` | **出版级出图执行**：9 类图配方/figurelib 调用/自检闭环 |
+| `bio-proto-pub-figure` | **出版级出图执行**：10 类图配方/显著性标注/多面板 GridSpec/figurelib 调用/自检闭环 |
 | `bio-proto-coords` | 基因组坐标：0/1-based 转换/BED-GFF-VCF 惯例/GRCh37-38/左对齐 |
 | `bio-proto-statistics` | 统计：检验选择/scipy+statsmodels 模板/多重校正/效应量对照/样本量与功效规划 |
 

@@ -105,3 +105,22 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
 ---
 
 > 完整吸收台账（含基线 commit、改造摘要、候选仓库裁决）见仓库根 `SKILL-PROVENANCE.yaml`。
+
+---
+
+# jaechang-hits/SciAgent-Skills 许可声明
+
+本插件 `skills/` 下的以下内容吸收自
+[jaechang-hits/SciAgent-Skills](https://github.com/jaechang-hits/SciAgent-Skills)
+（基线 commit `fe505cae14d20b6c33be2e49666425be98f005bb`，2026-09-11 核验）：
+
+| 落点 | 来源 skill | 许可 | 吸收方式 |
+|---|---|---|---|
+| `skills/bio-figure.md`（期刊规格速查） | `scientific-writing/*-figure-guide`（9 个期刊规格） | **CC-BY-4.0** | 仅取规格事实，**逐条对官方页复核后重写**（复核发现其 Science/PNAS 栏宽与官方页不符，已改用官方值） |
+| `skills/protocols/pub-figure.md`（显著性标注配方） | `data-visualization/statistical-significance-annotation` | **CC-BY-4.0** | 取星号约定与校正/选择纪律，重写为实现配方 |
+
+未使用：`data-visualization/multipanel`（**Proprietary, HITS Inc.**）——本插件多面板配方为自行编写。
+仓库根另有部分 GPL/AGPL/CC-BY-NC 系 skill，本插件**一律未取用**（逐条许可审计见 `SKILL-PROVENANCE.yaml`）。
+
+**CC-BY-4.0** — Copyright (c) jaechang-hits。许可全文：https://creativecommons.org/licenses/by/4.0/legalcode
+（CC-BY 要求署名：本节即署名与来源声明；修改后的内容标注在各 skill 正文末尾的 HTML 注释中。）

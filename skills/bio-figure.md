@@ -80,16 +80,35 @@ language: python
 
 ## 期刊规格速查
 
-| 期刊 | 单栏宽 | 双栏宽 | 字号 | DPI | 矢量偏好 |
-|---|---|---|---|---|---|
-| Nature | 3.5 in (89mm) | 7.2 in (183mm) | 7-8pt | 300 | PDF（字体嵌入） |
-| Science | 3.5 in | 7.2 in | 7-8pt | 300 | PDF |
-| IEEE | 3.5 in | 7.16 in | 8pt | 600 | EPS/PDF |
-| Elsevier | 90mm | 190mm | 7-10pt | 300-600 | PDF/TIFF |
-| PNAS | 3.5 in | 7.2 in | 7-8pt | 300-600 | PDF |
-| 中文核心 | 按期刊要求 | — | 宋体正文+Times 数字 | 300+ | PDF/TIFF |
+> **数据源**：`python/figurelib/assets/publisher_profiles.json`（自带官方页链接与快照日期的数据文件）。
+> ⭐ = 2026-09-11 已对官方页复核；† = 单一转录来源（SciAgent CC-BY-4.0），投稿前请核对目标刊当前页。
+> **口径**：宽度 = 排版尺寸（照它定 `figsize`，导出后不缩放）；DPI = **最终尺寸下**的最低要求；
+> 「矢量」= 保持矢量、勿栅格化（Nature 明确要求线稿不要栅格化）。**规格会变，以目标刊当前 Author Guidelines 为准。**
 
-`figurelib.setup_style(journal=..., lang=...)` 已内置对应预设（nature/science/ieee/general × zh/en）。
+| 期刊 | 排版宽度 | Panel 标签约定 | 图内字号 | 分辨率（最终尺寸下） | 格式 / 色彩 |
+|---|---|---|---|---|---|
+| **Nature** ⭐ | 89 mm 单栏 / 183 mm 双栏（1.5 栏 120–136） | **小写粗体 `a, b, c`** | 5–7 pt（标签 8 pt） | 照片 300；**线稿保持矢量**（研究图指南建议 ≥450 dpi 导出） | PDF/EPS/AI/PS；照片 PSD/TIFF/JPEG；RGB |
+| **Science** ⭐ | 57 / 121 / 184 mm（1/2/3 栏） | 8 pt 粗体 | 缩后约 7 pt（≥5 pt） | 初投 300；修订稿更高 | 矢量优先 PDF/EPS/AI；线宽 ≥0.5 pt、符号 ≥6 pt |
+| **Cell** ⭐ | 85 mm 单栏 / 114（1.5 栏）/ 174 mm 全宽（高 ≤200） | **大写粗体 `A, B, C`** | 5–7 pt（约 7） | 彩图/灰度 300、黑白 500、**线稿 1000** | TIFF/PDF/EPS；**RGB**；禁 JPEG |
+| **PNAS** ⭐ | 小 9×6 / 中 11×11 / 大 18×22 cm | **斜体大写 *A*, *B*, *C*** | 6–8 pt（印刷后 ≥2 mm） | 无字 300 / 含字 600–900 / 线稿 1000–1200 | TIFF/EPS/PDF/PPT；**仅 RGB（CMYK 退稿）** |
+| **Lancet** † | 75 mm 单栏 / 154 mm 双栏（最小 107） | 编辑部内重绘，勿自定风格 | 衬线 **Times New Roman** | 300（按 120% 尺寸出图再缩） | **可编辑源 PPTX/Word/SVG** 优先；RGB 线上 / CMYK 印刷 |
+| **NEJM** † | 由编辑部排版 | 编辑部内绘制 | **Univers**（备选 Helvetica/Arial） | 照片 300+；图表矢量 | **AI/EPS/SVG 可编辑矢量**优先；显微/组织图必带比例尺 |
+| **eLife** † | 无硬性规定 | 无硬性规定 | 无硬性规定 | 常规 300 建议；striking image ≥1800×900 px **且无任何文字** | TIFF/EPS/PDF/PNG；RGB 惯例 |
+| **Cancer Res (AACR)** † | 85 / 174 mm | 层级式 `A` → `Ai, Aii`（**不是** Aa/Ab）；不加框、不加点 | 8–12 pt | 线稿 1200 / 半色调 300 / 组合 600–900 | EPS/TIFF/AI/PNG；RGB 推荐 |
+| Elsevier 系 ⭐ | 90 单栏 / 140（1.5 栏）/ 190 mm 全宽（最小 30） | 按刊 | 7 pt（上下标 ≥6） | 彩图/灰度 300；线稿 1000（极细线 1200） | EPS/PDF（矢量）、TIFF（照片） |
+| BMC 系 ⭐ | 85 半栏 / 170 mm 全宽（高 ≤225） | 按刊 | — | 约 300（最终尺寸） | EPS/PDF + TIFF/PNG；**字体必须嵌入** |
+| IEEE ⭐ | 88.9 mm 单栏 / 182 mm 双栏 | 按刊 | ≥8 pt | 彩图/灰度 >300；黑白线稿 >600 | PS/EPS/PDF |
+| 中文核心 | 按刊物要求 | 按刊 | 宋体正文 + Times 数字 | 300+ | PDF/TIFF |
+
+**panel 标签实现**：`figurelib.layout_tools.add_panel_labels(fig, style=...)` 支持
+`nature`/`science`（a b c）、`ieee`/`paren`（(a)(b)(c)）、`upper`（A B C）、`upper_paren`（(A)(B)(C)）。
+PNAS 的**斜体**大写目前无预设——用 `labels=['A','B']` 后自行设 `fontstyle='italic'`，或按目标刊要求手写。
+
+**图注硬要求（多刊强制）**：误差类型（SD/SEM/95%CI）+ **n（生物学重复）** + 检验方法与多重校正；
+AACR 明确要求区分**技术重复与生物学重复**；显微/组织图带比例尺；Western blot 带分子量标记。
+
+`figurelib.setup_style(journal=..., lang=...)` 提供样式预设（nature/science/ieee/general × zh/en）；
+**宽度**照上表定 `figsize`，投稿前用 `bio_fig_export(paths, min_dpi, width_in, height_in)` 机器审计。
 
 ## 中文支持
 
@@ -108,3 +127,7 @@ language: python
 | 投稿前文件审计 | `bio_fig_export` |
 
 **AI 读图复核说明**：scipilot 的视觉自检有"AI 读图"一环（渲 PNG 后多模态读图核对图例压数据/子图对齐）。dsh-bio-genie 插件本身无多模态能力——机器自检（audit_layout + bio_fig_export）全保留；若 dsh 会话的模型支持读图，可将 preview PNG 交给模型复核，否则以程序自检 + 清单核对为准。
+
+<!-- absorbed (journal figure specs) from jaechang-hits/SciAgent-Skills@fe505cae14d20b6c33be2e49666425be98f005bb (CC-BY-4.0), 2026-09-11;
+     改造：仅取规格事实，且**逐条对官方页复核**（复核中发现其 Science 栏宽 3.4/5.0/7.0 in 与 PNAS 栏宽与官方页不符，已改用官方值）；
+     宽度/格式一并以本仓库 python/figurelib/assets/publisher_profiles.json 的带源快照为准；未复制其正文。 -->

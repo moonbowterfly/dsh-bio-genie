@@ -210,7 +210,7 @@ export const SKILL_MANIFEST = [
   {
     name: 'bio-proto-pub-figure',
     category: 'protocol',
-    description: '出版级出图执行协议：profile→选图→setup_style→9 类图配方→自检→导出→审计的完整闭环（figurelib 代码模板）。',
+    description: '出版级出图执行协议：profile→选图→setup_style→10 类图配方（含显著性标注、不等宽多面板）→自检→导出→审计闭环。',
     file: 'protocols/pub-figure.md',
   },
   {
@@ -257,7 +257,7 @@ export const SKILL_MANIFEST = [
   {
     name: 'bio-evidence-appraisal',
     category: 'research',
-    description: '证据分级与结论强度：证据层级（含基础研究梯级）、GRADE 降级域、四轴评估、验证深度、引用角色与措辞边界。',
+    description: '证据分级与结论强度：判断结论能说多强、能不能这么写（证据层级、GRADE 降级域、四轴评估、验证深度、引用角色与措辞边界）。',
     whenToUse: '判断一批文献谁更强、某个结论能说多强、写讨论/结论前定措辞、系统综述做偏倚评级时。',
     file: 'bio-evidence-appraisal.md',
   },

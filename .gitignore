@@ -16,6 +16,10 @@ node_modules/
 # 本地打包产物（npm/pnpm pack 试装用）
 *.tgz
 
+# ---- 本地测试/试跑产物（图/临时数据；2026-09-11 曾误入提交一次）----
+figs/
+out/
+tmp/
 # ---- Python 构建中间物 ----
 __pycache__/
 *.py[cod]
