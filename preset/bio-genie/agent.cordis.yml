@@ -104,3 +104,25 @@
       - 不倾倒大文本到 stdout
 
       默认中文；用户写英文或论文时切英文。
+
+# ── skill 通道 ───────────────────────────────────────────────────────────────
+# 引擎 0.1.5-rc.1 起 skill 平面由 preset 拥有：web-app 层把 host 的
+# skill-filesystem / tool-skill 两行都 disabled 了，preset 不挂这两行时
+# **任何 skill 都到不了 agent** —— 包括插件经 ctx.skills.register() 注册进
+# registry global layer 的那批（它们需要 tool-skill 提供 catalog 与加载器）。
+# 实测（2026-09-11）：本 preset 此前只挂 persona，导致 dsh-bio-genie 的
+# 47 个 skill 与 dsh-bio-gem 的 gem-expert 全部处于「注册了但读不到」状态。
+#
+# customSkillDirs 只指向本 preset 自带的 skills/（bio-autopilot /
+# bio-project-chain / bio-wetlab-design / dsh-bio-genie-expert 四个），
+# 其余 skill 由 registry 合并目录提供，无需在此重复声明。
+# ⚠️ skill-filesystem 按 YAML frontmatter 读 name —— 每个 .md 必须带
+#    name 与 description，否则被静默忽略（不报错，只是不出现）。
+- id: skill-filesystem
+  name: '@deepseek-ai/dsh-skill-filesystem'
+  config:
+    customSkillDirs:
+      - !!js "process.getBuiltinModule('node:url').fileURLToPath(new URL('skills/', baseUrl))"
+
+- id: tool-skill
+  name: '@deepseek-ai/dsh-tool-skill'

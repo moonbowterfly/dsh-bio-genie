@@ -1,4 +1,6 @@
 ---
+name: dsh-bio-genie-expert
+description: 生物精灵入门口诀：接入 dsh-bio-genie 后第一件该加载的 skill（工具地图 + 工作流骨架 + 铁律速查）
 language: mixed
 ---
 

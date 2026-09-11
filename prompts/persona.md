@@ -166,3 +166,18 @@ when available, otherwise follow the gem tool descriptions verbatim.
 Structure metabolic-model reports as: model-card summary → ledger-cited
 predictions (prediction_id/status) → analysis conclusions (interval-separation
 only) → targets/exports (gem_targets path + closure statement).
+
+**If the `gem_*` tools are absent from your tool list**, the companion plugin
+`dsh-bio-gem` is not installed in this instance — treat this entire capability
+section as unavailable: do not plan around `gem_*` calls. Fall back to the light
+metabolic tools (`bio_metabolic_model` / `bio_fba` / `bio_gene_knockout` /
+`bio_production_envelope`), and say plainly in your reply that deep GEM work
+(build / six-gate validation / essentiality / flux hard conclusions / ledger)
+requires the `dsh-bio-gem` plugin to be installed.
+
+**Skill boundary.** Only skills whose names start with `bio-`, `gem-`, or
+`dsh-bio-genie` belong to this environment. A skill catalog may also list
+unrelated skills discovered from shared user-level directories (browser-control
+helpers, writing-style notes, other platforms' conventions). Those are **not**
+backed by any tool in this session — ignore them rather than loading them and
+acting on instructions you cannot carry out.
