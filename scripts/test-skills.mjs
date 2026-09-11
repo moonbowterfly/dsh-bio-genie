@@ -24,11 +24,15 @@ let failures = 0
 let warnings = 0
 const acceptancePending = []
 const acceptanceFilled = []
+/** name → 是否已有「验收标准」节（供棘轮判定"改动且仍缺"用）。 */
+const acceptanceState = new Map()
 
-// 严格模式：CI / 发版必须开——缺 venv、probe 失败、probe 无输出一律 FAIL 而不是静默 WARN。
-// 背景（外部代码评审 2026-09-12）：非严格模式下干净 CI 可完全跳过"python 代码块"门禁却显示 ALL PASS。
-const STRICT = /^(1|true|yes)$/i.test(process.env.DSH_SKILLS_STRICT || '')
-if (STRICT) console.log('[strict] 严格模式：python 门禁不可跳过')
+// 严格模式**默认开启**：缺 venv、probe 失败、probe 无输出一律 FAIL（外部评审 2026-09-12：
+// 原先默认只 WARN，干净 CI 可整段跳过 python 门禁却显示 ALL PASS，等于门禁不存在）。
+// 没有自举环境的本机（克隆后尚未跑过插件）可显式放行：DSH_SKILLS_ALLOW_SKIP=1
+const ALLOW_SKIP = /^(1|true|yes)$/i.test(process.env.DSH_SKILLS_ALLOW_SKIP || '')
+const STRICT = !ALLOW_SKIP
+if (STRICT) console.log('[strict] 严格模式（python 门禁不可跳过）；确需跳过请设 DSH_SKILLS_ALLOW_SKIP=1')
 function assert(cond, msg) {
   if (cond) console.log(`  PASS ${msg}`)
   else { failures++; console.error(`  FAIL ${msg}`) }
@@ -41,6 +45,10 @@ function warn(msg) {
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 const skillsDir = join(repoRoot, 'skills')
 const guidesDir = join(repoRoot, 'docs', 'agent-guide')
+
+// EOL 归一化：git autocrlf 检出会得到 CRLF，而断言按 LF 写——
+// 不在读取时归一化就会对 CRLF 文件误报「缺 language 标注」（实测假阳性 2026-09-12）。
+const readNorm = (p) => readFileSync(p, 'utf8').split('\r' + '\n').join(NL)
 const protocols = SKILL_MANIFEST.filter((s) => s.file.startsWith('protocols/'))
 const domain = SKILL_MANIFEST.filter((s) => !s.file.startsWith('protocols/'))
 
@@ -85,7 +93,7 @@ for (const g of GUIDE_MANIFEST) {
   const p = join(guidesDir, g.file)
   assert(existsSync(p), `指南文件存在: docs/agent-guide/${g.file}`)
   if (existsSync(p)) {
-    const text = readFileSync(p, 'utf8')
+    const text = readNorm(p)
     assert(text.length > 500, `指南内容非空且完整: ${g.name}（${text.length} 字符）`)
     assert(!text.includes('[SKILL_PRUNED]'), `指南未被裁剪: ${g.name}`)
     assertLanguage(`指南 ${g.name}`, text)
@@ -96,7 +104,7 @@ for (const s of SKILL_MANIFEST) {
   const p = join(skillsDir, s.file)
   assert(existsSync(p), `文件存在: ${s.file}`)
   if (!existsSync(p)) continue
-  const text = readFileSync(p, 'utf8')
+  const text = readNorm(p)
   assertLanguage(`skill ${s.name}`, text)
   if (s.file.startsWith('protocols/')) {
     assert(text.startsWith('---'), `${s.file} 以 frontmatter 开头`)
@@ -112,6 +120,7 @@ for (const s of SKILL_MANIFEST) {
   }
   // 每个 skill 正文须有验收标准节（静态门 #2）；存量未达标走棘轮基线，只 WARN
   const hasAcceptance = /##\s*验收标准/.test(text)
+  acceptanceState.set(s.name, hasAcceptance)
   if (hasAcceptance) {
     // 光有标题不算——必须含至少一条 checklist 条目（外部评审 2026-09-12）
     const acc = text.split(/##\s*验收标准/)[1] || ''
@@ -139,11 +148,21 @@ for (const s of SKILL_MANIFEST) {
   } catch (err) {
     warn(`git 不可用 → 跳过「改动即须达标」检查: ${String(err.message).slice(0, 80)}`)
   }
-  const changedNames = new Set(changed.map((f) => SKILL_MANIFEST.find((s) => s.file === f)?.name).filter(Boolean))
-  const stillExempt = [...changedNames].filter((n) => GRANDFATHERED.has(n))
+  // ⚠️ git 给的是 `skills/xxx.md`，manifest 的 s.file 是 `xxx.md`：不归一化就永远匹配不到，
+  // 检查会静默空转（外部评审 2026-09-12 实测：8 个改动文件匹配到 0 个）。
+  // 取路径末段即可（git 给 `skills/x.md`，manifest 存 `x.md`）——用 split 而非正则，免去转义层踩坑
+  const toSkillName = (f) => SKILL_MANIFEST.find((s) => s.file === f.split('/').pop())?.name
+  const changedNames = new Set(changed.map(toSkillName).filter(Boolean))
+  if (changed.length > 0) {
+    assert(changedNames.size > 0,
+      `棘轮路径映射自检：git 报 ${changed.length} 个改动文件，应至少映射到 1 个 skill`
+      + `（映射全空 = 检查在空转）`)
+    console.log(`  改动过的 skill（须达标）: ${[...changedNames].join(', ')}`)
+  }
+  // 只对「改动过 ∧ 仍在基线 ∧ **确实仍缺**」判 FAIL：补好了还报错就是假阳性（本轮实测踩过）。
+  const stillExempt = [...changedNames].filter((n) => GRANDFATHERED.has(n) && acceptanceState.get(n) === false)
   assert(stillExempt.length === 0,
     `自基线 commit 起改动过的 skill 必须补齐「验收标准」${stillExempt.length ? ' → ' + stillExempt.join(', ') : ''}`)
-  if (changedNames.size) console.log(`  改动过的 skill（须达标）: ${[...changedNames].join(', ')}`)
 }
 
 // ─────────────────────────────────────────────────────────────

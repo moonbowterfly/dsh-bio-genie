@@ -16,7 +16,6 @@
     "bio-utils",
     "bio-graphics",
     "bio-popgen",
-    "bio-ml",
     "bio-dna-design",
     "bio-proto-seq-qc",
     "bio-proto-format-convert",

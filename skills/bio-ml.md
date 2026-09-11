@@ -76,3 +76,10 @@ bio_stats_test(path="results.csv", group_col="condition", value_col="expression"
 - 分类任务默认 80/20 划分 + 5 折交叉验证
 - `random_forest` 模型最稳定，适合作为默认选择
 - 结果中的 `feature_importance` 按重要性排序，前 3 个通常最有价值
+
+## 验收标准
+
+- [ ] 输入是 **CSV 文件路径**（工具不收 DataFrame）；分组/数值列名与实际表头一致
+- [ ] 分类任务报告 **CV 均值 + 标准差**（不看单次划分的准确率）
+- [ ] 特征重要性给排序后的前 N 个（并说明是哪种重要性口径）
+- [ ] 小样本（每组 n<10）不上复杂模型；类别不平衡时说明处理方式
