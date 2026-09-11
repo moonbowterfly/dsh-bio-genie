@@ -19,19 +19,19 @@ language: python
 ## 典型工作流
 
 ### 1. 分类预测（基因表达 → 表型）
-```python
+```text
 bio_ml_pipeline(path="expression.csv", target="phenotype", task="classification")
 → accuracy, cv_mean, feature_importance
 ```
 
 ### 2. 降维可视化（高维数据 → 2D/3D）
-```python
+```text
 bio_ml_reduce(path="data.csv", method="pca", n_components=2)
 → 坐标 + 方差解释率
 ```
 
 ### 3. 差异分析（实验组 vs 对照组）
-```python
+```text
 bio_stats_test(path="results.csv", group_col="condition", value_col="expression")
 → p 值 + 效应量 + 各组统计
 ```

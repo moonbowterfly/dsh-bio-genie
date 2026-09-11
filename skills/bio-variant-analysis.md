@@ -12,7 +12,7 @@ language: python
 
 ## 环境
 
-- **Python**：vcfpy（`pip install vcfpy`）、cyvcf2（需 htslib）
+- **Python**：`vcfpy`（**内置第一层依赖**，无需安装；若 `import vcfpy` 失败，调 `bio_env` 的 `reinstall=true` 补装）；cyvcf2 需 htslib，插件不内置
 - **数据库**：ClinVar、gnomAD、Ensembl VEP、dbSNP
 
 ## 变异分析决策树
@@ -63,13 +63,20 @@ print(dict(types))
 filtered = []
 for v in variants:
     # 质量过滤
-    if v QUAL < 30:
+    if v.QUAL is not None and v.QUAL < 30:
         continue
-    # 次要等位基因频率（MAF）过滤
-    if v.INFO.get('MAF', [1])[0] > 0.05:
+    # 次要等位基因频率（MAF）过滤——注意：字段缺失时**不要**当作"不合格"丢掉
+    maf = v.INFO.get('MAF')
+    if maf is not None and float(maf[0]) > 0.05:
         continue
-    # 功能区域（外显子/剪切位点）
-    if v.INFO.get('ANN', '').split('|')[1] in ['SYNONYMOUS', 'INTRON']:
+    # 功能区域（外显子/剪切位点）；ANN 缺失或格式异常时跳过该判据
+    # ⚠️ ANN 字段里是 SO 术语（synonymous_variant / intron_variant…），
+    #    不是 INTRON / SYNONYMOUS 这类缩写——写错术语集合会让整条判据静默失效
+    NONCODING = {'synonymous_variant', 'intron_variant', 'intergenic_region',
+                 'upstream_gene_variant', 'downstream_gene_variant'}
+    ann = (v.INFO.get('ANN') or [None])[0]
+    parts = str(ann).split('|') if ann else []
+    if len(parts) > 1 and parts[1] in NONCODING:
         continue
     filtered.append(v)
 print(f"过滤后: {len(filtered)}")

@@ -33,9 +33,16 @@ cobra>=0.32.0
 requests>=2.28
 # 数据科学与机器学习（2026-08-22 新增）：
 #  - scikit-learn: 机器学习（分类/回归/聚类/降维/特征选择）
-#  - statsmodels:  统计建模（假设检验/回归/时间序列）
+#  - statsmodels:  统计建模（假设检验/回归/时间序列）+ 功效/样本量规划（TTestIndPower 等）
 scikit-learn>=1.3
 statsmodels>=0.14
+# 捆绑 skill 实际依赖（2026-09-11 静态门查出：bio-variant-analysis / bio-survival-analysis
+# 的代码模板引用了环境里根本不存在的库，用户一跑就 ImportError，违反零安装原则）：
+#  - vcfpy:    VCF 读写（零依赖纯 Python，闭包仅自身）
+#  - lifelines: 生存分析 KM/Cox（闭包 autograd + autograd-gamma，其余依赖已在第一层）
+# 两者 uv 实测解析干净（Resolved 24 packages，仅需新增 4 个 wheel）。
+vcfpy>=0.14
+lifelines>=0.30
 # ⚠️ 合成生物学五项已下沉第二层（v0.6.16 分层调整，2026-08-26）：
 # primer3-py / dnachisel / dna-features-viewer 不再随环境引导安装，改由
 # src/extra-deps.js EXTRA_DEPS 首次调用对应 op 时自动补装。下沉原因：第一层是

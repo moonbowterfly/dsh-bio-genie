@@ -12,11 +12,11 @@ language: python
 
 ## 环境
 
-- **Python**：lifelines（`pip install lifelines`）
-  ```python
-  from lifelines import KaplanMeierFitter, CoxPHFitter, logrank_test
-  from lifelines.utils import concordance_index
-  ```
+- **Python**：`lifelines`（**内置第一层依赖**，无需安装；若 `import lifelines` 失败，调 `bio_env` 的 `reinstall=true` 补装）
+```python
+from lifelines import KaplanMeierFitter, CoxPHFitter, logrank_test
+from lifelines.utils import concordance_index
+```
 - **数据格式**：三列核心——`time`（随访时间）、`event`（1=发生终点事件，0=删失）、协变量列
 
 ## 统计方法选择决策树
