@@ -24,6 +24,11 @@ let failures = 0
 let warnings = 0
 const acceptancePending = []
 const acceptanceFilled = []
+
+// 严格模式：CI / 发版必须开——缺 venv、probe 失败、probe 无输出一律 FAIL 而不是静默 WARN。
+// 背景（外部代码评审 2026-09-12）：非严格模式下干净 CI 可完全跳过"python 代码块"门禁却显示 ALL PASS。
+const STRICT = /^(1|true|yes)$/i.test(process.env.DSH_SKILLS_STRICT || '')
+if (STRICT) console.log('[strict] 严格模式：python 门禁不可跳过')
 function assert(cond, msg) {
   if (cond) console.log(`  PASS ${msg}`)
   else { failures++; console.error(`  FAIL ${msg}`) }
@@ -47,15 +52,24 @@ const NL = String.fromCharCode(10)
 const VALID_LANGUAGES = ['python', 'mixed', 'none']
 
 /** 解析 frontmatter 里的 language 字段；无 frontmatter 或无字段返回 null。 */
-function frontmatterLanguage(text) {
-  if (!text.startsWith('---' + NL)) return null
+/** 取出 frontmatter 块正文（不含 --- 分隔行）；无 frontmatter 返回空串。 */
+function frontmatterBlock(text) {
+  if (!text.startsWith('---' + NL)) return ''
   const end = text.indexOf(NL + '---', 4)
-  if (end < 0) return null
-  for (const line of text.slice(4, end).split(NL)) {
+  return end < 0 ? '' : text.slice(4, end)
+}
+
+/** 解析 frontmatter 里的字段值（只在该块内查找，避免正文里的同名文字骗过门禁）。 */
+function frontmatterValue(text, field) {
+  for (const line of frontmatterBlock(text).split(NL)) {
     const t = line.trim()
-    if (t.startsWith('language:')) return t.slice('language:'.length).trim()
+    if (t.startsWith(field + ':')) return t.slice(field.length + 1).trim()
   }
   return null
+}
+
+function frontmatterLanguage(text) {
+  return frontmatterValue(text, 'language')
 }
 
 function assertLanguage(label, text) {
@@ -85,22 +99,51 @@ for (const s of SKILL_MANIFEST) {
   const text = readFileSync(p, 'utf8')
   assertLanguage(`skill ${s.name}`, text)
   if (s.file.startsWith('protocols/')) {
-    for (const field of ['name:', 'domain:', 'inputs:', 'outputs:', 'requires_network:']) {
-      assert(text.includes(field), `${s.file} frontmatter 含 ${field}`)
-    }
     assert(text.startsWith('---'), `${s.file} 以 frontmatter 开头`)
+    // 只在 frontmatter 块内校验字段（外部评审 2026-09-12：原先用 text.includes 全文匹配，
+    // 字段写进正文也能通过）
+    const fm = frontmatterBlock(text)
+    for (const field of ['name', 'domain', 'inputs', 'outputs', 'requires_network']) {
+      assert(frontmatterValue(text, field) !== null,
+        `${s.file} frontmatter 块内含 ${field}:（全文出现但不在块内不算）`)
+    }
     // 协议必须含可执行内容：python 代码模板 或 语义化工具调用序列（两者其一）
     assert(text.includes('```python') || text.includes('工具调用序列'), `${s.file} 含可执行内容`)
   }
   // 每个 skill 正文须有验收标准节（静态门 #2）；存量未达标走棘轮基线，只 WARN
   const hasAcceptance = /##\s*验收标准/.test(text)
   if (hasAcceptance) {
+    // 光有标题不算——必须含至少一条 checklist 条目（外部评审 2026-09-12）
+    const acc = text.split(/##\s*验收标准/)[1] || ''
+    assert(/- \[[ x]\]/.test(acc.slice(0, 1500)), `${s.name} 验收标准含 checklist 条目`)
     if (GRANDFATHERED.has(s.name)) acceptanceFilled.push(s.name)
   } else if (GRANDFATHERED.has(s.name)) {
     acceptancePending.push(s.name)
   } else {
     assert(false, `${s.name} 含「验收标准」节（新增/改动的 skill 不得豁免）`)
   }
+}
+
+// ── 棘轮收紧：自基线 commit 起**被改动过**的 skill 不得继续留在豁免名单 ──
+// 外部评审 2026-09-12：原基线是静态白名单，改动过的 skill 仍只 WARN，规则形同虚设。
+{
+  const base = BASELINE.baseline_commit
+  let changed = []
+  try {
+    if (base) {
+      changed = execFileSync('git', ['diff', '--name-only', `${base}..HEAD`, '--', 'skills/'],
+        { encoding: 'utf8', cwd: repoRoot }).split(NL).filter(Boolean)
+    }
+    changed = changed.concat(execFileSync('git', ['diff', '--name-only', '--', 'skills/'],
+      { encoding: 'utf8', cwd: repoRoot }).split(NL).filter(Boolean))
+  } catch (err) {
+    warn(`git 不可用 → 跳过「改动即须达标」检查: ${String(err.message).slice(0, 80)}`)
+  }
+  const changedNames = new Set(changed.map((f) => SKILL_MANIFEST.find((s) => s.file === f)?.name).filter(Boolean))
+  const stillExempt = [...changedNames].filter((n) => GRANDFATHERED.has(n))
+  assert(stillExempt.length === 0,
+    `自基线 commit 起改动过的 skill 必须补齐「验收标准」${stillExempt.length ? ' → ' + stillExempt.join(', ') : ''}`)
+  if (changedNames.size) console.log(`  改动过的 skill（须达标）: ${[...changedNames].join(', ')}`)
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -133,8 +176,10 @@ console.log('\n[目录预算]')
   const over = entries.filter((e) => e.description.length > DESC_MAX_LEN)
   assert(over.length === 0, `description 单条 ≤ ${DESC_MAX_LEN} 字符（超限 ${over.length} 条${over.length ? ' → ' + over.map((e) => `${e.name}(${e.description.length})`).join(', ') : ''}）`)
 
-  // 主词唯一性：description 首句引导词不得重复（两个 skill 说不出差别 = 该合并）
-  const lead = (s) => s.split(/[：:，,（(。；;]/)[0].trim().slice(0, 14)
+  // 主词唯一性（**启发式 lint**）：比较 description 首个分隔符前的**完整**引导词。
+  // 它只拦"同名/同形标题"这类明显撞车；语义可区分性仍需人工判断（外部评审 2026-09-12：
+  // 截断到 14 字符既可能误判、也能改个前缀绕过，不应被当成语义合并门）。
+  const lead = (s) => s.split(/[：:，,（(。；;]/)[0].trim()
   const byLead = new Map()
   for (const e of entries) {
     const k = lead(e.description)
@@ -178,7 +223,9 @@ console.log('\n[代码块静态检查]')
   if (blocks.length === 0) {
     console.log('  SKIP 未发现 python 代码块')
   } else if (!py) {
-    warn(`发现 ${blocks.length} 个 python 代码块，但找不到自举环境（DSH_BIO_PYTHON 可指定）→ 跳过语法/import 检查`)
+    const msg = `发现 ${blocks.length} 个 python 代码块，但找不到自举环境（DSH_BIO_PYTHON 可指定）→ `
+      + (STRICT ? '严格模式拒绝跳过' : '跳过语法/import 检查')
+    if (STRICT) assert(false, msg); else warn(msg)
   } else {
     // 第二层/第三层依赖允许缺失（首次调用时按需补装），只有第一层依赖缺失才算 FAIL
     // 本插件自带、通过 sys.path 注入可导入的模块（不是 pip 包，find_spec 查不到）
@@ -221,11 +268,12 @@ print(json.dumps({'syntax': bad_syntax, 'missing': missing, 'lazy': lazy_missing
     try {
       out = execFileSync(py, ['-I', '-', payloadFile], { input: probe, encoding: 'utf8', timeout: 120000 })
     } catch (e) {
-      warn(`自举环境执行失败（${py}）→ 跳过代码块检查: ${String(e.message).slice(0, 120)}`)
-      out = null
+      const msg = `自举环境执行失败（${py}）→ ${STRICT ? '严格模式判 FAIL' : '跳过代码块检查'}: ${String(e.message).slice(0, 120)}`
+      if (STRICT) { assert(false, msg); out = null } else { warn(msg); out = null }
     }
     if (!out || !out.trim()) {
-      warn('自举环境未返回结果 → 跳过代码块检查（stdout 为空）')
+      if (STRICT) assert(false, '自举环境未返回结果（严格模式判 FAIL）')
+      else warn('自举环境未返回结果 → 跳过代码块检查（stdout 为空）')
     } else {
       const r = JSON.parse(out.trim().split('\n').pop())
       console.log(`  ${blocks.length} 个代码块 / ${r.checked} 个 import 已解析`)

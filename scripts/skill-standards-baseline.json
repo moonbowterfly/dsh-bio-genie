@@ -1,5 +1,6 @@
 {
-  "_comment": "skill 质量标准棘轮基线：此处登记的是「尚未补齐标准」的存量 skill，由 scripts/test-skills.mjs 读取。规则：不在本表内的 skill 必须满足全部静态门（含「验收标准」节）；本表内的只 WARN 不 FAIL，补全后请从表中删除（脚本会提示可移除项）。只增不改语义：禁止为让测试变绿而往表里加新条目——新 skill 一律不接受豁免。",
+  "_comment": "skill 质量标准棘轮基线。规则：① 不在本表内的 skill 必须满足全部静态门（含「验收标准」节且含 checklist 条目）；② 自 baseline_commit 起被 git 改动过的 skill 即使在本表内也必须达标（脚本会用 git diff 核对）——所以不能靠往表里加条目来让测试变绿。补全后请从本表删除；改完一批后可把 baseline_commit 前移以减少检查面。",
+  "baseline_commit": "6fa7fb2",
   "missing_acceptance_criteria": [
     "bio-core",
     "bio-io",
@@ -15,12 +16,8 @@
     "bio-utils",
     "bio-graphics",
     "bio-popgen",
-    "bio-figure",
     "bio-ml",
     "bio-dna-design",
-    "bio-survival-analysis",
-    "bio-variant-analysis",
-    "bio-paper-writing",
     "bio-proto-seq-qc",
     "bio-proto-format-convert",
     "bio-proto-pairwise-align",
@@ -35,7 +32,7 @@
     "bio-proto-codon-optimization",
     "bio-proto-enrichment-workflow",
     "bio-proto-literature-review",
-    "bio-proto-pub-figure",
-    "bio-proto-coords"
+    "bio-proto-coords",
+    "bio-paper-writing"
   ]
 }
