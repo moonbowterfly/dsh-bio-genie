@@ -25,8 +25,8 @@ const MAX_VIOLATIONS = 5
 const REL_TOL = 0.002
 
 /**
- * agent → { numbers: number[], index: Set<number>, tools: string[], sawQuestion: boolean }
- * @type {WeakMap<object, {numbers:number[], index:Set<number>, tools:string[], sawQuestion:boolean}>}
+ * agent → { numbers: number[], tools: string[], sawQuestion: boolean }
+ * @type {WeakMap<object, {numbers:number[], tools:string[], sawQuestion:boolean}>}
  */
 const ledgers = new WeakMap()
 /** session → agent 映射由 rigor-guard 维护；这里只按 agent 存。 */
@@ -34,7 +34,7 @@ const ledgers = new WeakMap()
 function ledgerFor(agent) {
   let l = ledgers.get(agent)
   if (!l) {
-    l = { numbers: [], index: new Set(), tools: [], sawQuestion: false }
+    l = { numbers: [], tools: [], sawQuestion: false }
     ledgers.set(agent, l)
   }
   return l
@@ -74,11 +74,14 @@ function collectNumbers(value, out, depth, limit, seen) {
   }
 }
 
-/** 从台账前端移除 n 个最旧数值，并同步去重索引。 */
-function dropOldest(ledger, n) {
-  if (n <= 0) return
-  for (const v of ledger.numbers.slice(0, n)) ledger.index.delete(v)
-  ledger.numbers.splice(0, n)
+/**
+ * 两个数是否"同一个数"（精确，或在相对容差内——与 isVerified 同口径）。
+ * 去重与验证必须用同一套判定，否则近似值会白占槽位（外部评审 2026-09-12 指出）。
+ */
+function sameNumber(a, b) {
+  if (a === b) return true
+  const scale = Math.max(1, Math.abs(a), Math.abs(b))
+  return Math.abs(a - b) / scale <= REL_TOL
 }
 
 const FALLBACK_AGENT = {}
@@ -118,11 +121,13 @@ export function recordResult(agent, tool, result) {
   const incoming = []
   collectNumbers(result, incoming, 0, PER_RESULT_CAP, new Set())
   if (incoming.length > 0) {
-    const fresh = incoming.filter((n) => !ledger.index.has(n))
-    if (fresh.length > 0) {
-      dropOldest(ledger, ledger.numbers.length + fresh.length - LEDGER_CAP)
-      for (const n of fresh) { ledger.numbers.push(n); ledger.index.add(n) }
-    }
+    // LRU 语义（外部评审 2026-09-12 P1）：本次结果里出现的数值一律视为"刚被确认"，
+    // 因此先把旧队列中与之等值（或容差内近似）的条目**整体移除**，再把 incoming 追加到队尾。
+    // 旧实现是"先算 fresh 再淘汰"：被当前工具刚回显的最老值既不在 fresh 里、又正好落在
+    // 淘汰区 → 明明是当前工具刚证明过的数，却失去了溯源（回归实测复现）。
+    const remaining = ledger.numbers.filter((v) => !incoming.some((n) => sameNumber(n, v)))
+    const overflow = Math.max(0, remaining.length + incoming.length - LEDGER_CAP)
+    ledger.numbers = remaining.slice(overflow).concat(incoming)
   }
   if (!ledger.tools.includes(tool)) ledger.tools.push(tool)
 }
@@ -157,8 +162,7 @@ export function isVerified(agent, n) {
   const nums = ledgerFor(agent ?? FALLBACK_AGENT).numbers
   for (const v of nums) {
     if (v === n) return true
-    const scale = Math.max(1, Math.abs(v), Math.abs(n))
-    if (Math.abs(v - n) / scale <= REL_TOL) return true
+    if (sameNumber(v, n)) return true
   }
   return false
 }

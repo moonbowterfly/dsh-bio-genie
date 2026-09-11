@@ -7,9 +7,10 @@
  * 2026-09-12 外部评审指出：旧用例把十层对象先 JSON.stringify 成字符串再放进
  * `content[].text`，收集器只需扫字符串、**根本没递归**，所以那条"十层深嵌套"用例
  * 并没有测到深度上限。本文件用**真结构化对象**测深度契约：
- *   · 深度 ≤ DEPTH_CAP（24）→ 必须收到
- *   · 超过 DEPTH_CAP       → 按文档化契约收不到（这条是**已知边界**，不是缺陷）
- *   · 文本字段里的 JSON    → 无论多少层都能收到（走字符串扫描路径，与深度无关）
+ *   · 结构化 8/16 层 → 必须收到
+ *   · 超过 DEPTH_CAP   → 按文档化契约收不到（**已知边界**，不是缺陷）
+ *   · 文本字段里的 JSON → 无论多少层都能收到（走字符串扫描路径，与深度无关）
+ *   ⚠️ 口径：DEPTH_CAP 从**完整工具结果根**（result）起算，不是从业务 payload 起算。
  */
 import assert from 'node:assert/strict'
 import { beginTurn, findUnverifiedNumbers, recordResult } from '../src/provenance.js'
@@ -38,6 +39,13 @@ probe('② 结构化 16 层', { content: [{ type: 'text', text: 'ok' }], data: w
 // ③ 已知边界：超过 DEPTH_CAP 的**结构化**数值收不到（文档化契约，避免误以为是 bug）
 probe('③ 结构化 30 层（超 DEPTH_CAP，按契约收不到）',
   { content: [{ type: 'text', text: 'ok' }], data: wrapDeep(30, 9999.5) }, '深值 = 9999.5', false)
+
+// ③b 边界契约（对外表述要精确）：DEPTH_CAP 从**完整 result 根**起算，
+//     而 { data: wrapDeep(n, v) } 里 data 容器自己占一层、数值再占一层，
+//     所以 wrapDeep(22) 可收、wrapDeep(23)/wrapDeep(24) 已超界——这是文档化契约，
+//     不是"≤24 层都能收"（外部评审 2026-09-12 指出原表述会引起误解）。
+probe('③b wrapDeep(22) 可收（边界内）', { content: [{ type: 'text', text: 'ok' }], data: wrapDeep(22, 2222.5) }, '深值 = 2222.5', true)
+probe('③c wrapDeep(23) 已超界（按契约不收）', { content: [{ type: 'text', text: 'ok' }], data: wrapDeep(23, 3333.5) }, '深值 = 3333.5', false)
 
 // ④ 文本字段里的 JSON 与深度无关（走字符串扫描路径）
 probe('④ 文本字段里的 20 层 JSON',

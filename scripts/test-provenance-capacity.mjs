@@ -71,6 +71,21 @@ const CAP = 2000
   console.log('  ③ 重复值去重 ✓')
 }
 
+// ── ③b 回归：满台账时**当前工具刚回显的最老值**必须存活（LRU 刷新语义）───────
+{
+  const e = {}
+  beginTurn(e)
+  recordResult(e, 'fill1', txt({ nums: Array.from({ length: 1000 }, (_, i) => 10000 + i * 10) }))
+  recordResult(e, 'fill2', txt({ nums: Array.from({ length: 1000 }, (_, i) => 50000 + i * 10) }))
+  assert.equal(ledgerSize(e), CAP, '前置条件：台账应满')
+  assert.equal(isVerified(e, 10000), true, '前置条件：最早值 10000 应在台账内')
+  // 当前工具回显最早值 + 999 个新值
+  recordResult(e, 'echo', txt({ nums: [10000, ...Array.from({ length: 999 }, (_, i) => 900000 + i * 10)] }))
+  assert.equal(isVerified(e, 10000), true, '当前工具刚回显的值不得被淘汰（LRU 刷新回归）')
+  assert.equal(ledgerSize(e), CAP, '台账仍应满')
+  console.log('  ③b 回显即刷新（LRU）✓')
+}
+
 // ── ④ 护栏有效性：编造数字必须仍被拦（门不能只会放行）────────────────────
 {
   const d = {}

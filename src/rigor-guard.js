@@ -55,6 +55,9 @@ export function registerRigorGuard(ctx) {
   ctx.on('tools/post-execute', async (exec, result, next) => {
     try {
       const agent = exec?.agent
+      // 尽早在"回复文本产生之前"建立 session→agent 映射：session/event 只带 session，
+      // 若等到 turn-stopping 才登记，**第一回合的回复根本不会被扫描**（实测缺陷）。
+      if (agent?.session) sessionAgent.set(agent.session, agent)
       if (exec?.name === 'ask_user_question') markQuestionAsked(agent)
       if (agent && typeof exec?.name === 'string') {
         recordResult(agent, exec.name, result?.content ?? result)
@@ -64,6 +67,12 @@ export function registerRigorGuard(ctx) {
     }
     return next()
   })
+
+  // ⚠️ 不要挂 agent/pre-step：该事件是 **waterfall**（引擎读返回值 decision.kind），
+  // 普通 emit 语义的处理器会因返回 undefined 直接打断 agent 循环
+  //（2026-09-12 实测：turn/end 报 "Cannot read properties of undefined (reading 'kind')"）。
+  // session→agent 映射在 tools/post-execute 里登记已足够：只有用过工具的会话才可能触发强制，
+  // 而任何工具结果都必然早于同回合的 assistant/message。
 
   // 跟踪 assistant 回复文本（session/event 广播，按 session 归到 agent）
   ctx.on('session/event', (session, event) => {
@@ -77,6 +86,8 @@ export function registerRigorGuard(ctx) {
   })
 
   // 回合开始：重置打回计数与提问豁免
+  // ⚠️ 本引擎（0.1.5-rc.1）不派发 agent/turn-start（只有 turn-stopping），此处理器当前
+  // 不会触发；保留它是为引擎将来补上该事件时行为依旧正确（turn-stopping 里已有兜底）。
   ctx.on('agent/turn-start', ({ agent }) => {
     try {
       if (!agent) return
@@ -94,17 +105,25 @@ export function registerRigorGuard(ctx) {
       if (!agent) return
       if (agent.session) sessionAgent.set(agent.session, agent)
       const s = st(agent)
-      // 回合号变化时重置打回计数与提问豁免（不依赖 turn-start 事件是否存在）
-      if (s.turn !== turn) {
+      // ⚠️ 顺序很重要（2026-09-12 实测修正）：引擎只派发 agent/turn-stopping，
+      // **没有** agent/turn-start（见 dsh-agent-loop 的事件表），所以这里就是唯一的
+      // 回合状态推进点。旧实现在"判定之前"就 beginTurn()（重置 sawQuestion），
+      // 于是本回合 ask_user_question 刚设下的"提议数值豁免"当场被清掉 → 豁免形同虚设。
+      // 正解：**先用当前状态判定，跑完再推进**。
+      const newTurn = s.turn !== turn
+      if (newTurn) s.steers = 0
+      // 台账为空（没用过工具）或本回合已向用户提问 → 不强制
+      const exempt = ledgerSize(agent) === 0 || sawQuestion(agent)
+      let violations = []
+      if (!exempt && s.steers < MAX_STEERS_PER_TURN && s.lastReply) {
+        violations = findUnverifiedNumbers(agent, s.lastReply)
+      }
+      // 回合推进放在最后：为下一回合清豁免、记回合号（不依赖 turn-start 是否存在）
+      if (newTurn) {
         s.turn = turn
-        s.steers = 0
         beginTurn(agent)
       }
-      // 台账为空（没用过工具）或本回合已向用户提问 → 不强制
-      if (ledgerSize(agent) === 0 || sawQuestion(agent)) return
-      if (s.steers >= MAX_STEERS_PER_TURN || !s.lastReply) return
-      const violations = findUnverifiedNumbers(agent, s.lastReply)
-      if (violations.length === 0) return
+      if (exempt || violations.length === 0) return
       s.steers += 1
       const list = violations.map((v) => `\`${v}\``).join('、')
       // ⚠️ 必须传完整 message 记录：dsh 0.1.5-rc.1 的会话持久化校验

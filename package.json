@@ -44,7 +44,7 @@
   ],
   "license": "MIT",
   "scripts": {
-    "bench": "node scripts/test-throttle.mjs && node scripts/test-log.mjs && node scripts/test-memory.mjs && node scripts/test-skills.mjs && node scripts/test-recipe-runtime.mjs && node scripts/test-addons-status.mjs && node scripts/test-ops.mjs && node scripts/test-provenance-percent.mjs && node scripts/test-provenance-nested.mjs && node scripts/test-provenance-capacity.mjs && node scripts/test-doc-counts.mjs",
+    "bench": "node scripts/test-throttle.mjs && node scripts/test-log.mjs && node scripts/test-memory.mjs && node scripts/test-skills.mjs && node scripts/test-recipe-runtime.mjs && node scripts/test-addons-status.mjs && node scripts/test-ops.mjs && node scripts/test-provenance-percent.mjs && node scripts/test-provenance-nested.mjs && node scripts/test-provenance-capacity.mjs && node scripts/test-rigor-guard-lifecycle.mjs && node scripts/test-doc-counts.mjs",
     "install:preset": "node scripts/install-preset.js",
     "postinstall": "node scripts/install-preset.js"
   },
