@@ -105,9 +105,10 @@ sns.heatmap(corr, annot=True, fmt='.2f', cmap='RdBu_r', vmin=-1, vmax=1,
 ### 6. 误差棒图（剂量响应）
 
 ```python
-means, sems = df.groupby('dose')['response'].agg(['mean','sem']).values.T
-ax.errorbar(df['dose'].unique(), means[0], yerr=means[1], fmt='o-',
-            capsize=3, color='#0072B2')
+# 用 reset_index 把剂量列带回来，避免 unique() 顺序与 groupby 顺序脱节
+g = df.groupby('dose')['response'].agg(['mean', 'sem']).reset_index()
+ax.errorbar(g['dose'], g['mean'], yerr=g['sem'], fmt='o-',
+            capsize=3, color='#0072B2')          # x / y / yerr 三者同长
 ```
 
 ### 7. 分布图（直方图 + KDE + rug）
@@ -171,10 +172,13 @@ def bracket(ax, x1, x2, y, text='*', h=None, lw=.8):
     ax.text((x1 + x2) / 2, y + h, text, ha='center', va='bottom')
 
 # pairs = [(x1, x2, p_adj), ...]  ← 先跑检验拿**校正后** p 值（bio_stats_test / bio-proto-statistics）
-ymax = df['value'].max()
+# 用当前 y 轴**跨度**做 padding，不要硬设下界为 0：全负值 / 以 0 为中心的效应量 / log 轴都会被破坏
+ymin, ymax = ax.get_ylim()
+span = ymax - ymin
 for k, (x1, x2, p) in enumerate(pairs):
-    bracket(ax, x1, x2, y=ymax * (1.05 + 0.08 * k), text=p_to_stars(p))
-ax.set_ylim(0, ymax * (1.05 + 0.08 * len(pairs) + 0.05))   # 给标注留空间，防被裁
+    bracket(ax, x1, x2, y=ymax + span * 0.08 * k, text=p_to_stars(p), h=span * 0.02)
+ax.set_ylim(ymin, ymax + span * (0.08 * len(pairs) + 0.05))   # 只在原上界之上留白
+# log 轴：改用乘法 padding（ymax * 1.3 等），加法 padding 在对数坐标下会被压扁
 ```
 
 **纪律**：① **每个星号背后必须有一次真实检验**——没检验就没有星号（bio-figure P11）；
@@ -197,3 +201,11 @@ ax.set_ylim(0, ymax * (1.05 + 0.08 * len(pairs) + 0.05))   # 给标注留空间�
 <!-- absorbed (significance-annotation recipe) from jaechang-hits/SciAgent-Skills@fe505cae14d20b6c33be2e49666425be98f005bb (CC-BY-4.0), 2026-09-11.
      改造：只取星号约定表与「校正后 p 值 / 比较选择」纪律，重写为实现配方（含 y 轴留白与 dodge 坐标两个实测坑）；
      多 panel 一节（9b）为自写配方——外部 multipanel skill 为 Proprietary (HITS Inc.)，未使用其任何内容。 -->
+
+
+## 验收标准
+
+- [ ] 每个配方都能**独立执行**（复制进 bio_python 即用，无未定义变量、无数组形状不匹配）
+- [ ] 显著性桥：星号有对应检验 + 用校正后 p 值 + y 轴留白不裁切（负值/ log 轴场景已验证）
+- [ ] 误差棒图 x/y/yerr 三者同长（用 `reset_index` 保留分组列，不依赖 `unique()` 顺序）
+- [ ] 导出走 `export_figure` + `bio_fig_export` 审计（DPI/尺寸/字体嵌入）

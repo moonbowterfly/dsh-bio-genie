@@ -14,7 +14,9 @@ language: python
 
 - **Python**：`lifelines`（**内置第一层依赖**，无需安装；若 `import lifelines` 失败，调 `bio_env` 的 `reinstall=true` 补装）
 ```python
-from lifelines import KaplanMeierFitter, CoxPHFitter, logrank_test
+import matplotlib.pyplot as plt                       # 本 skill 后续代码块要用 plt，先导入
+from lifelines import KaplanMeierFitter, CoxPHFitter  # 顶层只导出这两个
+from lifelines.statistics import logrank_test         # logrank_test 在 lifelines.statistics 里
 from lifelines.utils import concordance_index
 ```
 - **数据格式**：三列核心——`time`（随访时间）、`event`（1=发生终点事件，0=删失）、协变量列
@@ -135,3 +137,11 @@ print(f'C-index: {c_index:.3f}')
 | 不检验 PH 假设 | 必须做 Schoenfeld 残差检验 |
 | 忽略竞争风险 | 有竞争事件时用 cmprsk::crr |
 | 样本量小仍过度解读 | 报告置信区间宽度，说明统计功效限制 |
+
+
+## 验收标准
+
+- [ ] 环境块导入与 `lifelines` 0.30 顶层导出**逐一对齐**（`logrank_test` 必须从 `lifelines.statistics` 导入）
+- [ ] 代码块**按 skill 内顺序**可直接执行（`plt` 等依赖在首个使用块之前已导入）
+- [ ] KM/Cox 输出含：中位生存时间或 HR + 95% CI + p 值 + n（事件数）
+- [ ] 分组切点方法在分析前声明（禁止"试切点直到显著"）

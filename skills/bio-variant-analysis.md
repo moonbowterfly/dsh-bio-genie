@@ -42,19 +42,25 @@ reader = vcfpy.Reader.from_path('variants.vcf')
 variants = list(reader)
 print(f"总变异数: {len(variants)}")
 
-# 按类型统计
+# 按类型统计——**必须按 ALT 序列长度分类，不能按 len(v.ALT)**：
+# len(v.ALT) 是"ALT 等位基因个数"，不是序列长度（A>AT 的插入会被误判成 SNV）。
+# 多等位记录（A>G,T）按 ALT 逐条计数更准确。
 from collections import Counter
 types = Counter()
 for v in variants:
-    if len(v.ALT) == 1 and len(v.REF) == 1:
-        types['SNV'] += 1
-    elif len(v.ALT) == 1 and len(v.REF) > 1:
-        types['Deletion'] += 1
-    elif len(v.ALT) > 1 and len(v.REF) == 1:
-        types['Insertion'] += 1
-    else:
-        types['MNV/Complex'] += 1
-print(dict(types))
+    for alt in v.ALT:
+        alt_seq = str(alt.value)
+        if alt_seq == '.':
+            types['NoAlt'] += 1
+        elif len(alt_seq) == len(v.REF) == 1:
+            types['SNV'] += 1
+        elif len(alt_seq) > len(v.REF):
+            types['Insertion'] += 1
+        elif len(alt_seq) < len(v.REF):
+            types['Deletion'] += 1
+        else:
+            types['MNV/Complex'] += 1
+print(dict(types), '（多等位记录按 ALT 分别计数）')
 ```
 
 ### 2. 变异过滤
@@ -65,10 +71,14 @@ for v in variants:
     # 质量过滤
     if v.QUAL is not None and v.QUAL < 30:
         continue
-    # 次要等位基因频率（MAF）过滤——注意：字段缺失时**不要**当作"不合格"丢掉
+    # 次要等位基因频率（MAF）过滤——注意两点：
+    #   ① 字段缺失时**不要**当作"不合格"丢掉；
+    #   ② VCF 头声明 Number=1 时 vcfpy 返回**标量 float**，声明 Number=A 时返回列表
     maf = v.INFO.get('MAF')
-    if maf is not None and float(maf[0]) > 0.05:
-        continue
+    if maf is not None:
+        maf_val = maf[0] if isinstance(maf, (list, tuple)) else maf
+        if float(maf_val) > 0.05:
+            continue
     # 功能区域（外显子/剪切位点）；ANN 缺失或格式异常时跳过该判据
     # ⚠️ ANN 字段里是 SO 术语（synonymous_variant / intron_variant…），
     #    不是 INTRON / SYNONYMOUS 这类缩写——写错术语集合会让整条判据静默失效
@@ -168,3 +178,11 @@ plt.savefig('figures/variant_manhattan.png', dpi=300)
 | 忽略群体频率 | 必须查 gnomAD，MAF>0.01 通常排除 |
 | 混淆 SNP/Indel | 明确变异类型，Indel 需 HGVS indel 命名 |
 | 不校正多重检验 | 多变异分析用 Bonferroni 或 BH-FDR |
+
+
+## 验收标准
+
+- [ ] VCF 用**声明了 INFO 头**（`Number`/`Type`）的真实文件验证过：MAF 标量与列表两种形态都不崩
+- [ ] 变异类型统计按 ALT **序列长度**分类（A>AT 必须报 Insertion），多等位记录按 ALT 分别计数
+- [ ] 过滤前后数量对得上，且**字段缺失不等于不合格**（缺 MAF/ANN 的记录不被静默丢弃）
+- [ ] 每条判据都用合成 VCF 实跑复现过（不是"看着对"）

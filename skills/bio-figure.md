@@ -131,3 +131,11 @@ AACR 明确要求区分**技术重复与生物学重复**；显微/组织图带�
 <!-- absorbed (journal figure specs) from jaechang-hits/SciAgent-Skills@fe505cae14d20b6c33be2e49666425be98f005bb (CC-BY-4.0), 2026-09-11;
      改造：仅取规格事实，且**逐条对官方页复核**（复核中发现其 Science 栏宽 3.4/5.0/7.0 in 与 PNAS 栏宽与官方页不符，已改用官方值）；
      宽度/格式一并以本仓库 python/figurelib/assets/publisher_profiles.json 的带源快照为准；未复制其正文。 -->
+
+
+## 验收标准
+
+- [ ] 期刊规格与 `publisher_profiles.json` / 官方页一致（数值有出处，不凭印象）
+- [ ] 给出的宽度直接用于 `figsize`（导出后不二次缩放）
+- [ ] panel 标签约定与目标刊一致（Nature 小写 / Cell 大写 / PNAS 斜体大写 / AACR 层级式）
+- [ ] 图注含误差类型 + n（生物学重复）+ 检验与校正

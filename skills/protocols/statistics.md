@@ -129,8 +129,11 @@ mde = ind.solve_power(nobs1=15, alpha=0.05, power=0.8, ratio=1.0, effect_size=No
 pw = ind.power(effect_size=0.8, nobs1=20, alpha=0.05, ratio=1.0)
 # 4) 配对 t（实测 d=0.5、power=0.8 → 33.37 对）
 n_paired = TTestPower().solve_power(effect_size=0.5, alpha=0.05, power=0.8, alternative='two-sided')
-# 5) 多组 ANOVA（f=0.25、k=4、power=0.8 → 实测 178.4/组）
-n_anova = FTestAnovaPower().solve_power(effect_size=0.25, alpha=0.05, power=0.8, k_groups=4)
+# 5) 多组 ANOVA —— 注意：solve_power 返回的是**总样本量 N，不是每组 n**
+#    （f=0.25、k=4、power=0.8 → 实测总 N=178.4；均衡 4 组时每组 ceil(178.4/4)=45）
+n_anova_total = FTestAnovaPower().solve_power(effect_size=0.25, alpha=0.05, power=0.8, k_groups=4)
+n_anova_per_group = int(np.ceil(n_anova_total / 4))
+print(f"ANOVA 总 N={n_anova_total:.1f} → 每组 {n_anova_per_group}")
 # 6) 比例：先算 Cohen's h，再求 n（p1=.30→p2=.50 时 h=0.4115，双侧 power=0.8 → 92.75/组）
 h = 2*np.arcsin(np.sqrt(0.50)) - 2*np.arcsin(np.sqrt(0.30))
 n_prop = NormalIndPower().solve_power(effect_size=h, alpha=0.05, power=0.8, ratio=1.0)
