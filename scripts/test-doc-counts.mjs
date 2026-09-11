@@ -83,5 +83,33 @@ assertCount('src/index.js', /(\d+)\s*个语义化工具/g, semanticTools, 'index
 assertCount('preset/bio-genie/preset.yml', /(\d+)\s*个工具/g, allTools, 'preset.yml 工具总数')
 assertCount('preset/bio-genie/agent.cordis.yml', /(\d+)\s*个工具/g, allTools, 'preset 人格 工具总数')
 
+// ── 工具清单完整性：人格/tools.md 提到的工具集合应覆盖代码定义的全部工具 ──
+// 注意人格里会用 `bio_seq_io_read/write` 这类斜杠简写表示两个工具，必须先展开，
+// 否则会产生大量误报（首版就误报了 5 个）。
+function mentionedTools(text) {
+  const out = new Set()
+  for (const m of text.matchAll(/\b(bio_[a-z0-9_]+)\b/g)) out.add(m[1])
+  for (const m of text.matchAll(/\b(bio_[a-z0-9_]+?)\/([a-z0-9_]+)\b/g)) {
+    const parts = m[1].split('_')
+    parts[parts.length - 1] = m[2]
+    out.add(parts.join('_'))
+  }
+  return out
+}
+
+for (const file of ['preset/bio-genie/agent.cordis.yml', 'docs/agent-guide/tools.md']) {
+  const body = read(file)
+  if (!body) { console.log(`SKIP  工具清单完整性（${file} 不存在）`); continue }
+  const mentioned = mentionedTools(body)
+  const missing = [...allToolNames].filter((t) => !mentioned.has(t)).sort()
+  if (missing.length === 0) {
+    console.log(`PASS  工具清单完整性：${file} 覆盖全部 ${allToolNames.size} 个工具`)
+    pass += 1
+  } else {
+    console.log(`FAIL  工具清单完整性：${file} 未提及 ${missing.length} 个工具 → ${missing.join(', ')}`)
+    fail += 1
+  }
+}
+
 console.log(`\n${pass} passed, ${fail} failed, ${warned} warning(s), ${skipped} skipped`)
 process.exit(fail === 0 ? 0 : 1)

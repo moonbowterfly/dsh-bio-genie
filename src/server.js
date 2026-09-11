@@ -30,6 +30,7 @@ import { venvPython, resolveEnvDir, bioEnvExists, PYTHON_DIR, manageAddon, addon
 
 import { listSkillsForPanel } from './skills.js'
 import { handleConfig } from './config_handler.js'
+import { writeJson } from './http-util.js'
 import { ADDON_MODULES } from './extra-deps.js'
 
 /** 路由前缀（与 @linxin666/dsh-client-ui-web-ui-settings 同风格）。 */
@@ -241,16 +242,6 @@ function isLoopbackRequest(req) {
   } catch {
     return false
   }
-}
-
-/** 写一段 JSON 响应。 */
-function writeJson(res, status, body) {
-  const payload = JSON.stringify(body)
-  res.writeHead(status, {
-    'content-type': 'application/json; charset=utf-8',
-    'referrer-policy': 'no-referrer',
-  })
-  res.end(payload)
 }
 
 /** 读 JSON 请求体（用于未来扩展写端点；当前路由只用 GET，保留以备扩展）。 */

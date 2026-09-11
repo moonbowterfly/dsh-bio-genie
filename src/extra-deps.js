@@ -37,22 +37,6 @@ export const EXTRA_DEPS = {
 /** 需要 --no-deps 安装的包（其传递依赖在本平台不可装且非必需）。 */
 export const EXTRA_NO_DEPS = new Set(['biocrnpyler'])
 
-/** pip 包名 → import 模块名（不一致或带版本约束时在此覆盖）。 */
-export const EXTRA_IMPORT_NAMES = {
-  'primer3-py>=2.3.0': 'primer3',
-  'dnachisel>=3.2,<4': 'dnachisel',
-  'dna-features-viewer>=3.1': 'dna_features_viewer',
-  'sbol3>=1.0': 'sbol3',
-  'tyto>=1.4': 'tyto',
-  pydna: 'pydna',
-  'pyparsing>=3.1': 'pyparsing',
-  biocrnpyler: 'biocrnpyler',
-  'python-libsbml': 'libsbml',
-  bokeh: 'bokeh',
-  networkx: 'networkx',
-  bioscrape: 'bioscrape',
-}
-
 /** 第三层：需用户手动启用的扩展模块（Phase 2/3 预留）。 */
 export const ADDON_MODULES = {
   'circuit-modeling': {

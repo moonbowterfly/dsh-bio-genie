@@ -5,15 +5,7 @@
  */
 import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
-
-function writeJson(res, status, body) {
-  const payload = JSON.stringify(body)
-  res.writeHead(status, {
-    'content-type': 'application/json; charset=utf-8',
-    'referrer-policy': 'no-referrer',
-  })
-  res.end(payload)
-}
+import { writeJson } from './http-util.js'
 
 export async function handleConfig(req, res, config) {
   if (req.method === 'GET') {

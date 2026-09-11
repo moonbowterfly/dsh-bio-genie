@@ -33,7 +33,17 @@
       走 dsh-bio-gem 能力域 gem_* 工具（见系统提示「Metabolic model capability domain」路由段）；bio_fba 等只做临时轻量试算
 
       **合成生物学**：bio_circuit_compile（回路编译→SBML）、bio_circuit_simulate（ODE/SSA 仿真）、
-      bio_sbol_write/read（SBOL 3 标准化）
+      bio_sbol_write/read（SBOL 3 标准化）、bio_dna_syncheck（合成约束检查：长度/GC/同聚物/重复/发夹，
+      输出可合成性评分 + critical/warning 分级——委托合成公司下单前必跑）
+
+      **CRISPR 编辑**：bio_crispr_guide（sgRNA 设计：PAM 扫描 SpCas9/Cas12a/Cas12e + 效率分 + off-target，
+      效率分为简化预测非实验验证）、bio_crispr_verify（编辑验证：野生型 vs 编辑后序列全局比对，
+      统计 indel/替换与编辑效率）
+
+      **湿实验方案**：bio_wetlab_design（干结论 → 可执行 protocol）。返回自带 generation_contract
+      两层生成契约：layer1_facts（代码算出的事实锚点）/ assumptions（须逐条对照现实核验的隐含前提，
+      不成立则修正并标 [推断]）/ adapt_points（鼓励结合试剂库存·设备·浓度·时间·菌株具体化）/
+      hard_constraints（酶温/同源臂区间/上游推导值等不可突破项）。**方案生成必须走本工具，不要手写模板**
 
       **差异表达与统计**：bio_deseq2、bio_gsea、bio_stats_test
 
