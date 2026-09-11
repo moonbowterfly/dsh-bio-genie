@@ -131,7 +131,7 @@ X and gaps are treated as unknown bases during translation (Biopython standard b
 ### Master skill: `dsh-bio-genie`
 Tool-layering decision tree: **check the semantic tool table first → use it if matched; otherwise write Biopython code with the bio_python executor**.
 
-### 17 Domain Recipes + 4 Research Methods
+### 17 Domain Recipes + 5 Research Methods
 
 | Skill | Biopython modules covered |
 |-------|---------------------------|
@@ -153,7 +153,7 @@ Tool-layering decision tree: **check the semantic tool table first → use it if
 | `bio-ml` | scikit-learn ML on biological data (classification / dimred / clustering / feature importance) |
 | `bio-dna-design` | DNA design (primers, codon optimization, plasmid maps) |
 
-Research-method skills: `bio-survival-analysis`, `bio-variant-analysis`, `bio-literature-review`, `bio-paper-writing`. Plus 17 protocol templates and 8 agent guides bundled with the plugin.
+Research-method skills: `bio-survival-analysis`, `bio-variant-analysis`, `bio-literature-review` (incl. PRISMA 2020 systematic-review workflow), `bio-evidence-appraisal` (evidence hierarchy / GRADE / claim-strength wording), `bio-paper-writing`. Plus 17 protocol templates and 8 agent guides bundled with the plugin.
 
 ---
 

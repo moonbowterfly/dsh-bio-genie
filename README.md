@@ -153,7 +153,7 @@ X 与 gap 在翻译时按未知碱基处理（Biopython 标准行为），含 X/
 ### 主 skill：`dsh-bio-genie`
 工具分层决策树：**先查语义化工具表 → 命中就用；否则用 bio_python 执行器写 Biopython 代码**。
 
-### 17 个领域配方 + 4 个研究方法
+### 17 个领域配方 + 5 个研究方法
 
 | Skill | 覆盖的 Biopython 模块 |
 |-------|---------------------|
@@ -175,7 +175,7 @@ X 与 gap 在翻译时按未知碱基处理（Biopython 标准行为），含 X/
 | `bio-ml` | scikit-learn 生物数据机器学习（分类/降维/聚类/特征重要性） |
 | `bio-dna-design` | DNA 设计（引物、密码子优化、质粒图谱） |
 
-研究方法 skill：`bio-survival-analysis`（生存分析）、`bio-variant-analysis`（变异分析）、`bio-literature-review`（文献综述）、`bio-paper-writing`（论文写作）。另有 17 个协议模板与 8 份 agent 使用指南，随插件打包。
+研究方法 skill：`bio-survival-analysis`（生存分析）、`bio-variant-analysis`（变异分析）、`bio-literature-review`（文献检索与综述，含 PRISMA 2020 系统综述流程）、`bio-evidence-appraisal`（证据分级与结论强度：证据层级/GRADE/四轴评估/措辞边界）、`bio-paper-writing`（论文写作）。另有 17 个协议模板与 8 份 agent 使用指南，随插件打包。
 
 ---
 

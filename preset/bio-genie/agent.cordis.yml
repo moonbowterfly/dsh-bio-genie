@@ -121,7 +121,7 @@
 # **任何 skill 都到不了 agent** —— 包括插件经 ctx.skills.register() 注册进
 # registry global layer 的那批（它们需要 tool-skill 提供 catalog 与加载器）。
 # 实测（2026-09-11）：本 preset 此前只挂 persona，导致 dsh-bio-genie 的
-# 47 个 skill 与 dsh-bio-gem 的 gem-expert 全部处于「注册了但读不到」状态。
+# 全部 skill（当时 47 个）与 dsh-bio-gem 的 gem-expert 处于「注册了但读不到」状态。
 #
 # customSkillDirs 只指向本 preset 自带的 skills/（bio-autopilot /
 # bio-project-chain / bio-wetlab-design / dsh-bio-genie-expert 四个），
