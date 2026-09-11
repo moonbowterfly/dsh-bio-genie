@@ -12,6 +12,7 @@
  */
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
+import { SKILL_MANIFEST, GUIDE_MANIFEST } from '../src/skills.js'
 
 const ROOT = process.cwd()
 
@@ -109,6 +110,45 @@ for (const file of ['preset/bio-genie/agent.cordis.yml', 'docs/agent-guide/tools
     console.log(`FAIL  工具清单完整性：${file} 未提及 ${missing.length} 个工具 → ${missing.join(', ')}`)
     fail += 1
   }
+}
+
+// ── skill 计数覆盖（2026-09-11 扩展）──
+// 背景：skill 计数的漂移面比工具数更广（README 双语 3 处 + 指南导航 + 架构文档 +
+// package.json + index.js 头注释 + 手写 bundle），且「加一个 skill 只改一处」正是
+// 本轮实测踩过的坑。这里把每个声明点都钉在代码真值上。
+console.log('--- skill 计数 ---')
+const catCount = (c) => SKILL_MANIFEST.filter((s) => s.category === c).length
+const domainN = catCount('domain')
+const researchN = catCount('research')
+const protocolN = catCount('protocol')
+const guidesN = GUIDE_MANIFEST.length
+
+assertCount('README.md', /Skill 体系（(\d+) 个）/g, skillTotal, 'README skill 总数')
+assertCount('README.md', /Skill 模块（(\d+) 个条目/g, skillTotal, 'README 面板条目数')
+assertCount('README.md', /(\d+) 个 skill」/g, skillTotal, 'README 人设声明 skill 数')
+assertCount('README.en.md', /Skill System \((\d+) total\)/g, skillTotal, 'README.en skill 总数')
+assertCount('README.en.md', /Skill Modules \((\d+) entries/g, skillTotal, 'README.en 面板条目数')
+assertCount('README.en.md', /you have \d+ tools \+ (\d+) skills/g, skillTotal, 'README.en 人设声明 skill 数')
+assertCount('docs/agent-guide/README.md', /(\d+) 个 skill 导航/g, skillTotal, 'guide-README skill 数')
+assertCount('docs/agent-guide/skills.md', /Skill 体系导航（(\d+) 个注册条目）/g, skillTotal, 'skills.md 标题条目数')
+assertCount('docs/ARCHITECTURE.md', /共 (\d+) 个条目/g, skillTotal, 'ARCHITECTURE 条目数')
+assertCount('src/index.js', /共 (\d+) 个注册条目/g, skillTotal, 'index.js 头注释条目数')
+assertCount('lib/client.js', /(\d+) 个 skill、零依赖/g, skillTotal, 'client.js 面板文案 skill 数')
+assertCount('package.json', /\+ (\d+) 个 skill（1 主 skill/g, skillTotal, 'package.json description skill 数')
+
+const breakdown = 1 + domainN + researchN + protocolN + guidesN
+if (breakdown === skillTotal) {
+  console.log(`PASS  skill 分类分解：主 1 + 领域 ${domainN} + 研究 ${researchN} + 协议 ${protocolN} + 指南 ${guidesN} = ${skillTotal}`)
+  pass += 1
+} else {
+  console.log(`FAIL  skill 分类分解：1+${domainN}+${researchN}+${protocolN}+${guidesN}=${breakdown} ≠ 文件真值 ${skillTotal}`)
+  fail += 1
+}
+{
+  const m = read('docs/agent-guide/skills.md').match(/主 1 \+ 领域 (\d+) \+ 研究 (\d+) \+ 协议 (\d+) \+ 指南 (\d+)/)
+  const ok = m && +m[1] === domainN && +m[2] === researchN && +m[3] === protocolN && +m[4] === guidesN
+  if (ok) { console.log(`PASS  skills.md 分类分解与 manifest 一致（${m[1]}/${m[2]}/${m[3]}/${m[4]}）`); pass += 1 }
+  else { console.log(`FAIL  skills.md 分类分解${m ? ` 写的是 ${m[1]}/${m[2]}/${m[3]}/${m[4]}` : ' 未找到'}，manifest 真值 ${domainN}/${researchN}/${protocolN}/${guidesN}`); fail += 1 }
 }
 
 console.log(`\n${pass} passed, ${fail} failed, ${warned} warning(s), ${skipped} skipped`)

@@ -1,5 +1,5 @@
 /**
- * dsh-bio-genie — skill 目录（38 个领域/研究/协议 skill + 1 个 genie 主 skill + 8 份指南，共 47 个注册条目）
+ * dsh-bio-genie — skill 目录（39 个领域/研究/协议 skill + 1 个 genie 主 skill + 8 份指南，共 48 个注册条目）
  *
  * 每个 skill body 在插件加载时从 skills/*.md 读入，经 ctx.skills.register
  * 注册为 embedded runtime skill（不依赖文件系统发现，实现"one is all"）。
@@ -7,7 +7,7 @@
  * 每项的 `category` 字段给设置面板「Skill 模块」按功能层级分组：
  *   - main:     主 skill（dsh-bio-genie，注册见 src/index.js 的 GENIE_SKILL_CONTENT）
  *   - domain:   Biopython 领域（17 个）
- *   - research: 科研方法（4 个）
+ *   - research: 科研方法（5 个，含证据分级与结论强度）
  *   - protocol: 协议库——高频任务的可执行工作流（17 个）
  *   - guide:    docs/agent-guide 说明书（走 GUIDE_MANIFEST，8 份）
  *
@@ -22,25 +22,25 @@ export const SKILL_MANIFEST = [
   {
     name: 'bio-core',
     category: 'domain',
-    description: 'Core dsh-bio-genie workflow: how to use the bio_python tool and express a bioinformatics wish as Biopython code. Load first for any analysis.',
+    description: 'Core workflow: turn a bioinformatics wish into Biopython code via the bio_python tool. Load first for any analysis.',
     file: 'bio-core.md',
   },
   {
     name: 'bio-io',
     category: 'domain',
-    description: 'Read and write sequence files with Bio.SeqIO: FASTA, FASTQ, GenBank, EMBL, Swiss-Prot; format conversion; large-file streaming.',
+    description: 'Read/write sequence files with Bio.SeqIO: FASTA, FASTQ, GenBank, EMBL, Swiss-Prot; conversion; streaming.',
     file: 'bio-io.md',
   },
   {
     name: 'bio-seq',
     category: 'domain',
-    description: 'Sequence manipulation: reverse complement, transcribe/translate, GC content and skew, molecular weight, melting temperature (Bio.SeqUtils).',
+    description: 'Sequence manipulation: reverse complement, translate, GC content/skew, molecular weight, Tm (Bio.SeqUtils).',
     file: 'bio-seq.md',
   },
   {
     name: 'bio-align',
     category: 'domain',
-    description: 'Pairwise and multiple alignment with Bio.Align.PairwiseAligner and Bio.AlignIO: scoring, reading/writing alignments, consensus.',
+    description: 'Pairwise/multiple alignment with Bio.Align.PairwiseAligner and Bio.AlignIO: scoring, IO, consensus.',
     file: 'bio-align.md',
   },
   {
@@ -52,13 +52,13 @@ export const SKILL_MANIFEST = [
   {
     name: 'bio-searchio',
     category: 'domain',
-    description: 'Parse search outputs (BLAST, HMMER, Exonerate) uniformly with Bio.SearchIO: querying hits, HSPs, and extracting alignments.',
+    description: 'Parse search outputs (BLAST, HMMER, Exonerate) with Bio.SearchIO: hits, HSPs, alignments.',
     file: 'bio-searchio.md',
   },
   {
     name: 'bio-entrez',
     category: 'domain',
-    description: 'Query NCBI E-utilities with Bio.Entrez: esearch/efetch/esummary/elink for sequences, taxonomy, and literature; email requirement.',
+    description: 'Query NCBI E-utilities with Bio.Entrez: esearch/efetch/esummary/elink for sequences, taxonomy, literature.',
     file: 'bio-entrez.md',
   },
   {
@@ -70,13 +70,13 @@ export const SKILL_MANIFEST = [
   {
     name: 'bio-structure',
     category: 'domain',
-    description: 'Protein structure analysis with Bio.PDB: parse PDB/mmCIF, iterate atoms/residues/chains, compute distances, superimpose structures.',
+    description: 'Protein structure with Bio.PDB: parse PDB/mmCIF, iterate atoms/residues/chains, distances, superimpose.',
     file: 'bio-structure.md',
   },
   {
     name: 'bio-motif',
     category: 'domain',
-    description: 'Sequence motifs with Bio.motifs: position-weight matrices, motif creation, scanning sequences, reading MEME/JASPAR output.',
+    description: 'Sequence motifs with Bio.motifs: PWMs, motif creation, scanning sequences, reading MEME/JASPAR output.',
     file: 'bio-motif.md',
   },
   {
@@ -88,7 +88,7 @@ export const SKILL_MANIFEST = [
   {
     name: 'bio-utils',
     category: 'domain',
-    description: 'Bio.SeqUtils utilities, genetic codes and codon tables (Bio.Data.CodonTable), translation tables, and codon usage statistics.',
+    description: 'Bio.SeqUtils utilities, genetic codes/codon tables (Bio.Data.CodonTable), translation tables, codon usage.',
     file: 'bio-utils.md',
   },
   {
@@ -222,14 +222,14 @@ export const SKILL_MANIFEST = [
   {
     name: 'bio-proto-statistics',
     category: 'protocol',
-    description: '统计分析协议：检验选择决策树、scipy 模板、多重校正（Bonferroni/BH-FDR）、效应量与功效、实验设计要点、APA 报告规范。',
+    description: '统计分析协议：检验选择决策树、scipy/statsmodels 模板、多重校正、效应量对照、样本量与功效规划、实验设计、统计陷阱表。',
     file: 'protocols/statistics.md',
   },
   // ---- 科研专精（preset skills，含统计严谨性 + 完整代码模板）----
   {
     name: 'bio-survival-analysis',
     category: 'research',
-    description: '生存分析完整工作流：Kaplan-Meier 与 log-rank、Cox 比例风险回归（单/多因素）、PH 假设检验、竞争风险、时间依赖 ROC。Python lifelines 与 R survival/survminer 双实现。含统计严谨性清单和常见错误。',
+    description: '生存分析工作流：Kaplan-Meier/log-rank、Cox 回归（单/多因素）、PH 假设检验、竞争风险、时间依赖 ROC（lifelines）。',
     whenToUse: '做生存分析、KM 曲线、Cox 回归、预后模型、表达-生存关联时。',
     file: 'bio-survival-analysis.md',
   },
@@ -250,9 +250,16 @@ export const SKILL_MANIFEST = [
   {
     name: 'bio-literature-review',
     category: 'research',
-    description: '文献检索与综述：PubMed 检索式构建、文献筛选流程（PRISMA）、文献信息提取、综述写作结构、引用格式速查。',
-    whenToUse: '文献检索、文献综述、研究背景调研、参考文献收集时。',
+    description: '文献检索与综述：PubMed 检索式、PRISMA 2020 系统综述流程、偏倚评估工具选择、信息提取、综述写作与引用格式。',
+    whenToUse: '文献检索、文献综述、系统综述/Meta 分析、研究背景调研、参考文献收集时。',
     file: 'bio-literature-review.md',
+  },
+  {
+    name: 'bio-evidence-appraisal',
+    category: 'research',
+    description: '证据分级与结论强度：证据层级（含基础研究梯级）、GRADE 降级域、四轴评估、验证深度、引用角色与措辞边界。',
+    whenToUse: '判断一批文献谁更强、某个结论能说多强、写讨论/结论前定措辞、系统综述做偏倚评级时。',
+    file: 'bio-evidence-appraisal.md',
   },
 ]
 
@@ -489,7 +496,9 @@ language: mixed
 | 文献调研 | bio-proto-literature-review |
 | 论文配图/统计图（选图+出版级出图） | bio-figure + bio-proto-pub-figure |
 | 基因组坐标转换/off-by-one 排查 | bio-proto-coords |
-| 统计检验/多重校正/功效 | bio-proto-statistics |
+| 统计检验/多重校正/功效/样本量规划 | bio-proto-statistics |
+| 系统综述（PRISMA）与文献偏倚评估 | bio-literature-review |
+| 证据强弱判断/结论措辞/引用角色 | bio-evidence-appraisal |
 
 
 ## 调用规则
@@ -513,6 +522,7 @@ language: mixed
 17. 基因回路：组件列表（promoter 可带 regulators）→ bio_circuit_compile 得 SBML + 网络拓扑图 → bio_circuit_simulate 做 ODE/SSA 仿真出浓度曲线。首次调用自动安装 biocrnpyler/bioscrape（~20MB，提示用户等待）；simulation_type=ssa 用于噪声/随机性分析。
 18. CRISPR：设计 sgRNA 用 bio_crispr_guide（指定 Cas 类型，默认 SpCas9 NGG，按 efficiency_score 降序 + off-target 升序排序，top_n 默认 10）；编辑验证用 bio_crispr_verify（需提供 wild_type 与 edited 序列，返回 indel/substitution 统计与编辑效率）。
 19. DNA 合成前置检查：合成前用 bio_dna_syncheck 评估可合成性（GC/同聚物/发夹/重复），critical 问题需先解决再送合成公司；合成后用 bio_dna_syncheck 复查合成产物序列。
+21. 文献与证据路由：系统综述/PRISMA 流程用 bio-literature-review；判断「这批文献谁更强、结论能说多强」用 bio-evidence-appraisal（证据层级 + GRADE + 四轴 + 措辞边界）；所有引用必须经 bio_pubmed_search 核验，**禁止凭记忆写 PMID/DOI**。
 20. 湿实验方案：干实验结论转湿实验 protocol 用 bio_wetlab_design（protocol_type 指定方案类型，input_data 传上游工具输出）。典型链路：bio_primer3_design → bio_wetlab_design(pcr_amplification)；bio_clone_simulate → bio_wetlab_design(gibson_assembly)；bio_crispr_guide → bio_wetlab_design(crispr_editing)；bio_gene_knockout(optknock) → bio_wetlab_design(strain_construction)。
 
 
@@ -570,7 +580,7 @@ bio_python 失败时返回 \`needs_repair: true\` + 完整 stderr。下面分三
 - bio_python 代码里调 NCBI 必须设 Bio.Entrez.email，且注意 3 req/s 速率限制。
 - bio_enrichr 的结果按 adjusted_p_value 升序解读；combined_score 越高证据越强。
 - ImportError → 先 bio_env 看环境，必要时 reinstall。
-- R 报 "there is no package called 'X'" → X 不在核心包集（org.Hs.eg.db 等），换等效实现或如实告知边界。
+- 组间比较优先 bio_stats_test（CSV 场景，自动选检验并给效应量）；它覆盖不到的场景（配对/事后检验/功效）用 bio-proto-statistics 的 scipy+statsmodels 配方——两者都是内置依赖，可直接 import。
 
 加载领域 skill（bio-io、bio-seq、bio-align…）获取详细配方后再写非平凡代码。
 

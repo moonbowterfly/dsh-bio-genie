@@ -2,7 +2,7 @@
 language: none
 ---
 
-# Skill 体系导航（47 个注册条目）
+# Skill 体系导航（48 个注册条目）
 
 > skill 是插件内置的可加载知识库（配方/工作流/坑）。加载方式：用 skill 工具按名字加载。**写非平凡代码前先加载对应领域 skill；命中协议场景直接加载协议。**
 
@@ -15,11 +15,11 @@ language: none
 | 层级 | 命名特征 | 分类依据 |
 |---|---|---|
 | 主 skill | `dsh-bio-genie`（唯一） | **路由中枢**：工具分层决策树、协议映射、调用规则。任何生物分析先加载它 |
-| 领域 skill | `bio-*`（17 个） | 按 **能力域**划分——按 Biopython 模块（io/seq/align/…）教「某个模块怎么用」；研究方法（生存分析/变异分析/文献综述/论文写作）单列一类 |
+| 领域 skill | `bio-*`（17 个） | 按 **能力域**划分——按 Biopython 模块（io/seq/align/…）教「某个模块怎么用」；研究方法（生存分析/变异分析/文献综述/论文写作/证据分级）单列一类 |
 | 协议 skill | `bio-proto-*`（17 个） | 按 **高频任务**划分（质控/建树/富集/绘图/差异表达/GSEA…）——教「某类任务怎么完整做完」，含可执行代码模板 + 常见坑 |
 | 指南 skill | `dsh-bio-genie-guide-*`（8 个） | 插件**整体说明书**——教「这个插件怎么用」，按主题划分 |
 
-合计：主 1 + 领域 17 + 研究 4 + 协议 17 + 指南 8 = **47 个注册条目（不含主 skill 为 46 个）**。
+合计：主 1 + 领域 17 + 研究 5 + 协议 17 + 指南 8 = **48 个注册条目（不含主 skill 为 47 个）**。
 
 ### 维度二：按语言解释器（这个 skill 的代码跑在哪个环境）
 
@@ -46,9 +46,9 @@ language: none
 
 任何生物分析**先加载**。内容：工具分层决策树（语义化工具表 → 协议映射表 → 调用规则 → ACR → 会话记忆 → 科学严谨性）。它告诉你去哪、用哪个工具、加载哪个 skill。
 
-## 二、21 个领域与研究 skill（全 Python 配方）
+## 二、22 个领域与研究 skill（全 Python 配方）
 
-> 17 个 Biopython 领域 + 4 个研究方法（单列一类，见维度一分类表）。
+> 17 个 Biopython 领域 + 5 个研究方法（单列一类，见维度一分类表）。
 
 | Skill | 覆盖 | 何时加载 |
 |---|---|---|
@@ -71,7 +71,8 @@ language: none
 | `bio-dna-design` | DNA 序列设计：引物/探针/元件设计约束 | 序列设计任务 |
 | `bio-survival-analysis` | lifelines 生存分析：KM/log-rank/Cox | 生存分析任务 |
 | `bio-variant-analysis` | 变异分析：VCF 解析/注释/过滤 | 变异任务 |
-| `bio-literature-review` | 文献调研方法学：检索式/筛选/综述结构 | 文献综述任务 |
+| `bio-literature-review` | 文献检索与综述方法学：PubMed 检索式、PRISMA 2020 系统综述流程、偏倚评估工具选择 | 文献综述 / 系统综述任务 |
+| `bio-evidence-appraisal` | 证据分级与结论强度：证据层级、GRADE 降级域、四轴评估、引用角色、措辞边界 | 判断证据强弱、定结论措辞 |
 | `bio-paper-writing` | 论文写作：IMRaD 结构/图表规范/投稿 | 写作任务 |
 
 ## 三、17 个协议 skill（高频任务工作流，含代码模板+坑）
@@ -94,7 +95,7 @@ language: none
 | `bio-proto-literature-review` | 文献调研：PubMed 检索式/批量摘要/OpenAlex 补充 |
 | `bio-proto-pub-figure` | **出版级出图执行**：9 类图配方/figurelib 调用/自检闭环 |
 | `bio-proto-coords` | 基因组坐标：0/1-based 转换/BED-GFF-VCF 惯例/GRCh37-38/左对齐 |
-| `bio-proto-statistics` | 统计：检验选择/scipy 模板/多重校正/效应量与功效 |
+| `bio-proto-statistics` | 统计：检验选择/scipy+statsmodels 模板/多重校正/效应量对照/样本量与功效规划 |
 
 ## 四、加载策略
 
@@ -126,4 +127,4 @@ language: none
 | `bio-project-chain` | 项目链式管理：多步骤分析项目的状态串联 |
 | `bio-wetlab-design` | 湿实验方案引导（配合 `bio_wetlab_design` 工具与两层生成契约） |
 
-> 注意：`bio-survival-analysis` / `bio-variant-analysis` / `bio-literature-review` / `bio-paper-writing` 4 个研究方法 skill 同时存在于 `skills/`（SKILL_MANIFEST 注册）与 preset 目录，内容以 `skills/` 为准。
+> 注意：研究方法 skill 只存在于 `skills/`（由 SKILL_MANIFEST 注册）；preset 目录（`preset/bio-genie/skills/`）**不含**它们的副本，两者不会重名。

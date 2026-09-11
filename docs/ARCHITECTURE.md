@@ -139,7 +139,7 @@ GSEA 改由 Python 语义化工具 `bio_deseq2` / `bio_gsea` 提供。
 - **当前内容（v0.3.1+，2026-08-18 起）**：四 tab 内部 state 切换的设置面板
   - **总览 tab**：包元信息 + 配置默认值只读视图 + 文档导航（v0.3.0 原有）
   - **Skill 模块 tab**：调 GET /api/dsh-bio-genie/skills 拉真实清单，主 skill 1 +
-    领域/研究/协议/指南共 47 个条目，按 category 分组显示
+    领域/研究/协议/指南共 48 个条目，按 category 分组显示
   - **Python 环境 tab**：调 GET /api/dsh-bio-genie/python-packages 拉 venv 内
     `pip list --format=json` 真实结果，name + version 按字母排序；venv 未引导时
     明确标注 + 引导触发方式

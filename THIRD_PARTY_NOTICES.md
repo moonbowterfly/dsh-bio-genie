@@ -69,4 +69,39 @@ publisher_profiles.json、color_palettes.py）吸收自
 <!-- R/Bioconductor 生态许可声明已随 R 引擎移除（2026-08）一并删除；
      历史决策记录存于仓库外内部文档，不随插件分发。 -->
 
+---
 
+# aipoch/medical-research-skills 许可声明
+
+本插件 `skills/` 下的以下内容吸收自
+[aipoch/medical-research-skills](https://github.com/aipoch/medical-research-skills)
+（基线 commit `f5ef65b9bea79b6dd9553f52f95b0d08f7d64d26`，2026-09-11 核验，MIT 许可）：
+
+| 落点 | 来源 skill | 吸收方式 |
+|---|---|---|
+| `skills/bio-evidence-appraisal.md` | `Evidence Insight/evidence-level-ranker` + `Evidence Insight/scientific-critical-thinking` | 改造（重写为分子生物/合成生物学口径） |
+| `skills/bio-literature-review.md`（§三–§五） | `Academic Writing/systematic-review` + `Evidence Insight/rct-bias-assessment-rob2` | 改造（剥离平台耦合，补工具选择表与实测 PMID） |
+| `skills/protocols/statistics.md`（§四–§五、§八） | `Protocol Design/sample-size-and-power-planning-assistant` + `Data Analysis/statistical-analysis` | 改造（临床口径→生物学重复口径，配方实测） |
+
+以下内容**仅参考思路、未复制文本**：`skill-auditor`（MedSkillAudit）——
+本插件 `scripts/test-skills.mjs` 的静态质量门与棘轮基线机制参考其「否决门 + 分级评分」
+
+**MIT License** — Copyright (c) 2026 AIpoch
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+
+---
+
+> 完整吸收台账（含基线 commit、改造摘要、候选仓库裁决）见仓库根 `SKILL-PROVENANCE.yaml`。
