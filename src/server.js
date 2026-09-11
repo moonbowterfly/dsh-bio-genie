@@ -21,7 +21,11 @@
  * @module dsh-bio-genie/server
  */
 import { spawn } from 'node:child_process'
-import { join as pathJoin } from 'node:path'
+import { createRequire } from 'node:module'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { dirname, join as pathJoin } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import os from 'node:os'
 import { venvPython, resolveEnvDir, bioEnvExists, PYTHON_DIR, manageAddon, addonsStatus } from './runtime.js'
 
 import { listSkillsForPanel } from './skills.js'
@@ -440,6 +444,192 @@ async function handleExecuteTool(req, res, config) {
  * 路由注册入口：被 src/index.js 的 apply() 在 cordis ctx.webServer 可用时调用。
  * 路由 kind: 'exact'（精确路径匹配，模仿 web-ui-settings 的做法）。
  */
+// ============================================================ 代谢建模域（域插件分页）
+//
+// 「域插件分页」设计：dsh-bio-gem 独立安装时没有自己的设置面板；当它与本插件共存
+// 时，其状态以**分页**形式并入 BioGenie 设置面板（客户端不注册独立 section）。
+//
+// 关键约束：**未安装 dsh-bio-gem 时该分页完全不出现**——宿主不应暴露空壳 UI。
+// 前端先调本端点探测，installed=false 时不渲染该 tab。
+//
+// 数据所有权：本端点直接读取 gem 的运行时目录（$DSH_HOME/dsh-bio-gem/），不 import
+// gem 的代码——两个插件是彼此独立的 npm 包、不构成依赖关系。所读布局是 gem 的稳定
+// 契约（见 dsh-bio-gem 的 ARCHITECTURE.md 与系统提示的资产契约段）。
+
+/** dsh-bio-gem 对外暴露的 20 个语义化工具（面板只做展示）。 */
+const GEM_TOOLS = [
+  'gem_build', 'gem_report', 'gem_validate', 'gem_gapfind', 'gem_gapfill', 'gem_gapseq',
+  'gem_phenotype', 'gem_essentiality', 'gem_annotate', 'gem_media_resolve', 'gem_l3_fix',
+  'gem_biomass', 'gem_fluxscan', 'gem_sensitivity', 'gem_ledger', 'gem_benchmark',
+  'gem_secretion', 'gem_double_knockout', 'gem_enrichment', 'gem_targets',
+]
+
+/** dsh-bio-gem 的运行时数据根（与其 ARCHITECTURE 契约一致）。 */
+function gemDataRoot() {
+  const dshHome = process.env.DSH_HOME ?? pathJoin(os.homedir(), '.dsh')
+  return pathJoin(dshHome, 'dsh-bio-gem')
+}
+
+/**
+ * 探测 dsh-bio-gem 是否与本插件共存。
+ * 先用模块解析（能正确处理 pnpm 符号链接与 hoisting），失败再退回同级目录猜测。
+ */
+function detectGem() {
+  const require = createRequire(import.meta.url)
+  const readPkg = (p) => JSON.parse(readFileSync(p, 'utf8'))
+  try {
+    const pkgPath = require.resolve('@dsh-bio/dsh-bio-gem/package.json')
+    const pkg = readPkg(pkgPath)
+    return { installed: true, version: pkg.version, pluginDir: dirname(pkgPath), detectedBy: 'module-resolve' }
+  } catch { /* 继续尝试同级目录 */ }
+  try {
+    const sibling = pathJoin(dirname(fileURLToPath(import.meta.url)), '..', '..', 'dsh-bio-gem', 'package.json')
+    const pkg = readPkg(sibling)
+    return { installed: true, version: pkg.version, pluginDir: dirname(sibling), detectedBy: 'sibling-path' }
+  } catch {
+    return { installed: false, detectedBy: 'none' }
+  }
+}
+
+/** 列出目录下指定后缀的文件（按修改时间倒序；目录不存在返回空数组）。 */
+function listDirEntries(dir, suffix) {
+  try {
+    return readdirSync(dir)
+      .filter((f) => f.endsWith(suffix))
+      .map((f) => {
+        const full = pathJoin(dir, f)
+        const st = statSync(full)
+        return { name: f, path: full, sizeBytes: st.size, modifiedAt: st.mtime.toISOString() }
+      })
+      .sort((a, b) => (a.modifiedAt < b.modifiedAt ? 1 : -1))
+  } catch {
+    return []
+  }
+}
+
+/** 账本概览：一个模型一个账本（<模型名>.jsonl），统计条数。 */
+function ledgerSummary(root) {
+  const dir = pathJoin(root, 'ledger')
+  const files = listDirEntries(dir, '.jsonl')
+  const ledgers = files.map((f) => {
+    let entries = 0
+    try {
+      entries = readFileSync(f.path, 'utf8').split('\n').filter((l) => l.trim()).length
+    } catch { /* 读失败按 0 计 */ }
+    return { model: f.name.replace(/\.jsonl$/, ''), file: f.path, entries, modifiedAt: f.modifiedAt }
+  })
+  return {
+    dir,
+    count: ledgers.length,
+    totalEntries: ledgers.reduce((s, x) => s + x.entries, 0),
+    ledgers,
+  }
+}
+
+/** 构建引擎可用性（只做廉价的文件探测；gapseq 需 WSL 调用故不做昂贵检查）。 */
+function gemEngineStatus(root) {
+  const scripts = pathJoin(root, 'venv-carveme', 'Scripts')
+  const carve = existsSync(pathJoin(scripts, 'carve.exe'))
+  const diamond = existsSync(pathJoin(scripts, 'diamond.exe'))
+  return {
+    carveme: {
+      available: carve && diamond, carve, diamond,
+      hint: carve && diamond ? undefined : 'gem_build(carveme) 需独立 venv + carve.exe + diamond.exe',
+    },
+    gapseq: {
+      available: null,
+      hint: 'gem_build(gapseq) 需 WSL2 + gapseq；面板不做昂贵探测，请用 gem_gapseq 的能力检查',
+    },
+  }
+}
+
+/** gem 的解释器候选（与其 src/python.js 的候选顺序保持一致，仅作展示）。 */
+function gemPythonCandidates() {
+  const win = process.platform === 'win32'
+  const list = []
+  if (process.env.GEM_PYTHON) list.push({ path: process.env.GEM_PYTHON, source: 'GEM_PYTHON' })
+  const dshHome = process.env.DSH_HOME ?? pathJoin(os.homedir(), '.dsh')
+  const hosted = pathJoin(dshHome, 'dsh-bio-genie', 'python-env')
+  list.push({
+    path: win ? pathJoin(hosted, 'Scripts', 'python.exe') : pathJoin(hosted, 'bin', 'python'),
+    source: '宿主自举环境（本插件）',
+  })
+  if (process.env.CONDA_PREFIX) {
+    list.push({
+      path: win ? pathJoin(process.env.CONDA_PREFIX, 'python.exe') : pathJoin(process.env.CONDA_PREFIX, 'bin', 'python'),
+      source: 'CONDA_PREFIX',
+    })
+  }
+  list.push({ path: 'python', source: 'PATH' })
+  return list
+}
+
+/** 单次 cobra 探测（20s 上限）。 */
+function runCobraProbe(exe) {
+  return new Promise((resolve) => {
+    let settled = false
+    const finish = (v) => { if (!settled) { settled = true; resolve(v) } }
+    try {
+      const cp = spawn(exe, ['-I', '-c', 'import cobra;print(cobra.__version__)'], { windowsHide: true })
+      let out = ''
+      cp.stdout.on('data', (d) => { out += d })
+      cp.on('error', () => finish(null))
+      cp.on('close', (code) => finish(code === 0 ? out.trim() : null))
+      setTimeout(() => { try { cp.kill() } catch { /* 已退出 */ } finish(null) }, 20_000)
+    } catch { finish(null) }
+  })
+}
+
+let gemEnvCache = { at: 0, value: null }
+
+/** 探测 gem 实际会选中的解释器 + cobra 版本（60s 缓存，避免每次开面板都跑探测）。 */
+async function probeGemPython() {
+  const now = Date.now()
+  if (gemEnvCache.value && now - gemEnvCache.at < 60_000) return gemEnvCache.value
+  const candidates = gemPythonCandidates().map((c) => ({
+    ...c,
+    exists: c.path === 'python' ? true : existsSync(c.path),
+  }))
+  let selected = null
+  for (const c of candidates) {
+    if (!c.exists) continue
+    const cobra = await runCobraProbe(c.path)
+    if (cobra) { selected = { path: c.path, source: c.source, cobraVersion: cobra }; break }
+  }
+  const value = {
+    selected,
+    candidates,
+    note: selected ? undefined : '所有候选均未通过 import cobra 探测 —— gem 的分析类工具将不可用（gem_build 另有独立依赖）',
+  }
+  gemEnvCache = { at: now, value }
+  return value
+}
+
+/** GET /api/dsh-bio-genie/metabolic —— 代谢建模域插件面板数据。 */
+async function handleMetabolic(req, res) {
+  const gem = detectGem()
+  if (!gem.installed) {
+    // 未安装：这不是错误状态，前端据此不渲染分页
+    return writeJson(res, 200, { ok: true, value: { installed: false } })
+  }
+  const root = gemDataRoot()
+  const models = listDirEntries(pathJoin(root, 'models'), '.xml')
+  const value = {
+    installed: true,
+    version: gem.version,
+    pluginDir: gem.pluginDir,
+    detectedBy: gem.detectedBy,
+    dataRoot: root,
+    dataRootExists: existsSync(root),
+    models: { count: models.length, items: models.slice(0, 50) },
+    ledger: ledgerSummary(root),
+    engines: gemEngineStatus(root),
+    python: await probeGemPython(),
+    tools: GEM_TOOLS,
+  }
+  return writeJson(res, 200, { ok: true, value })
+}
+
 export function registerApiRoutes(ctx, config = {}) {
   const guard = (handler) => async (req, res) => {
     if (!isLoopbackRequest(req)) {
@@ -469,6 +659,8 @@ export function registerApiRoutes(ctx, config = {}) {
     { kind: 'exact', path: `${ROUTE_PREFIX}/tool-schemas`,    handler: guard((req, res) => handleToolSchemas(req, res)) },
     { kind: 'exact', path: `${ROUTE_PREFIX}/execute-tool`,    handler: guard((req, res) => handleExecuteTool(req, res, config)) },
     { kind: 'exact', path: `${ROUTE_PREFIX}/addons`,          handler: guard((req, res) => handleAddons(req, res, config)) },
+    // 代谢建模域插件面板数据：dsh-bio-gem 未安装时返回 installed:false，前端据此不渲染该分页
+    { kind: 'exact', path: `${ROUTE_PREFIX}/metabolic`,       handler: guard((req, res) => handleMetabolic(req, res, config)) },
   ]) {
     disposers.push(ctx.webServer.register(route))
   }
