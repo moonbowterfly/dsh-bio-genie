@@ -4,16 +4,15 @@
 import os
 import sys
 import re
+from seq_util import clean_seq
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 
-def _clean_seq(seq):
-    return ''.join(str(seq).upper().split())
 
 
 def _gc_percent(seq):
-    s = _clean_seq(seq).replace('N', '')
+    s = clean_seq(seq).replace('N', '')
     if not s:
         return 0.0
     return (s.count('G') + s.count('C')) / len(s) * 100
@@ -124,7 +123,7 @@ def op_dna_syncheck(args):
       poly_run_min: 连续重复报警阈值（默认 6）
     返回：各约束检查结果 + 综合可合成性评估。
     """
-    sequence = _clean_seq(args.get('sequence', ''))
+    sequence = clean_seq(args.get('sequence', ''))
     if not sequence:
         raise ValueError('sequence 必填')
     if not re.match(r'^[ACGTN]+$', sequence):

@@ -6,6 +6,7 @@ import os
 import sys
 import re
 from collections import defaultdict
+from seq_util import clean_seq
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -23,15 +24,13 @@ PAM_CONFIG = {
 }
 
 
-def _clean_seq(seq):
-    return ''.join(str(seq).upper().split())
 
 
 def _calc_gc(seq):
     """GC 含量（排除 N）。"""
     if not seq:
         return 0.0
-    s = _clean_seq(seq).replace('N', '')
+    s = clean_seq(seq).replace('N', '')
     if not s:
         return 0.0
     return (s.count('G') + s.count('C')) / len(s) * 100
@@ -75,8 +74,8 @@ def _count_offtargets(guide_seq, ref_seq, max_mismatches=3):
     简化版：不实现全基因组扫描的种子匹配算法，对小质粒/单基因场景足够。
     返回 [(position, mismatches, strand)]。
     """
-    guide = _clean_seq(guide_seq)
-    ref = _clean_seq(ref_seq)
+    guide = clean_seq(guide_seq)
+    ref = clean_seq(ref_seq)
     guide_len = len(guide)
     targets = []
     # + 链扫描
@@ -97,7 +96,7 @@ def _count_offtargets(guide_seq, ref_seq, max_mismatches=3):
 
 def _reverse_complement(seq):
     comp = {'A': 'T', 'T': 'A', 'G': 'C', 'C': 'G', 'N': 'N'}
-    return ''.join(comp[b] for b in reversed(_clean_seq(seq)))
+    return ''.join(comp[b] for b in reversed(clean_seq(seq)))
 
 
 def op_crispr_guide(args):
@@ -110,7 +109,7 @@ def op_crispr_guide(args):
       max_mismatches: off-target 错配上限（默认 3）
       top_n: 返回候选数（默认 10）
     """
-    sequence = _clean_seq(args.get('sequence', ''))
+    sequence = clean_seq(args.get('sequence', ''))
     if not sequence:
         raise ValueError('sequence 必填（DNA 模板序列）')
     if len(sequence) < 23:
@@ -255,8 +254,8 @@ def op_crispr_verify(args):
     返回：alignment + 突变类型 + 频率
     注：纯 indel 检测，不调用 trace 解析（避免额外依赖）。如需 .ab1 解析可后续扩展。
     """
-    wt = _clean_seq(args.get('wild_type', ''))
-    ed = _clean_seq(args.get('edited', ''))
+    wt = clean_seq(args.get('wild_type', ''))
+    ed = clean_seq(args.get('edited', ''))
     if not wt or not ed:
         raise ValueError('wild_type 与 edited 均必填')
 

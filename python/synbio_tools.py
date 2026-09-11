@@ -14,12 +14,11 @@ error 字典，不影响 bio_ops.py 其余 op 的加载。
 """
 import os
 import sys
+from seq_util import clean_seq
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 
-def _clean_seq(seq):
-    return ''.join(str(seq).upper().split())
 
 
 # Primer3 explain 短语 → 中文可操作建议。
@@ -69,7 +68,7 @@ def op_primer3_design(args):
     except ImportError:
         return {'error': 'primer3-py 未安装，请运行 bio_env reinstall=true 或 uv pip install primer3-py'}
 
-    sequence = _clean_seq(args.get('sequence', ''))
+    sequence = clean_seq(args.get('sequence', ''))
     if not sequence:
         raise ValueError('sequence 必填（模板 DNA 序列）')
     if len(sequence) < 40:
@@ -222,11 +221,11 @@ def op_dna_optimize(args):
     do_codon_opt = bool(args.get('codon_optimize', True))
 
     if dna:
-        dna = _clean_seq(dna)
+        dna = clean_seq(dna)
     elif protein:
         # 反向翻译起点：先用最优密码子铺一条初始序列，再交给约束求解
         from dnachisel.biotools import reverse_translate
-        dna = reverse_translate(_clean_seq(protein))
+        dna = reverse_translate(clean_seq(protein))
     else:
         raise ValueError('dna_sequence 与 protein_sequence 至少提供一个')
 
@@ -246,7 +245,7 @@ def op_dna_optimize(args):
         except Exception:
             pass  # 未知酶名跳过，不阻塞优化
     for motif in constraints.get('avoid_motifs') or []:
-        cons.append(AvoidPattern(_clean_seq(motif)))
+        cons.append(AvoidPattern(clean_seq(motif)))
 
     objectives = [CodonOptimize(species=host)] if do_codon_opt else []
     problem = DnaOptimizationProblem(sequence=dna, constraints=cons, objectives=objectives)
@@ -282,7 +281,7 @@ def op_clone_simulate(args):
         return {'error': 'pydna 未安装，正在自动安装…（若仍未就绪请运行 uv pip install pydna）',
                 'needs_install': True}
 
-    backbone = _clean_seq(args.get('backbone', ''))
+    backbone = clean_seq(args.get('backbone', ''))
     inserts = args.get('inserts') or []
     method = str(args.get('method', 'gibson')).lower()
     if not backbone:
@@ -294,7 +293,7 @@ def op_clone_simulate(args):
 
     fragments = [Dseqrecord(backbone, name='backbone', circular=True)]
     for i, ins in enumerate(inserts):
-        seq = _clean_seq(ins.get('sequence', '') if isinstance(ins, dict) else ins)
+        seq = clean_seq(ins.get('sequence', '') if isinstance(ins, dict) else ins)
         if not seq:
             raise ValueError(f'inserts[{i}] 缺 sequence')
         fragments.append(Dseqrecord(seq, name=(ins.get('name') if isinstance(ins, dict) else None)
@@ -405,7 +404,7 @@ def op_sbol_write(args):
         roles = [_role_uri(comp['role'])] if comp.get('role') else []
         c = sbol3.Component(cname, ctype, name=cname, roles=roles)
         doc.add(c)
-        seq_text = _clean_seq(comp.get('sequence', '') or '')
+        seq_text = clean_seq(comp.get('sequence', '') or '')
         if seq_text:
             s = sbol3.Sequence(f'{cname}_seq', elements=seq_text.lower() if False else seq_text,
                                encoding=sbol3.IUPAC_DNA_ENCODING,
