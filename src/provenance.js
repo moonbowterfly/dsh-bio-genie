@@ -16,14 +16,17 @@
 const LEDGER_CAP = 2000
 /** 单次工具结果最多贡献的数值数（防单个超大输出独占台账容量，见 recordResult）。 */
 const PER_RESULT_CAP = Math.floor(LEDGER_CAP / 2)
+/** 递归收集数值的深度上限。8 层太浅——SBML/配置类嵌套 JSON 常超过 8 层，
+ *  深层合法数值收不进来会让 agent 引用它们时被误判"无溯源"，故放宽到 24。 */
+const DEPTH_CAP = 24
 /** 回复扫描时单次最多报告的违规数。 */
 const MAX_VIOLATIONS = 5
 /** 数值匹配相对容差：允许 agent 做末位四舍五入（52.3 匹配 52.28）。 */
 const REL_TOL = 0.002
 
 /**
- * agent → { numbers: number[], tools: string[], sawQuestion: boolean }
- * @type {WeakMap<object, {numbers:number[], tools:string[], sawQuestion:boolean}>}
+ * agent → { numbers: number[], index: Set<number>, tools: string[], sawQuestion: boolean }
+ * @type {WeakMap<object, {numbers:number[], index:Set<number>, tools:string[], sawQuestion:boolean}>}
  */
 const ledgers = new WeakMap()
 /** session → agent 映射由 rigor-guard 维护；这里只按 agent 存。 */
@@ -31,35 +34,51 @@ const ledgers = new WeakMap()
 function ledgerFor(agent) {
   let l = ledgers.get(agent)
   if (!l) {
-    l = { numbers: [], tools: [], sawQuestion: false }
+    l = { numbers: [], index: new Set(), tools: [], sawQuestion: false }
     ledgers.set(agent, l)
   }
   return l
 }
 
-/** 递归收集 JSON 值中的有限数值（裁剪到本次采集上限 limit）。 */
-function collectNumbers(value, out, depth, limit = LEDGER_CAP) {
-  if (depth > 8 || out.length >= limit) return
+/** 文本中的数值形态（工具字符串字段与回复扫描共用）。 */
+const NUM_RE = /-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g
+
+/**
+ * 递归收集 JSON 值中的有限数值。
+ * @param {number[]} out 收集目标
+ * @param {number} depth 当前深度（超过 DEPTH_CAP 停止）
+ * @param {number} limit 本次采集的数量上限
+ * @param {Set<number>} seen 本次已见数值——**边扫边去重**：重复值不该吃光预算
+ */
+function collectNumbers(value, out, depth, limit, seen) {
+  if (depth > DEPTH_CAP || out.length >= limit) return
   if (typeof value === 'number') {
-    if (Number.isFinite(value)) out.push(value)
+    if (Number.isFinite(value) && !seen.has(value)) { seen.add(value); out.push(value) }
     return
   }
   if (typeof value === 'string') {
     // 工具 stdout/文本字段里的数字也收（agent 常直接引用 print 输出）
-    for (const m of value.matchAll(/-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g)) {
+    for (const m of value.matchAll(NUM_RE)) {
       const n = Number(m[0])
-      if (Number.isFinite(n)) out.push(n)
+      if (Number.isFinite(n) && !seen.has(n)) { seen.add(n); out.push(n) }
       if (out.length >= limit) return
     }
     return
   }
   if (Array.isArray(value)) {
-    for (const v of value) collectNumbers(v, out, depth + 1, limit)
+    for (const v of value) collectNumbers(v, out, depth + 1, limit, seen)
     return
   }
   if (value && typeof value === 'object') {
-    for (const v of Object.values(value)) collectNumbers(v, out, depth + 1, limit)
+    for (const v of Object.values(value)) collectNumbers(v, out, depth + 1, limit, seen)
   }
+}
+
+/** 从台账前端移除 n 个最旧数值，并同步去重索引。 */
+function dropOldest(ledger, n) {
+  if (n <= 0) return
+  for (const v of ledger.numbers.slice(0, n)) ledger.index.delete(v)
+  ledger.numbers.splice(0, n)
 }
 
 const FALLBACK_AGENT = {}
@@ -83,25 +102,27 @@ export function stampProvenance(tool, result) {
 /**
  * 把工具结果中的数值记入该 agent 的台账。由 rigor-guard 在
  * tools/post-execute 钩子中调用。
+ *
+ * 两条不变量（2026-09-12 依外部评审 + 本地复现修正）：
+ *  ① **无新增数值就不动台账**——旧实现在"本次结果有无数字"尚未可知时先砍掉一半旧数据，
+ *     一个空结果就能把历史合法数值清掉，让 agent 引用它们时被误判无溯源（假阳性）。
+ *  ② **按需淘汰**——只丢"刚好容纳新数值"所需的量，不再整段砍半。
+ *  另：去重索引保证同一数值不在台账里堆积（重复值输出不该挤掉别的数字）。
+ *
  * @param {object} agent 调用方 agent（可为空 → 进程级兜底台账）
  * @param {string} tool 工具名
  * @param {*} result 工具返回
  */
 export function recordResult(agent, tool, result) {
   const ledger = ledgerFor(agent ?? FALLBACK_AGENT)
-  // ⚠️ 必须先腾空间再收集（2026-09-11 缺陷修复）：
-  // collectNumbers 遇到 out.length >= limit 会**整体跳过**，而末尾的 splice 只删旧的
-  // 救不回已跳过的采集。若台账被某个超大输出（实测 96K 字符级）一次填满，
-  // 之后**所有**工具的数字都进不来 → 该会话的防火墙永久误伤每一个新数字
-  // （现场：seq 56 的 46K 输出填满台账，seq 73 的 521 无法入账，agent 在 seq 82
-  //  引用它时被判无溯源）。
-  if (ledger.numbers.length >= LEDGER_CAP) {
-    ledger.numbers.splice(0, ledger.numbers.length - Math.floor(LEDGER_CAP / 2))
-  }
-  // 单次结果贡献上限：防止单个超大输出独占全部容量（保证至少两个工具的贡献能共存）
-  collectNumbers(result, ledger.numbers, 0, ledger.numbers.length + PER_RESULT_CAP)
-  if (ledger.numbers.length > LEDGER_CAP) {
-    ledger.numbers.splice(0, ledger.numbers.length - LEDGER_CAP)
+  const incoming = []
+  collectNumbers(result, incoming, 0, PER_RESULT_CAP, new Set())
+  if (incoming.length > 0) {
+    const fresh = incoming.filter((n) => !ledger.index.has(n))
+    if (fresh.length > 0) {
+      dropOldest(ledger, ledger.numbers.length + fresh.length - LEDGER_CAP)
+      for (const n of fresh) { ledger.numbers.push(n); ledger.index.add(n) }
+    }
   }
   if (!ledger.tools.includes(tool)) ledger.tools.push(tool)
 }
@@ -164,7 +185,10 @@ export function findUnverifiedNumbers(agent, text) {
     if (!Number.isFinite(n) || seen.has(raw)) continue
     seen.add(raw)
     // 版本号链豁免：数字前后紧跟 .数字 的（如 0.6.0 中的 0.6）
-    const numStart = m.index + m[0].length - raw.length
+    // 用 lastIndexOf 定位数值：CLAIM_RE 末尾的 `%?` 会吞掉一个字符，
+    // 用 m[0].length - raw.length 反推会偏移一位，导致 `= 68.35%` / `: 68.35%`
+    // 这类写法读不到 %，不做 ×100 换算，把合法引用误拦（2026-09-12 复现）。
+    const numStart = m.index + m[0].lastIndexOf(raw)
     const before = clean[numStart - 1]
     const before2 = clean[numStart - 2]
     const after = clean[numStart + raw.length]

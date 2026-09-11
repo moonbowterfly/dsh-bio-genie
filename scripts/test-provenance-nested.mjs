@@ -1,60 +1,54 @@
 /**
- * 验证：嵌套 dict 里的数字是否进不了 rigor-guard 台账（导致误伤）。
+ * provenance 嵌套与深度契约 —— 硬断言回归。
  *
- * 现场（2026-09-11 E2E）：agent 的 bio_python 返回里，521 嵌在
- * { M00001_water_proof: { 各种统计 } } 内层；agent 在回复中引用 521 时被防火墙打回。
+ * 现场（2026-09-11 E2E）：521 嵌在 { M00001_water_proof: { ... } } 内层，
+ * agent 引用时被防火墙打回 → 说明"能不能收进嵌套数值"直接决定误报率。
+ *
+ * 2026-09-12 外部评审指出：旧用例把十层对象先 JSON.stringify 成字符串再放进
+ * `content[].text`，收集器只需扫字符串、**根本没递归**，所以那条"十层深嵌套"用例
+ * 并没有测到深度上限。本文件用**真结构化对象**测深度契约：
+ *   · 深度 ≤ DEPTH_CAP（24）→ 必须收到
+ *   · 超过 DEPTH_CAP       → 按文档化契约收不到（这条是**已知边界**，不是缺陷）
+ *   · 文本字段里的 JSON    → 无论多少层都能收到（走字符串扫描路径，与深度无关）
  */
+import assert from 'node:assert/strict'
 import { beginTurn, findUnverifiedNumbers, recordResult } from '../src/provenance.js'
 
-function probe(title, result, claim, expectVerified = true) {
+/** 把 value 包进 n 层对象（真嵌套，不序列化）。 */
+function wrapDeep(n, value) {
+  let o = { deep_value: value }
+  for (let i = 0; i < n; i++) o = { inner: o }
+  return o
+}
+
+function probe(title, result, claim, expectVerified) {
   const agent = {}
   beginTurn(agent)
   recordResult(agent, 'bio_python', result)
   const v = findUnverifiedNumbers(agent, claim)
   const ok = expectVerified ? v.length === 0 : v.length > 0
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${title}`)
-  console.log(`      声明 ${JSON.stringify(claim)} → 违规 ${JSON.stringify(v)}`
-    + `（期望${expectVerified ? '有溯源' : '被拦截'}）`)
-  return ok
+  assert.ok(ok, `${title}：声明 ${JSON.stringify(claim)} → 违规 ${JSON.stringify(v)}（期望${expectVerified ? '有溯源' : '被拦截'}）`)
+  console.log(`  PASS ${title}`)
 }
 
-const nested = {
-  content: [{
-    type: 'text',
-    text: JSON.stringify({
-      M00001_water_proof: {
-        reactions_total: 521,
-        as_reactant: 411,
-        as_product: 110,
-        abc_transport: 128,
-      },
-    }),
-  }],
-}
+// ① 真结构化嵌套：8 层 / 16 层都要收到（≤ DEPTH_CAP=24）
+probe('① 结构化 8 层', { content: [{ type: 'text', text: 'ok' }], data: wrapDeep(8, 4321.5) }, '深值 = 4321.5', true)
+probe('② 结构化 16 层', { content: [{ type: 'text', text: 'ok' }], data: wrapDeep(16, 5678.5) }, '深值 = 5678.5', true)
 
-const flat = {
-  content: [{
-    type: 'text',
-    text: JSON.stringify({ reactions_total: 521, as_reactant: 411 }),
-  }],
-}
+// ③ 已知边界：超过 DEPTH_CAP 的**结构化**数值收不到（文档化契约，避免误以为是 bug）
+probe('③ 结构化 30 层（超 DEPTH_CAP，按契约收不到）',
+  { content: [{ type: 'text', text: 'ok' }], data: wrapDeep(30, 9999.5) }, '深值 = 9999.5', false)
 
-const deep = {
-  content: [{
-    type: 'text',
-    text: JSON.stringify({ a: { b: { c: { d: { e: { f: { g: { h: { i: { deep_value: 777 } } } } } } } } } }),
-  }],
-}
+// ④ 文本字段里的 JSON 与深度无关（走字符串扫描路径）
+probe('④ 文本字段里的 20 层 JSON',
+  { content: [{ type: 'text', text: JSON.stringify(wrapDeep(20, 7777.5)) }] }, '深值 = 7777.5', true)
 
-let allOk = true
-allOk = probe('① 嵌套 dict（现场形态）', nested, '反应总数 521') && allOk
-allOk = probe('② 顶层扁平（对照）', flat, '反应总数 521') && allOk
-allOk = probe('③ 十层深嵌套（depth 上限探测）', deep, '深值 777') && allOk
+// ⑤ 现场形态：单层嵌套 dict
+probe('⑤ 现场形态（M00001_water_proof.reactions_total）',
+  { content: [{ type: 'text', text: JSON.stringify({ M00001_water_proof: { reactions_total: 521, as_reactant: 411 } }) }] },
+  '反应总数 = 521.0', true)
 
-// ④ 护栏不能失效：编造数字必须被拦。
-// 注意 CLAIM_RE 只扫「带小数」或「前面带比较语境（= < > : 等）」的数字——
-// 纯整数裸写在句中本就不在扫描范围（这是设计，不是缺陷），故用例要用比较语境写法。
-allOk = probe('④ 编造数字应被拦（护栏有效性）', flat, '编造值 = 9999.5', false) && allOk
+// ⑥ 护栏有效性：编造数字必须被拦
+probe('⑥ 编造数字应被拦', { content: [{ type: 'text', text: '{}' }] }, '编造值 = 9999.5', false)
 
-console.log(`\n结论：${allOk ? '嵌套提取正常且护栏有效' : '存在问题（见上方 FAIL）'}`)
-process.exit(allOk ? 0 : 1)
+console.log('\nALL PASS')
