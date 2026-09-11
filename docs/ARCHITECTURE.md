@@ -28,8 +28,8 @@ DeepSeek Harness 是 Cordis 驱动的「一切皆插件」框架。第三方插�
 | **环境诊断** | bio_env | 环境故障排查 | 可重装 | — |
 
 agent 的决策路径（写入 `dsh-bio-genie` 主 skill）：**先查语义化工具表，命中就用；
-否则用 bio_python 写代码执行**。两个 skill 体系并存：14 个领域 skill（教模型写
-Biopython 代码）+ 1 个主 skill（教模型选工具）。
+否则用 bio_python 写代码执行**。两个 skill 体系并存：22 个领域/研究 skill（17 个 Biopython
+领域 + 5 个研究方法，教模型写代码）+ 1 个主 skill（教模型选工具）。
 
 ## 3. 为什么不用 dsh 内置的 code-runtime
 

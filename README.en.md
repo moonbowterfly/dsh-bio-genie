@@ -21,7 +21,7 @@
 | Feature | Description |
 |---------|-------------|
 | 🪄 **Wish-style Analysis (Wish Coding)** | Plain language in, results out: *"What's the GC content and EcoRI cut sites of this sequence?"* |
-| 🧩 **Full Coverage** | The `bio_python` executor runs arbitrary Biopython code (alignment, PDB, Phylo, motif, BLAST…), backed by 21 domain/research skill recipes |
+| 🧩 **Full Coverage** | The `bio_python` executor runs arbitrary Biopython code (alignment, PDB, Phylo, motif, BLAST…), backed by 22 domain/research skill recipes |
 | ⚡ **High-Frequency Semantic Tools** | 48 fixed-parameter tools (GC content, translation, restriction enzymes, k-mer, file IO, BLAST, multiple sequence alignment, phylogenetic trees, Entrez, pathway enrichment, PubMed literature, reference genome, publication-grade plotting, machine learning, DNA design, Primer3 primers/multi-constraint DNA optimization/clone simulation/SBOL standardization/production envelope/gene circuit compile & simulation, differential expression/GSEA) + 5 executor/meta tools (bio_python / bio_env / bio_log / bio_memory / bio_goal) — token-efficient, stable output, validated arguments |
 | 📦 **Zero Installation** | Automatically downloads an isolated Python environment (uv + venv + Biopython) to `$DSH_HOME/dsh-bio-genie/`, no system pollution |
 | 🇨🇳 **China-Network Ready** | Auto network adaptation: official sources by default, automatic switch to domestic mirrors on any failure (uv→Tsinghua PyPI, CPython→npmmirror, PyPI packages→Tsinghua), zero configuration required |

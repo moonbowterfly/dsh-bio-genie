@@ -21,7 +21,7 @@
 | 特性 | 说明 |
 |------|------|
 | 🪄 **许愿式分析（Wish Coding）** | 说人话就能分析：*"这条序列的 GC 含量和 EcoRI 酶切位点？"* |
-| 🧩 **全功能覆盖** | `bio_python` 执行器可运行任意 Biopython 代码（比对、PDB、Phylo、motif、BLAST…），配合 21 个领域/研究 skill 配方 |
+| 🧩 **全功能覆盖** | `bio_python` 执行器可运行任意 Biopython 代码（比对、PDB、Phylo、motif、BLAST…），配合 22 个领域/研究 skill 配方 |
 | ⚡ **高频语义化工具** | 48 个固定参数工具（GC 含量、翻译、限制酶、k-mer、文件 IO、BLAST、多序列比对、系统发育树、Entrez 检索、通路富集、PubMed 文献、参考基因组、出版级绘图、机器学习、DNA 设计、Primer3 引物/多约束 DNA 优化/克隆模拟/SBOL 标准化/生产包络线/CRISPR 向导设计/编辑验证/合成可行性检查、基因回路编译/动力学仿真、差异表达/GSEA）+ 5 个执行器/元工具（bio_python / bio_env / bio_log / bio_memory / bio_goal）——省 token、输出稳定、参数有校验 |
 | 📦 **零安装** | 自动下载隔离的 Python 环境（uv + venv + Biopython 绘图栈）到 `$DSH_HOME/dsh-bio-genie/`，不污染系统 |
 | 🇨🇳 **网络自动适配** | 默认直连官方源，任一环节失败自动切换国内镜像（uv→清华 PyPI、CPython→npmmirror、PyPI 包→清华镜像），无需任何配置 |
