@@ -125,6 +125,8 @@ language: none
 
 **bio_fig_qa** — 绘图环境自检：`lang`（zh/en，默认 zh）、`journal`（nature/science/ieee/general，默认 nature）。返回 `{matplotlib, cjk_fonts[], cjk_ready, preset_test{journal, lang, ok, applied, error}, hint}`。**cjk_ready=false 时中文标签必然方框**——改英文标签或提示装 Noto CJK。
 
+**bio_fig_lint** — FIG 级出版语义 lint（画完图立刻自检视觉选择，无 fig 对象依赖）：`colors_used`（实际用色 hex 数组）、`cmap_used`（连续 colormap 名）、`n_categorical`（类别总数）、`err_semantics`（误差棒语义声明，未画传 "none"）、`has_stat_metadata`（图上 p 值/星号是否有检验元数据）、`n_available`（exact n 是否声明）、`min_pt`（默认 5）。返回 `{issues[{severity, message}], verdict(PASS/WARN/FAIL), hint}`。拦截：红绿对（FIG003）、rainbow/jet 色图（FIG004）、纯色相编码 >8 类（FIG005）、灰度坍缩（FIG015）、误差棒/统计谱系/exact n 未声明（FIG008/009/010）。**识别规则**：分类=Okabe-Ito 色板；连续=viridis/cividis/batlow；diverging 必须 center=0。
+
 ### 组学分析
 
 **bio_deseq2** — 差异表达分析（Python 实现）：`counts_file ★`（counts 矩阵 CSV，行=基因列=样本）、`meta_file ★`（样本信息 CSV，**必须含 `sample` 与 `condition` 两列**——condition 为分组列，取值如 ctrl/trt；用其他列名会报 KeyError）、`contrast`（对比组，格式 `trt_vs_ctrl`）。返回差异基因表。触发词：差异表达。
@@ -145,6 +147,7 @@ language: none
 | "人类参考基因组版本" | `bio_ref_genome species=human` |
 | "这组数据怎么画/画成论文图" | `bio_fig_profile` → bio_python 画 → `bio_fig_export` 审计 |
 | "中文图会不会出方框" | `bio_fig_qa` |
+| "图配色/投稿自查" | 画完 → `bio_fig_lint`（红绿对/rainbow/灰度/统计元数据自检） |
 | "counts 矩阵差异表达" | `bio_deseq2` |
 | "全基因组排序 GSEA" | `bio_gsea` |
 | "远程 BLAST / 多序列比对 / 建树" | `bio_blast_search` / `bio_msa` / `bio_phylo_build` |
