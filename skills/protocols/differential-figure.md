@@ -65,6 +65,7 @@ meta['caption_fragments'] 已给出可拼接句子：
 | D4 | 阈值线不画 | effect_threshold / alpha 线必须画（拚图=透明） |
 | D5 | y 上界让 p=0 极端值压缩主体 | 配方内部已做 quantile 截断（自动） |
 | D6 | diverging effect 色带 center≠0 | 配方无色带；若上下文需要 diverging 热图？改 heat：center=0 |
+| D7 | 审稿人要出图代码时现写 | **不必现写**：导出时 `meta.repro_script`（`<图名>_reproduce.py`）已自动落盘，直接交付 |
 
 ## 验收标准
 

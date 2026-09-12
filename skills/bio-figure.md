@@ -67,6 +67,11 @@ fig, ax, meta = differential_plot(df, effect_col='log2FC', p_col='pvalue', padj_
 自动标注只标 top effect（正负各）+ top significance + 用户点名，绝不全标 Top-N；
 `meta.caption_fragments` 直接可拼进图注。
 
+**复现 bundle（审稿人索要代码时直接交付）**：只要传 `out_file` 导出，
+`meta.repro_script`（`<图名>_reproduce.py`，含环境版本+参数重放+DATA TODO 段）
+与 `meta.repro_readme` 自动生成——**在报告里主动告知用户"出图代码已随图落盘"**，
+审稿人要求给代码时把 `_reproduce.py` 直接交给用户，无需临时补写。
+
 ## 选图决策速查表
 
 | 数据形态 | 推荐首选 | 不该用 |
