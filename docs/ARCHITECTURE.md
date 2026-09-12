@@ -136,18 +136,27 @@ GSEA 改由 Python 语义化工具 `bio_deseq2` / `bio_gsea` 提供。
   注册 `settings.section` 列表条目（`id: biogenie`、`order: 50`、`label: BioGenie`），
   即设置面板侧栏一级菜单 + 右侧内容页。`inject = ['slots']`（cordis 服务，由
   `@deepseek-ai/dsh-client-runtime` 提供）。
-- **当前内容（v0.3.1+，2026-08-18 起）**：四 tab 内部 state 切换的设置面板
+- **当前内容（v0.3.1+，2026-08-18 起）**：基础 tab 内部 state 切换的设置面板；安装 dsh-bio-gem 时附加一个可选的代谢建模子页
   - **总览 tab**：包元信息 + 配置默认值只读视图 + 文档导航（v0.3.0 原有）
   - **Skill 模块 tab**：调 GET /api/dsh-bio-genie/skills 拉真实清单，主 skill 1 +
     领域/研究/协议/指南共 48 个条目，按 category 分组显示
   - **Python 环境 tab**：调 GET /api/dsh-bio-genie/python-packages 拉 venv 内
     `pip list --format=json` 真实结果，name + version 按字母排序；venv 未引导时
     明确标注 + 引导触发方式
+  - **代谢建模 tab（可选）**：先仅作本地模块安装探测；用户打开子页或手动刷新时，才由宿主
+    五态适配器请求 gem 的固定 integration health/status 端点。`not-installed` 不渲染 tab；
+    `legacy` 显示明确的文件系统只读兼容视图；`installed-unavailable`、`incompatible`、
+    `degraded`、`ready` 各有独立文案和只读真实状态。最后一次成功快照在重新探测失败时标为过期。
 - **数据通道（v0.3.1 新增，loopback-only RPC）**：浏览器 fetch('/api/dsh-bio-genie/<endpoint>')
   同源调宿主侧 server.js 注册的路由；server.js 用 isLoopbackRequest 守卫
   （127.0.0.1/localhost/sec-fetch-site/origin 三层校验）拒绝跨站/非本地访问。
   返回统一信封 { ok, value } 或 { ok:false, code, message }，失败 code 区分
   env-not-ready/network/parse-failed/internal，方便面板渲染对应占位与重试。
+- **gem 五态适配器（托管领域扩展 v1）**：`detectGem()` 只负责本地安装/版本探测；协议版
+  gem 的 models/ledger/exports/env 只从其 API 消费，避免双事实源。服务端以当前 Host 为基址，
+  health 3 秒、status 5 秒并通过 `AbortSignal.timeout` 取消；非 200、超时、坏 JSON 或坏信封
+  均映射为 `installed-unavailable`，不得拖垮整个设置面板。只有低于 0.1.11 的 legacy gem
+  允许读取 `~/.dsh/dsh-bio-gem/` 做兼容摘要。
 - **扩展路径**：设置内容复杂化后可迁到 tsdown 构建（`src/client/*.tsx`），
   宿主侧逻辑完全不受影响。RPC 端点可继续扩展（写端点 mutate 已在 guard 中保留
   POST 支持，但当前未对外暴露）。

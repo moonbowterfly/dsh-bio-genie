@@ -30,7 +30,7 @@
 | 📜 **Transparency Log** | Every code execution / tool call appends an async JSONL log (hash/preview/duration); `bio_log` traces back any analysis; logs are auto-rotated after 30 days |
 | 🧬 **Scientific Rigor Guardrails** | Persona enforces "biological conclusions must trace to tool output"; pure inference is marked [inferred — unverified] |
 | 🧠 **Session Memory** | Successful code patterns + error→fix lessons accumulate automatically (local JSON); query via `bio_memory`, gets smarter over time |
-| ⚙️ **Settings Panel** | "BioGenie" menu in dsh Settings sidebar (⚙️) — tabs: Overview (package info/config defaults), Skill Modules (48 entries grouped by main/domain/research/protocol/guide), Python Environment (venv packages), Tool Debug |
+| ⚙️ **Settings Panel** | "BioGenie" menu in dsh Settings sidebar (⚙️) — tabs: Overview (package info/config defaults), Skill Modules (48 entries grouped by main/domain/research/protocol/guide), Python Environment (venv packages), Tool Debug; when dsh-bio-gem shares the instance, an additional read-only five-state Metabolic Modeling tab |
 | 📚 **Protocol Knowledge Base** | 17 high-frequency task protocols (QC/alignment/BLAST/cloning/trees/structure/enrichment/publication figures/coordinate systems/statistics/differential expression/GSEA…), each with runnable code templates + pitfalls, bundled with the plugin |
 
 ---
