@@ -76,6 +76,17 @@ function assertCount(file, re, truth, label) {
   }
 }
 
+// ── 面板元信息版本：静态 client bundle 必须与 package 真值同步 ──
+const packageVersion = JSON.parse(read('package.json')).version
+const clientVersion = /version:\s*'([^']+)'/.exec(read('lib/client.js'))?.[1]
+if (clientVersion === packageVersion) {
+  console.log(`PASS  client.js 面板版本：${clientVersion} 与 package.json 一致`)
+  pass += 1
+} else {
+  console.log(`FAIL  client.js 面板版本：${clientVersion ?? '未找到'} ≠ package.json ${packageVersion}`)
+  fail += 1
+}
+
 assertCount('package.json', /(\d+)\s*个高频语义化工具/g, semanticTools, 'package.json 语义化工具数')
 assertCount('README.md', /(\d+)\s*个工具/g, allTools, 'README 工具总数')
 assertCount('README.md', /Skill 体系（(\d+) 个）/g, skillTotal, 'README skill 总数')

@@ -93,7 +93,11 @@ GET  /api/dsh-bio-gem/integration/v1/jobs/:id     # 任务状态（批次 2 预�
 ```
 
 - `checks` 是环境事实项的机器可读清单（`id` 稳定，`status` 四值枚举）；`state=degraded` 当且仅当存在非 `ok` 的 check。
-- 昂贵探测（Python/cobra 探测 ≈2.7s）必须做**短缓存（≤60s）**，且不得在插件加载期执行。
+- **慢探测必须非阻塞（stale-while-revalidate）**：任何可能耗时 >3s 的探测（如 WSL 命令、冷启动子进程）不得阻塞 `status` 响应——
+  缓存未过期直接返回；过期时立即返回旧值并后台刷新；从未探测过则用占位值（如 `available: null` + `probing` 提示），
+  并把该 check 记为 `warn`（语义 = 「尚未确定」），后台完成后自动转 `ok`/`missing`。
+  **失败结果只做短缓存（≤60s）并自动重试**（冷启动类失败是暂时性状态）。真实教训：慢探测阻塞响应会导致消费端超时截断，
+  使 `status` 永远不可达（实测）。
 - `data` 只放摘要 + 有限条目（列表截断 ≤50，其余给计数）。
 - `remediations` 只允许**受控 code + owner**（`owner ∈ {genie, gem}`）；**严禁**返回任意 URL、
   任意 shell 命令、任意 pip 参数或前端 callback；消费者只做 code → 已知页面/操作的映射。
@@ -146,6 +150,10 @@ GET  /api/dsh-bio-gem/integration/v1/jobs/:id     # 任务状态（批次 2 预�
   输入映射为有限 action schema，对模型目录/导出目录/删除目标做 allowlist 与路径归一化；
   不接受任意命令、任意路径、任意 pip 参数、任意下载 URL；job 日志脱敏并受分页/长度限制。
 - 跨插件原则：**不执行对方给的 URL/命令**；remediation 只做受控 code → 已知操作映射。
+- **内层 HTTP 纪律**：插件对**同一实例端点**发起的服务端请求（如宿主代理消费接入方 API）必须使用
+  `node:http`（或等效直连实现），**不要用全局 `fetch`**——dsh 进程内可能装载全局代理 dispatcher
+  （`@deepseek-ai/dsh-http-proxy` 会 `undici.setGlobalDispatcher`），实测同一端点在服务端内层 `fetch`
+  下出现过长挂起（浏览器路径 102s vs `node:http` 62ms）。
 
 ## 6. 兼容与降级规则
 

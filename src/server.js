@@ -21,6 +21,7 @@
  * @module dsh-bio-genie/server
  */
 import { spawn } from 'node:child_process'
+import http from 'node:http'
 import { createRequire } from 'node:module'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname, join as pathJoin } from 'node:path'
@@ -626,26 +627,63 @@ function legacyMetabolicValue(gem) {
   }
 }
 
-/** Fetch and validate one fixed gem integration envelope with a bounded wait. */
-async function fetchGemIntegration(req, endpoint, timeoutMs) {
+/**
+ * 读取一个固定的 gem integration 信封（有界等待）。
+ *
+ * 用 `node:http` 直连而非全局 fetch：dsh 进程内可能安装全局代理 dispatcher
+ * （`@deepseek-ai/dsh-http-proxy` 会 `undici.setGlobalDispatcher`），实测同一
+ * 端点在**服务端内层 fetch** 下出现过长挂起（浏览器路径实测 102s，而同等
+ * curl/外部 node fetch 为 15–25ms）。node:http 不经过 undici，无此变量。
+ */
+export function fetchGemIntegration(req, endpoint, timeoutMs) {
   const host = req.headers?.host
-  if (typeof host !== 'string') throw new Error('missing host')
-  const response = await fetch(new URL(endpoint, `http://${host}`), {
-    method: 'GET',
-    headers: { accept: 'application/json' },
-    signal: AbortSignal.timeout(timeoutMs),
+  if (typeof host !== 'string') return Promise.reject(new Error('missing host'))
+  const target = new URL(endpoint, `http://${host}`)
+  const hostname = target.hostname.replace(/^\[|\]$/g, '')
+  const port = target.port || '80'
+  return new Promise((resolve, reject) => {
+    let settled = false
+    const fail = (err) => { if (!settled) { settled = true; clearTimeout(timer); reject(err) } }
+    const ok = (value) => { if (!settled) { settled = true; clearTimeout(timer); resolve(value) } }
+    let timer
+    const request = http.get({
+      hostname,
+      port,
+      path: target.pathname,
+      headers: { accept: 'application/json' },
+    }, (res) => {
+      let body = ''
+      res.setEncoding('utf8')
+      res.on('data', (chunk) => {
+        body += chunk
+        if (body.length > 1_000_000) {
+          res.destroy()
+          fail(new Error('gem integration response too large'))
+        }
+      })
+      res.on('end', () => {
+        if (res.statusCode < 200 || res.statusCode >= 300) {
+          return fail(new Error(`gem integration HTTP ${res.statusCode}`))
+        }
+        let envelope
+        try {
+          envelope = JSON.parse(body)
+        } catch {
+          return fail(new Error('gem integration returned invalid JSON'))
+        }
+        if (!envelope || envelope.ok !== true || !envelope.value || typeof envelope.value !== 'object') {
+          return fail(new Error('gem integration returned an invalid envelope'))
+        }
+        ok(envelope.value)
+      })
+      res.on('error', fail)
+    })
+    timer = setTimeout(() => {
+      request.destroy()
+      fail(new Error('gem integration request timeout'))
+    }, timeoutMs)
+    request.on('error', fail)
   })
-  if (!response.ok) throw new Error(`gem integration HTTP ${response.status}`)
-  let envelope
-  try {
-    envelope = await response.json()
-  } catch {
-    throw new Error('gem integration returned invalid JSON')
-  }
-  if (!envelope || envelope.ok !== true || !envelope.value || typeof envelope.value !== 'object') {
-    throw new Error('gem integration returned an invalid envelope')
-  }
-  return envelope.value
 }
 
 function liveMetabolicValue(gem, classification, health, status) {
@@ -726,12 +764,18 @@ async function handleMetabolic(req, res) {
     if (classification.state === 'incompatible') {
       return writeJson(res, 200, { ok: true, value: liveMetabolicValue(gem, classification, health) })
     }
-    if (classification.state === 'installed-unavailable') {
-      return writeJson(res, 200, { ok: true, value: liveMetabolicValue(gem, classification) })
-    }
-    status = await fetchGemIntegration(req, '/api/dsh-bio-gem/integration/v1/status', 5_000)
-  } catch {
+    // 注意：health 成功但 status 尚未取回时，classifyGemState 会判 installed-unavailable
+    // （它只在 health+status 齐全时才判 degraded/ready）——因此**不能**在此提前返回，
+    // 否则 status 永远不会被请求，degraded/ready 状态不可达（真实运行时实测过的缺陷）。
+    // health 失败的情形由外层 catch 兜底：health 保持 undefined，最终分类仍为 unavailable。
+    // status 冷探测包含只读 WSL/gapseq 探测（本机 wsl.exe 启动即 ~3s，加 conda/gapseq 更久），
+    // 5s 超时会在首次请求时必然截断（真实运行时实测）——给足余量；gem 侧有 60s 缓存
+    // + 延迟预热（见其 src/index.js），正常情况下列表面板打开时已命中缓存。
+    status = await fetchGemIntegration(req, '/api/dsh-bio-gem/integration/v1/status', 12_000)
+  } catch (err) {
     // A subpage probe failure is a visible state, never a BioGenie panel crash.
+    console.warn('[dsh-bio-genie] gem integration probe failed:',
+      err?.message, '| cause:', err?.cause?.message ?? err?.cause ?? 'none')
   }
   classification = classifyGemState({ probe: gem, health, status })
   return writeJson(res, 200, { ok: true, value: liveMetabolicValue(gem, classification, health, status) })

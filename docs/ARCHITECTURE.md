@@ -154,9 +154,11 @@ GSEA 改由 Python 语义化工具 `bio_deseq2` / `bio_gsea` 提供。
   env-not-ready/network/parse-failed/internal，方便面板渲染对应占位与重试。
 - **gem 五态适配器（托管领域扩展 v1）**：`detectGem()` 只负责本地安装/版本探测；协议版
   gem 的 models/ledger/exports/env 只从其 API 消费，避免双事实源。服务端以当前 Host 为基址，
-  health 3 秒、status 5 秒并通过 `AbortSignal.timeout` 取消；非 200、超时、坏 JSON 或坏信封
-  均映射为 `installed-unavailable`，不得拖垮整个设置面板。只有低于 0.1.11 的 legacy gem
-  允许读取 `~/.dsh/dsh-bio-gem/` 做兼容摘要。
+  先取 health（3 秒）再取 status（12 秒）；两步都完成后才对 ready/degraded 分类，避免 health 成功、
+  status 尚未读取时被误判为 `installed-unavailable`。内层请求使用 `node:http` 的有界直连，而非全局
+  `fetch`：dsh 进程可能安装全局 undici proxy dispatcher，直连可避免服务端内层请求被代理长挂起。
+  非 200、超时、坏 JSON、超大响应或坏信封均映射为 `installed-unavailable`，不得拖垮整个设置面板。
+  只有低于 0.1.11 的 legacy gem 允许读取 `~/.dsh/dsh-bio-gem/` 做兼容摘要。
 - **扩展路径**：设置内容复杂化后可迁到 tsdown 构建（`src/client/*.tsx`），
   宿主侧逻辑完全不受影响。RPC 端点可继续扩展（写端点 mutate 已在 guard 中保留
   POST 支持，但当前未对外暴露）。
