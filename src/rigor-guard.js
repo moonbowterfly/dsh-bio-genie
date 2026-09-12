@@ -1,16 +1,21 @@
 /**
- * dsh-bio-genie — rigor-guard（计算防火墙的运行时强制层）
+ * dsh-bio-genie — rigor-guard（计算防火墙的运行时层）
  *
- * 挂载框架 agent 生命周期事件，实现「无溯源数字物理上发不出去」：
+ * ⚙️ 模式说明（2026-09-12 用户决策：由「回合拦截」降级为「溯源提醒」）：
+ * 旧模式曾用 agent.steer() 在收尾前**物理打回**含无溯源数字的回复——实战发现
+ * 数字本身往往是对的（只是台账滞后/四位小数截断），打回反而打断工作流、拖慢回合。
+ * 现模式：**放行回复 + 在收尾时静默收集违规清单记入日志**；
+ * 强制语气改为**文本提醒**（通过 steer 注入要求「下次给数字带出处」，不再阻断本轮）。
+ * 台账（provenance.js）与数值检测逻辑保持不变——溯源能力完整保留，只是不再 jail。
  *
+ * 挂载框架 agent 生命周期事件：
  *  - `session/event`（assistant/message）：跟踪每个 agent 最新的回复文本
- *  - `agent/turn-stopping`：回合收尾前扫描回复；发现无溯源数值声明时
- *    用 agent.steer() 注入一条插件反馈，强制 agent 调用工具验证后再输出
+ *  - `agent/turn-stopping`：收尾扫描回复中无溯源的数值声明 → 记日志 + 软提醒
  *
  * 设计约束：
  *  - 只对用过 bio_* 工具的 agent 生效（台账为空直接放行，不打扰闲聊）
  *  - 本回合调过 ask_user_question 的放行（决策检查点允许提议数值）
- *  - 每回合最多打回 2 次，防止 steer 死循环
+ *  - 提醒注入每回合最多 1 次（软提醒，不重试不强制）
  *  - 任何内部异常只记日志，绝不阻塞 agent 循环
  *
  * @module dsh-bio-genie/rigor-guard
@@ -20,8 +25,8 @@ import {
   ledgerSize, beginTurn, findUnverifiedNumbers,
 } from './provenance.js'
 
-/** 每回合最多打回次数。 */
-const MAX_STEERS_PER_TURN = 2
+/** 每回合最多软提醒次数（提醒≠拦截；超限完全静默）。 */
+const MAX_SOFT_NUDGES_PER_TURN = 1
 
 /** 从 assistant/message 事件的 message.content 提取纯文本。 */
 function messageText(message) {
@@ -37,7 +42,7 @@ function messageText(message) {
  * @param {import('@deepseek-ai/cordis').Context} ctx
  */
 export function registerRigorGuard(ctx) {
-  /** agent → { lastReply: string, steers: number, turn: number } */
+  /** agent → { lastReply: string, nudges: number, turn: number } */
   const state = new WeakMap()
   /** session 对象 → agent 对象（assistant/message 事件不带 agent，靠 session 关联） */
   const sessionAgent = new WeakMap()
@@ -45,7 +50,7 @@ export function registerRigorGuard(ctx) {
   const st = (agent) => {
     let s = state.get(agent)
     if (!s) {
-      s = { lastReply: '', steers: 0, turn: -1 }
+      s = { lastReply: '', nudges: 0, turn: -1 }
       state.set(agent, s)
     }
     return s
@@ -93,13 +98,13 @@ export function registerRigorGuard(ctx) {
       if (!agent) return
       if (agent.session) sessionAgent.set(agent.session, agent)
       const s = st(agent)
-      s.steers = 0
+      s.nudges = 0
       s.lastReply = ''
       beginTurn(agent)
     } catch { /* ignore */ }
   })
 
-  // 回合收尾：扫描回复，无溯源数字 → steer 打回
+  // 回合收尾：扫描回复，无溯源数字 → 记日志 + 软提醒（不拦截）
   ctx.on('agent/turn-stopping', ({ agent, turn }) => {
     try {
       if (!agent) return
@@ -111,11 +116,11 @@ export function registerRigorGuard(ctx) {
       // 于是本回合 ask_user_question 刚设下的"提议数值豁免"当场被清掉 → 豁免形同虚设。
       // 正解：**先用当前状态判定，跑完再推进**。
       const newTurn = s.turn !== turn
-      if (newTurn) s.steers = 0
-      // 台账为空（没用过工具）或本回合已向用户提问 → 不强制
+      if (newTurn) s.nudges = 0
+      // 台账为空（没用过工具）或本回合已向用户提问 → 完全静默
       const exempt = ledgerSize(agent) === 0 || sawQuestion(agent)
       let violations = []
-      if (!exempt && s.steers < MAX_STEERS_PER_TURN && s.lastReply) {
+      if (!exempt && s.lastReply) {
         violations = findUnverifiedNumbers(agent, s.lastReply)
       }
       // 回合推进放在最后：为下一回合清豁免、记回合号（不依赖 turn-start 是否存在）
@@ -123,15 +128,20 @@ export function registerRigorGuard(ctx) {
         s.turn = turn
         beginTurn(agent)
       }
+      // 违规记录（审计留痕：数字出来了但没溯源，日志可查）
+      if (violations.length > 0) {
+        ctx.logger?.info?.(
+          `dsh-bio-genie rigor-guard: noticed ${violations.length} number(s) without provenance: ${violations.join(', ')}`)
+      }
       if (exempt || violations.length === 0) return
-      s.steers += 1
-      const list = violations.map((v) => `\`${v}\``).join('、')
+      if (s.nudges >= MAX_SOFT_NUDGES_PER_TURN) return  // 提醒过就够，不反复打扰
+      s.nudges += 1
+      const list = violations.slice(0, 6).map((v) => `\`${v}\``).join('、')
       // ⚠️ 必须传完整 message 记录：dsh 0.1.5-rc.1 的会话持久化校验
       // （dsh-session assertMessageEventShape）要求 user/message 的 data 自带
-      // 非空 `id` 与 `role: 'user'`，否则存盘后 resume 直接失败
-      // （"session event at seq N lacks an identified message" → 会话被判损坏、
-      //  永久无法恢复）。旧版引擎自动补齐字段，故此前从未暴露；引擎自有路径
-      // 用 createUserMessage() 生成同样的字段。
+      // 非空 `id` 与 `role: 'user'`，否则存盘后 resume 直接失败。
+      // 这是**本轮之后的提醒**（回复已放行）：要求下一轮给数字带上出处，
+      // 不要求撤回、不要求停止本轮工作。
       agent.steer({
         id: `plugin-msg-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
         role: 'user',
@@ -139,13 +149,11 @@ export function registerRigorGuard(ctx) {
         content: [{
           type: 'text',
           text:
-            `[dsh-bio-genie 计算防火墙] 你刚才的回复包含无工具溯源的数值声明：${list}。\n` +
-            `这些数字不在本轮任何工具输出的 _provenance 台账中。请调用相应 bio_* 工具` +
-            `实际计算/验证这些数值后再回复；若它们只是计划中的提议值（而非结论），` +
-            `请改用 ask_user_question 向用户确认，或在文本中明确标注 [提议-待验证]。`,
+            `[dsh-bio-genie 溯源提醒] 刚才的回复里有这些数字本轮没在工具输出中出现过：${list}。` +
+            `不用撤回，本轮继续；但**下次引用关键数值时请顺带说明来源**（哪个工具/哪次计算，` +
+            `或补一次 bio_* 调用验证）。若它只是计划值，标注 [提议-待验证] 即可。`,
         }],
       })
-      ctx.logger?.info?.(`dsh-bio-genie rigor-guard: blocked ${violations.length} unverified claim(s): ${violations.join(', ')}`)
     } catch (error) {
       ctx.logger?.warn?.(`dsh-bio-genie rigor-guard: turn-stopping check failed: ${String(error)}`)
     }
