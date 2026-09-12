@@ -862,6 +862,44 @@ def op_fig_export(args):
     return {'count': len(results), 'results': results}
 
 
+def op_fig_lint(args):
+    """FIG 级语义 lint：配色语义/排印/灰度/统计元数据的出版合规检查。
+
+    与 fig_export（文件级：DPI/格式/字体）互补。推荐元数据模式：调用方自报
+    colors_used / cmap_used / n_categorical / err_semantics / has_stat_metadata /
+    n_available——画完图后立刻自检自己的视觉选择；不持有 fig 对象（对象级
+    typography 检查由 bio_python 桥内直接调 figurelib.fig_lint.lint_typography）。
+
+    也可直接检查一组 hex 色板的出版合规性（选色板时用）。
+    """
+    from figurelib.fig_lint import full_lint
+
+    colors_used = args.get('colors_used')
+    if colors_used is not None and not isinstance(colors_used, list):
+        raise ValueError('colors_used must be a list of hex color strings')
+    cmap_used = args.get('cmap_used')
+    n_categorical = args.get('n_categorical')
+    if n_categorical is not None:
+        n_categorical = int(n_categorical)
+    err_semantics = args.get('err_semantics')          # e.g. 'mean±SEM', '95% CI'
+    has_stat_metadata = args.get('has_stat_metadata')  # 图上的 p 值/star 是否有检验元数据
+    n_available = args.get('n_available')              # exact n 是否已声明
+    min_pt = float(args.get('min_pt', 5.0))
+
+    result = full_lint(fig=None,
+                       colors_used=colors_used,
+                       n_categorical=n_categorical,
+                       cmap_used=cmap_used,
+                       err_semantics=err_semantics,
+                       has_stat_metadata=has_stat_metadata if has_stat_metadata is not None else None,
+                       n_available=n_available if n_available is not None else None,
+                       min_pt=min_pt)
+    # 元数据类检查：调用方没提供时才提示（None = 未声明 → 提示；显式 false 已在 lint 内处理）
+    result['hint'] = ('主用元数据模式：画完图后立刻把 colors_used/cmap_used/err_semantics/'
+                      'has_stat_metadata/n_available 传进来自检。')
+    return result
+
+
 def op_metabolic_model(args):
     """代谢模型管理：加载、查看、列出可用模型。"""
     import cobra
@@ -1804,6 +1842,7 @@ OPS = {
     'fig_profile': op_fig_profile,
     'fig_export': op_fig_export,
     'fig_qa': op_fig_qa,
+    'fig_lint': op_fig_lint,
     'env_status': op_env_status,
     'metabolic_model': op_metabolic_model,
     'fba': op_fba,

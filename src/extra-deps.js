@@ -30,6 +30,10 @@ export const EXTRA_DEPS = {
   // 无 Windows wheel；fa2 只用于力导向布局，缺失不影响编译/仿真）
   circuit_compile: ['biocrnpyler', 'python-libsbml', 'bokeh', 'networkx', 'bioscrape'],
   circuit_simulate: ['bioscrape'],
+  // 出版级标注避碰（2026-09-12，受 R ggrepel 启发的 matplotlib 自动文字避碰）：
+  // differential_plot 等关键基因标注防重叠。MIT，纯 Python 无二进制依赖。
+  // 挂在 fig_lint op 上（agent 画完图 lint 时预装，供 bio_python 桥的标注配方 import）。
+  fig_lint: ['adjustText>=1.1'],
   // Phase 2 预留：
   // cobra_model: ['cobra', 'glpk'],
 }

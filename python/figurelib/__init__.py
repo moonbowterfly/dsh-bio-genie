@@ -22,6 +22,7 @@ bio_fig_export / bio_fig_qa 已包装高频入口）：
     from figurelib.layout_tools import finalize_figure, add_panel_labels
     from figurelib.check_figure import check_figure
     from figurelib.profile_data import profile_data
+    from figurelib.fig_lint import full_lint          # FIG 级语义 lint（自研）
 
 依赖：matplotlib / pandas / numpy / scipy / Pillow（已在
 python/requirements.txt 核心依赖中）；seaborn 为绘图配方常用。

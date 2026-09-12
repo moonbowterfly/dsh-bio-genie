@@ -692,6 +692,26 @@ function semanticTools(config) {
       op: 'fig_qa',
       timeoutMs: 120_000,
     }),
+    bioTool(config, {
+      name: 'bio_fig_lint',
+      description:
+        'FIG 级出版语义 lint（画完图后立刻自检视觉选择）：红/绿对（FIG003）、' +
+        'rainbow/jet colormap（FIG004）、类别数>8 禁纯色相编码（FIG005）、灰度打印坍缩（FIG015）、' +
+        '误差棒语义/p 值检验元数据/exact n 是否声明（FIG008/009/010）。' +
+        '规则：分类色板=Okabe-Ito；连续=viridis/cividis/batlow；diverging 必须 center=0。' +
+        '触发词：检查配色、色盲、灰度、投稿自查、figure lint。',
+      parameters: {
+        colors_used: { type: 'array', description: '图中实际使用的颜色列表（hex，如 ["#0072B2","#D55E00"]）', items: { type: 'string' } },
+        cmap_used: { type: 'string', description: '连续 colormap 名（如 viridis；用了热图/色带时必传）' },
+        n_categorical: { type: 'number', description: '类别总数（分组数）' },
+        err_semantics: { type: 'string', description: '误差棒语义声明，如 "mean±SEM, n=6 biological replicates"；未画误差棒传 "none"' },
+        has_stat_metadata: { type: 'boolean', description: '图上 p 值/星号是否携带统计检验元数据（检验名+校正方法）' },
+        n_available: { type: 'boolean', description: 'exact n 是否已在图或图注中声明' },
+        min_pt: { type: 'number', description: '最小可接受字号 pt（默认 5，Nature 底线）' },
+      },
+      op: 'fig_lint',
+      timeoutMs: 120_000,
+    }),
     // ---- 代谢通路设计（2026-08-22 新增，支持代谢网络建模与通量平衡分析）----
     bioTool(config, {
       name: 'bio_metabolic_model',

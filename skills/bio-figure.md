@@ -20,11 +20,52 @@ language: python
 2. 选图        按数据形态+论证目标决策（下方速查表）；给出推荐+理由+1-2 备选
 3. 查规范      确定目标期刊 → 查下方期刊规格表（Nature/IEEE/中文核心）
 4. 查环境      bio_fig_qa(lang) → 中文图先确认 cjk_ready，否则出方框
-5. 绘制        bio_python + figurelib.setup_style + 配方（见 bio-proto-pub-figure）
+5. 绘制        bio_python + figurelib.setup_style + 配方（见 bio-proto-pub-figure）；
+               差异分析直接 figurelib.differential_plot（volcano/MA 双模），
+               重要基因标注自动用 adjustText 避碰（未装则静态 offset 兜底）
 6. 自检        figurelib.visual_qa.audit_layout(fig) 程序自检（缺字/裁切/刻度重叠）
 7. 导出        figurelib.export_figure.export_figure(...) 按最终尺寸多格式导出
-8. 审计        bio_fig_export(paths, min_dpi, width_in, height_in) 机器审计 → 回改
+8. lint+审计   bio_fig_lint（FIG 级语义：配色/灰度/统计元数据）+ bio_fig_export（文件级）
 ```
+
+## 一条式契约（图内 vs 图注）
+
+**Figure contains what is necessary to decode and visually evaluate the evidence;
+caption contains what is necessary to reproduce and statistically interpret the evidence.**
+（图内负责「看懂证据」，图注负责「解释证据如何得到与检验」。）
+
+| 必须进图本体 | 默认进 caption/图注 |
+|---|---|
+| 数据身份（组名 Control/KO/WT——去掉就看不懂） | 统计检验全名（two-sided Welch's t-test、BH 校正） |
+| 轴变量 + 单位（Time (h)、log2FC——**不能只写 Expression/Value**） | 误差棒定义（mean±SEM / median+IQR / 95% CI） |
+| 颜色/符号/线型对应关系（key 或 direct label，**不许读者靠 caption 反推**） | 重复定义（n=6 biological replicates——n 本身无意义，须知道 6 是什么） |
+| 参考线（y=x、chance line、FDR 阈值、fold-change 阈值） | 精确统计口径（图内可 P = 0.013；t/df/检验全名 → 图注） |
+| panel 字母（统一坐标——用 add_panel_labels，**禁手写 fig.text 摆放**） | 数据处理流程（normalized with VST、batch corrected…→ Methods） |
+| 少量关键结论标签（gene/cluster/HR/AUC，受**标注预算**控制） | |
+
+配色的语义层级：Tier A 焦点证据（accent 色、zorder 高）> Tier B 辅助（次级色）> Tier C 上下文（浅灰、细、低透明度）。**约 80% 数据用中性灰，只有 20% 关键数据才有颜色——这是「编辑级质感」的第一杠杆。**
+
+## 视觉层级与配色语义（2026-09-12 升级，源自 GPT 评审 + 本地复核）
+
+- **语义色 token（全篇一致）**：neutral=#BDBDBD、up=#D55E00（vermillion）、down=#0072B2（blue）、
+  highlight=#000000。同一语义全图全篇同色——Control 在 Fig.1 是蓝色，Fig.2-6 不许变橙。
+- 分级负载：1-4 组纯 hue 可；5-6 组加 CVD+灰度 QA；7-8 组必须补 marker/线型；**>8 组禁止纯色相编码**（改 facet/direct label/分组）。
+- 连续变量：viridis/cividis/magma/inferno（matplotlib 感知均匀）为白名单，可选 batlow（cmcrameri）；**diverging（log2FC/z-score/相关）必须 center=0**（RdBu_r 或 roma）。
+- 灰度打印 ≠ 色盲友好：色板选好后**必须跑灰度模拟**（bio_fig_lint 自带）——若坍缩，加 marker/direct label，别换更花的颜色。
+
+## 差异分析专用配方（differential_recipes，2026-09-12 新增）
+
+```python
+from figurelib.differential_recipes import differential_plot   # volcano/MA 双模
+fig, ax, meta = differential_plot(df, effect_col='log2FC', p_col='pvalue', padj_col='padj',
+                                  base_mean_col='baseMean', label_col='gene', mode='volcano',
+                                  user_labels=['TP53'], out_file='figures/volcano.pdf')
+# meta = {n_sig_up, n_sig_down, sig_basis, thresholds, labeled, caption_fragments, out_file}
+```
+
+内置语义：NS 灰 #BDBDBD / up vermillion / down blue / 标注黑——**颜色=统计分类结果，不是装饰**；
+自动标注只标 top effect（正负各）+ top significance + 用户点名，绝不全标 Top-N；
+`meta.caption_fragments` 直接可拼进图注。
 
 ## 选图决策速查表
 
@@ -124,6 +165,7 @@ AACR 明确要求区分**技术重复与生物学重复**；显微/组织图带�
 | 剖析数据 → 图型建议 | `bio_fig_profile` |
 | 字体/预设环境探测 | `bio_fig_qa` |
 | 绘制/自检/导出 | `bio_python` + `figurelib.*`（见 bio-proto-pub-figure） |
+| FIG 级语义 lint | `bio_fig_lint`（配色/灰度/统计元数据，画完图立刻跑） |
 | 投稿前文件审计 | `bio_fig_export` |
 
 **AI 读图复核说明**：scipilot 的视觉自检有"AI 读图"一环（渲 PNG 后多模态读图核对图例压数据/子图对齐）。dsh-bio-genie 插件本身无多模态能力——机器自检（audit_layout + bio_fig_export）全保留；若 dsh 会话的模型支持读图，可将 preview PNG 交给模型复核，否则以程序自检 + 清单核对为准。
