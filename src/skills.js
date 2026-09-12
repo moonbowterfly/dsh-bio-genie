@@ -214,6 +214,12 @@ export const SKILL_MANIFEST = [
     file: 'protocols/pub-figure.md',
   },
   {
+    name: 'bio-proto-differential-figure',
+    category: 'protocol',
+    description: '差异分析出版配方：differential_plot volcano/MA 双模、三层视觉角色（NS 灰/显著彩/标注黑）、标注预算、caption_fragments、陷阱表。',
+    file: 'protocols/differential-figure.md',
+  },
+  {
     name: 'bio-proto-coords',
     category: 'protocol',
     description: '基因组坐标系统协议：0/1-based 转换、BED/GFF/VCF 惯例、GRCh37/38、indel 左对齐归一化、区间运算与审计清单。',
