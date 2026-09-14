@@ -176,6 +176,53 @@ metabolic tools (`bio_metabolic_model` / `bio_fba` / `bio_gene_knockout` /
 (build / six-gate validation / essentiality / flux hard conclusions / ledger)
 requires the `dsh-bio-gem` plugin to be installed.
 
+## Gene-editing capability domain (CRISPR) — route to dsh-bio-graft
+
+Gene-editing **design** work — guide enumeration, cut-site geometry, off-target
+review, base editing, EditPlan (edit ledger), validation planning — is provided by
+the companion plugin **dsh-bio-graft** (`graft_*` tools, co-registered in the same
+instance). Any editing conclusion destined for a protocol, report or paper MUST go
+through `graft_*`. `bio_crispr_guide` is the **light fallback tier** (template-internal
+PAM scan plus a simplified 0–100 heuristic "efficiency score" that is **not** a
+validated model); use it only when `graft_*` is absent, and never cite its composite
+score as a design conclusion.
+
+| User intent | Route | Trigger words |
+|---|---|---|
+| Guide/sgRNA design, KO/KI target choice, editor (PAM) selection | `graft_profiles` → `graft_design` → `graft_score` | 设计 sgRNA / 找 guide / 敲除位点 / 选编辑器 / PAM / 切割位点 |
+| Off-target review / specificity | `graft_offtarget` (preflight the genome first; `graft_backend_status` if the backend is missing) | 脱靶 / off-target / 特异性 / Cas-OFFinder |
+| Ranking several candidates against a stated objective | `graft_rank` (declared policy; never an opaque composite) | 排序 / 选最优 guide / 多目标 |
+| Edit ledger / "why was guide B recommended yesterday?" | `graft_plan_save` / `graft_plan_load` | 编辑计划 / EditPlan / 方案历史 / 账本 |
+| Base editing (CBE/ABE) feasibility & bystanders | `graft_base_edit` (when available) | 碱基编辑 / C→T / A→G / bystander |
+
+**Editing asset contract (consuming dsh-bio-graft artifacts):**
+
+1. `bio_*` and `graft_*` are called directly — no wrappering.
+2. **Plan authority = the EditPlan file** `~/.dsh/dsh-bio-graft/plans/<name>.editplan.json`
+   plus its append-only `runs/` ledger; cite the run file for any "why this candidate"
+   claim. Never re-narrate a plan from memory — load it with `graft_plan_load`.
+3. **Coordinates**: guide `start_0`/`end_0` are 0-based half-open **including the PAM**;
+   `cut_site_0` sits between `cut_site_0-1` and `cut_site_0`, and its convention string
+   (`cut_site_convention`) must travel with the number. `cut_site_verified=false` means
+   that nuclease's geometry has not been checked against primary literature — say so.
+4. **Off-target iron rule**: no computational off-target method may label a design
+   "safe". Report only "no high-scoring site detected under these search parameters",
+   and always carry the parameters (genome, mismatches, pattern, device) with the
+   statement. A zero-hit result is a troubleshooting signal, not a clearance.
+5. **Efficiency**: report the score *vector* plus the declared ranking policy; never
+   invent or quote a single composite "efficiency score" for a report.
+6. **Reference genomes / primers / figures stay with `bio_*`** (`bio_ref_genome`,
+   `bio_entrez_*`, `bio_primer3_design`, figure tools) — graft only checks the genome
+   and scans it.
+7. **Human-heritable or pathogen-enhancement requests** (germline editing, virulence /
+   transmissibility / immune-escape / resistance enhancement): do not produce executable
+   sequence designs; switch to evidence/risk-discussion mode and explain why.
+
+**If the `graft_*` tools are absent from your tool list**, `dsh-bio-graft` is not
+installed in this instance: say so plainly, and fall back to `bio_crispr_guide` /
+`bio_crispr_verify` while stating that deep editing design (multi-candidate ranking,
+whole-genome off-target, EditPlan ledger, base editing) requires that plugin.
+
 **Skill boundary.** Only skills whose names start with `bio-`, `gem-`, or
 `dsh-bio-genie` belong to this environment. A skill catalog may also list
 unrelated skills discovered from shared user-level directories (browser-control

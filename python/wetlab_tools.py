@@ -90,7 +90,8 @@ HARD_CONSTRAINTS = {
         '酶切位点不得存在于插入序列内部（上游 bio_seq_restriction 已验证）',
     ],
     'crispr_editing': [
-        'sgRNA 序列必须来自 bio_crispr_guide 输出，不可手改',
+        'sgRNA 序列必须来自 CRISPR 设计工具输出（graft_design/graft_base_edit 优先；'
+        '无 graft_* 时用 bio_crispr_guide），不可手改',
         'PAM（NGG）紧邻靶序列，编辑窗口位置不可移',
     ],
     'strain_construction': [

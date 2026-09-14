@@ -1023,8 +1023,11 @@ function semanticTools(config) {
     bioTool(config, {
       name: 'bio_crispr_guide',
       description:
-        'CRISPR sgRNA 设计：扫描模板序列中的 PAM 位点（支持 SpCas9/Cas12a/Cas12e），' +
-        '返回 GC/效率分/off-target 数排名靠前的 guide 候选。' +
+        'CRISPR sgRNA 设计（**轻量兜底层**：仅模板内 PAM 扫描 + 简化启发式效率分，非验证模型）。' +
+        '若本实例已装 dsh-bio-graft（`graft_*` 工具存在），编辑设计请改用 graft_profiles → graft_design → ' +
+        'graft_score → graft_offtarget（含切割位点几何、全基因组脱靶、EditPlan 账本）；' +
+        '本工具的 efficiency_score 是启发式综合分，**不得**作为报告里的设计结论引用。' +
+        '返回 GC/效率分/模板内 off-target 数排名靠前的 guide 候选。' +
         '效率分为基于 GC 含量+末端 poly-run+PAM 的简化预测（0-100，非实验验证）；off-target 仅扫描输入模板，全基因组扫描需用 Cas-OFFinder。' +
         '触发词：sgRNA 设计、Cas9 引导 RNA、CRISPR 设计、sgRNA 筛选、PAM 扫描。',
       parameters: {
