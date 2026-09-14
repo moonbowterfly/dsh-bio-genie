@@ -15,6 +15,7 @@ import { join } from 'node:path'
 import { existsSync } from 'node:fs'
 import { resolveWorkdir, fallbackWorkspace } from './workdir.js'
 import { cacheGet, cacheSet, throttle } from './throttle.js'
+import { detectDomain, domainById } from './domain-adapter.js'
 import { appendLog, codeHash, readLogs } from './log.js'
 import {
   codeSignature, errorSignature, rememberSuccess, rememberLesson,
@@ -35,6 +36,24 @@ async function requireEnv(config) {
     throw new Error(`dsh-bio-genie Python 环境引导失败: ${env.error ?? 'unknown'}（可运行 bio_env 查看详情）`)
   }
   return env.python
+}
+
+/**
+ * 深度设计器（dsh-bio-graft）是否已安装 —— 带 60s 缓存，供工具级语义标签注入使用。
+ * 只做包探测（require.resolve + 读 package.json），**不 spawn 进程**；探测失败一律当未安装
+ * （宁少说能力，不多说）。
+ */
+let advancedEditorCache = { at: 0, installed: false }
+function advancedEditorInstalled() {
+  if (Date.now() - advancedEditorCache.at < 60_000) return advancedEditorCache.installed
+  let installed = false
+  try {
+    installed = detectDomain(domainById('graft')).installed === true
+  } catch {
+    installed = false
+  }
+  advancedEditorCache = { at: Date.now(), installed }
+  return installed
 }
 
 /** 定义语义化工具（async 执行，统一 env 确保 + callBio 调用）。 */
@@ -85,10 +104,12 @@ function bioTool(config, opts) {
         })
       }
       if (!res.ok) throw new Error(res.error ?? 'bio op failed')
-      if (cacheKey) cacheSet(cacheKey, res.result)
+      // 可选装饰钩子：工具级语义标签/宿主机状态注入（在缓存之前做，保证命中缓存也带标签）
+      const result = typeof opts.decorate === 'function' ? opts.decorate(res.result, args, config) : res.result
+      if (cacheKey) cacheSet(cacheKey, result)
       // 计算防火墙：返回值挂 _provenance 背书字段（台账记录由 rigor-guard 的
       // tools/post-execute 钩子统一完成，那里拿得到 agent 上下文）
-      return stampProvenance(opts.name, res.result)
+      return stampProvenance(opts.name, result)
     },
   })
 }
@@ -1041,6 +1062,16 @@ function semanticTools(config) {
       },
       op: 'crispr_guide',
       timeoutMs: 60_000,
+      // 语义标签（2026-09-14 GPT 裁决 #4：**保留行为、只改标签**，对既有用户零破坏）：
+      // 明确本工具是「轻量启发式」，并据真实包探测告知是否已装深度设计器 dsh-bio-graft。
+      decorate: (value) => ({
+        ...value,
+        scope: 'lightweight_heuristic',
+        scope_note: '模板内 PAM 扫描 + 简化启发式效率分（0-100，非验证模型）：'
+          + '不得作为报告/方案的设计结论引用。全基因组脱靶、切割位点几何、可审计 EditPlan、'
+          + '碱基编辑等深水区设计请用 dsh-bio-graft（graft_* 工具）。',
+        advanced_designer_available: advancedEditorInstalled(),
+      }),
     }),
     bioTool(config, {
       name: 'bio_crispr_verify',

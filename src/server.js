@@ -33,6 +33,9 @@ import { listSkillsForPanel } from './skills.js'
 import { handleConfig } from './config_handler.js'
 import { writeJson } from './http-util.js'
 import { ADDON_MODULES } from './extra-deps.js'
+import { DOMAINS, domainById, detectDomain, classifyDomainState,
+  fetchDomainIntegration, handleDomainRequest, GEM_TOOLS, GRAFT_TOOLS }
+  from './domain-adapter.js'
 
 /** 路由前缀（与 @linxin666/dsh-client-ui-web-ui-settings 同风格）。 */
 const ROUTE_PREFIX = '/api/dsh-bio-genie'
@@ -447,111 +450,20 @@ async function handleExecuteTool(req, res, config) {
 // 数据所有权：协议版 gem 的运行时状态只从 gem 自己的 integration API 获取；
 // 仅 legacy 兼容视图保留文件系统摘要这个明确允许的例外，不 import gem 代码。
 
-/** dsh-bio-gem 对外暴露的 21 个语义化工具（面板只做展示）。 */
-const GEM_TOOLS = [
-  'gem_build', 'gem_report', 'gem_validate', 'gem_gapfind', 'gem_gapfill', 'gem_gapseq',
-  'gem_phenotype', 'gem_essentiality', 'gem_annotate', 'gem_media_resolve', 'gem_l3_fix',
-  'gem_biomass', 'gem_fluxscan', 'gem_sensitivity', 'gem_ledger', 'gem_benchmark',
-  'gem_secretion', 'gem_double_knockout', 'gem_enrichment', 'gem_targets', 'gem_precursor_scan',
-]
-
 /** dsh-bio-gem 的运行时数据根（与其 ARCHITECTURE 契约一致）。 */
 function gemDataRoot() {
   const dshHome = process.env.DSH_HOME ?? pathJoin(os.homedir(), '.dsh')
   return pathJoin(dshHome, 'dsh-bio-gem')
 }
 
-/**
- * 探测 dsh-bio-gem 是否与本插件共存。
- * 先用模块解析（能正确处理 pnpm 符号链接与 hoisting），失败再退回同级目录猜测。
- */
-function detectGem() {
-  const require = createRequire(import.meta.url)
-  const readPkg = (p) => JSON.parse(readFileSync(p, 'utf8'))
-  try {
-    const pkgPath = require.resolve('@dsh-bio/dsh-bio-gem/package.json')
-    const pkg = readPkg(pkgPath)
-    return { installed: true, version: pkg.version, pluginDir: dirname(pkgPath), detectedBy: 'module-resolve' }
-  } catch { /* 继续尝试同级目录 */ }
-  try {
-    const sibling = pathJoin(dirname(fileURLToPath(import.meta.url)), '..', '..', 'dsh-bio-gem', 'package.json')
-    const pkg = readPkg(sibling)
-    return { installed: true, version: pkg.version, pluginDir: dirname(sibling), detectedBy: 'sibling-path' }
-  } catch {
-    return { installed: false, detectedBy: 'none' }
-  }
-}
-
-/** The first gem version that implements integration protocol v1. */
-export const GEM_INTEGRATION_MIN_VERSION = '0.1.11'
-export const GEM_INTEGRATION_PROTOCOL_MAJOR = 1
-
-const GEM_REQUIRED_CHECK_IDS = ['python.cobra', 'runtime.carveme', 'runtime.gapseq']
-const GEM_CHECK_STATUSES = new Set(['ok', 'warn', 'missing', 'error'])
-
-function isVersionBelow(version, minimum) {
-  const parse = (input) => {
-    const match = /^v?(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/.exec(input ?? '')
-    return match ? match.slice(1, 4).map(Number) : null
-  }
-  const current = parse(version)
-  const target = parse(minimum)
-  if (!current || !target) return false
-  for (let index = 0; index < target.length; index += 1) {
-    if (current[index] !== target[index]) return current[index] < target[index]
-  }
-  return false
-}
-
-function hasValidGemStatus(status) {
-  if (!status || !['ready', 'degraded'].includes(status.state) || !Array.isArray(status.checks)) return false
-  if (!status.checks.every((check) => typeof check?.id === 'string' && GEM_CHECK_STATUSES.has(check.status))) return false
-  if (!GEM_REQUIRED_CHECK_IDS.every((id) => status.checks.some((check) => check.id === id))) return false
-  const hasNonOkCheck = status.checks.some((check) => check.status !== 'ok')
-  return status.state === (hasNonOkCheck ? 'degraded' : 'ready')
-}
-
-/**
- * Resolve the hosted-domain state from the local package probe plus protocol
- * results. More-specific installed states are added below this first branch.
- */
-export function classifyGemState({ probe, health, status } = {}) {
-  if (!probe?.installed) return { state: 'not-installed', installed: false }
-  if (isVersionBelow(probe.version, GEM_INTEGRATION_MIN_VERSION)) {
-    return {
-      state: 'legacy',
-      installed: true,
-      version: probe.version,
-      minimumVersion: GEM_INTEGRATION_MIN_VERSION,
-    }
-  }
-  if (health?.protocolMajor !== undefined && health.protocolMajor !== GEM_INTEGRATION_PROTOCOL_MAJOR) {
-    return {
-      state: 'incompatible',
-      installed: true,
-      version: probe.version,
-      protocolMajor: health.protocolMajor,
-      expectedProtocolMajor: GEM_INTEGRATION_PROTOCOL_MAJOR,
-    }
-  }
-  if (health?.protocolMajor === GEM_INTEGRATION_PROTOCOL_MAJOR && hasValidGemStatus(status)) {
-    if (status.checks.some((check) => check?.status !== 'ok')) {
-      return {
-        state: 'degraded',
-        installed: true,
-        version: probe.version,
-        checks: status.checks,
-      }
-    }
-    return {
-      state: 'ready',
-      installed: true,
-      version: probe.version,
-      checks: status.checks,
-    }
-  }
-  return { state: 'installed-unavailable', installed: true, version: probe.version }
-}
+// ── 兼容导出（批次 B：机制已提炼到 src/domain-adapter.js）─────────────────────
+// 既有单测 scripts/test-gem-adapter.mjs 与 scripts/test-gem-http.mjs 零修改通过这些别名。
+export const GEM_INTEGRATION_MIN_VERSION = domainById('gem').minIntegrationVersion
+export const GEM_INTEGRATION_PROTOCOL_MAJOR = domainById('gem').protocolMajor
+export const GRAFT_INTEGRATION_MIN_VERSION = domainById('graft').minIntegrationVersion
+export const GRAFT_INTEGRATION_PROTOCOL_MAJOR = domainById('graft').protocolMajor
+export const classifyGemState = (input) => classifyDomainState(domainById('gem'), input)
+export const fetchGemIntegration = (req, endpoint, timeoutMs) => fetchDomainIntegration(req, endpoint, timeoutMs)
 
 /** 列出目录下指定后缀的文件（按修改时间倒序；目录不存在返回空数组）。 */
 function listDirEntries(dir, suffix) {
@@ -627,65 +539,6 @@ function legacyMetabolicValue(gem) {
   }
 }
 
-/**
- * 读取一个固定的 gem integration 信封（有界等待）。
- *
- * 用 `node:http` 直连而非全局 fetch：dsh 进程内可能安装全局代理 dispatcher
- * （`@deepseek-ai/dsh-http-proxy` 会 `undici.setGlobalDispatcher`），实测同一
- * 端点在**服务端内层 fetch** 下出现过长挂起（浏览器路径实测 102s，而同等
- * curl/外部 node fetch 为 15–25ms）。node:http 不经过 undici，无此变量。
- */
-export function fetchGemIntegration(req, endpoint, timeoutMs) {
-  const host = req.headers?.host
-  if (typeof host !== 'string') return Promise.reject(new Error('missing host'))
-  const target = new URL(endpoint, `http://${host}`)
-  const hostname = target.hostname.replace(/^\[|\]$/g, '')
-  const port = target.port || '80'
-  return new Promise((resolve, reject) => {
-    let settled = false
-    const fail = (err) => { if (!settled) { settled = true; clearTimeout(timer); reject(err) } }
-    const ok = (value) => { if (!settled) { settled = true; clearTimeout(timer); resolve(value) } }
-    let timer
-    const request = http.get({
-      hostname,
-      port,
-      path: target.pathname,
-      headers: { accept: 'application/json' },
-    }, (res) => {
-      let body = ''
-      res.setEncoding('utf8')
-      res.on('data', (chunk) => {
-        body += chunk
-        if (body.length > 1_000_000) {
-          res.destroy()
-          fail(new Error('gem integration response too large'))
-        }
-      })
-      res.on('end', () => {
-        if (res.statusCode < 200 || res.statusCode >= 300) {
-          return fail(new Error(`gem integration HTTP ${res.statusCode}`))
-        }
-        let envelope
-        try {
-          envelope = JSON.parse(body)
-        } catch {
-          return fail(new Error('gem integration returned invalid JSON'))
-        }
-        if (!envelope || envelope.ok !== true || !envelope.value || typeof envelope.value !== 'object') {
-          return fail(new Error('gem integration returned an invalid envelope'))
-        }
-        ok(envelope.value)
-      })
-      res.on('error', fail)
-    })
-    timer = setTimeout(() => {
-      request.destroy()
-      fail(new Error('gem integration request timeout'))
-    }, timeoutMs)
-    request.on('error', fail)
-  })
-}
-
 function liveMetabolicValue(gem, classification, health, status) {
   const runtimeVersion = status?.pluginVersion ?? health?.pluginVersion ?? gem.version
   const base = {
@@ -730,55 +583,83 @@ function liveMetabolicValue(gem, classification, health, status) {
   }
 }
 
-/** A local installation check lets the client defer remote probes until tab open. */
-function isMetabolicInstallProbe(req) {
-  try {
-    return new URL(req.url ?? '/', 'http://localhost').searchParams.get('probe') === 'install'
-  } catch {
-    return false
+/** graft 的 legacy 兼容视图（只读文件系统摘要：旧版 graft 无 integration API）。 */
+function graftLegacyValue(graft) {
+  const root = graftDataRoot()
+  const plans = listDirEntries(pathJoin(root, 'plans'), '.editplan.json')
+  return {
+    installed: true,
+    state: 'legacy',
+    version: graft.version,
+    minimumVersion: GRAFT_INTEGRATION_MIN_VERSION,
+    pluginDir: graft.pluginDir,
+    detectedBy: graft.detectedBy,
+    dataRoot: root,
+    dataRootExists: existsSync(root),
+    plans: { count: plans.length, items: plans.slice(0, 50) },
+    backend: { casOffinder: existsSync(pathJoin(root, 'bin', 'cas-offinder.exe')) },
+    tools: GRAFT_TOOLS,
   }
 }
 
-/** GET /api/dsh-bio-genie/metabolic —— gem 五态适配器。 */
-async function handleMetabolic(req, res) {
-  const gem = detectGem()
-  if (isMetabolicInstallProbe(req)) {
-    const value = gem.installed
-      ? { installed: true, version: gem.version, pluginDir: gem.pluginDir, detectedBy: gem.detectedBy }
-      : { installed: false }
-    return writeJson(res, 200, { ok: true, value })
+/** graft 的实时视图（数据全部来自 graft 自己的 integration API，宿主不读它的内部实现）。 */
+function graftLiveValue(graft, classification, health, status) {
+  const base = {
+    installed: true,
+    state: classification.state,
+    version: status?.pluginVersion ?? health?.pluginVersion ?? graft.version,
+    installVersion: graft.version,
+    pluginDir: graft.pluginDir,
+    detectedBy: graft.detectedBy,
+    tools: GRAFT_TOOLS,
   }
-  let classification = classifyGemState({ probe: gem })
-  if (classification.state === 'not-installed') {
-    return writeJson(res, 200, { ok: true, value: { installed: false } })
-  }
-  if (classification.state === 'legacy') {
-    return writeJson(res, 200, { ok: true, value: legacyMetabolicValue(gem) })
-  }
-
-  let health
-  let status
-  try {
-    health = await fetchGemIntegration(req, '/api/dsh-bio-gem/integration/health', 3_000)
-    classification = classifyGemState({ probe: gem, health })
-    if (classification.state === 'incompatible') {
-      return writeJson(res, 200, { ok: true, value: liveMetabolicValue(gem, classification, health) })
+  if (classification.state === 'installed-unavailable') {
+    return {
+      ...base,
+      availabilityMessage: '已安装，但当前不可用。请重新探测或确认 graft 的 integration API 已随同一实例启动。',
     }
-    // 注意：health 成功但 status 尚未取回时，classifyGemState 会判 installed-unavailable
-    // （它只在 health+status 齐全时才判 degraded/ready）——因此**不能**在此提前返回，
-    // 否则 status 永远不会被请求，degraded/ready 状态不可达（真实运行时实测过的缺陷）。
-    // health 失败的情形由外层 catch 兜底：health 保持 undefined，最终分类仍为 unavailable。
-    // status 冷探测包含只读 WSL/gapseq 探测（本机 wsl.exe 启动即 ~3s，加 conda/gapseq 更久），
-    // 5s 超时会在首次请求时必然截断（真实运行时实测）——给足余量；gem 侧有 60s 缓存
-    // + 延迟预热（见其 src/index.js），正常情况下列表面板打开时已命中缓存。
-    status = await fetchGemIntegration(req, '/api/dsh-bio-gem/integration/v1/status', 12_000)
-  } catch (err) {
-    // A subpage probe failure is a visible state, never a BioGenie panel crash.
-    console.warn('[dsh-bio-genie] gem integration probe failed:',
-      err?.message, '| cause:', err?.cause?.message ?? err?.cause ?? 'none')
   }
-  classification = classifyGemState({ probe: gem, health, status })
-  return writeJson(res, 200, { ok: true, value: liveMetabolicValue(gem, classification, health, status) })
+  if (classification.state === 'incompatible') {
+    return {
+      ...base,
+      minimumVersion: GRAFT_INTEGRATION_MIN_VERSION,
+      protocol: {
+        hostMajor: GRAFT_INTEGRATION_PROTOCOL_MAJOR,
+        graftMajor: classification.protocolMajor,
+        graftMinors: Array.isArray(health?.protocolMinors) ? health.protocolMinors : [],
+      },
+    }
+  }
+  return {
+    ...base,
+    protocol: {
+      hostMajor: GRAFT_INTEGRATION_PROTOCOL_MAJOR,
+      graftMajor: health?.protocolMajor,
+      graftMinors: Array.isArray(health?.protocolMinors) ? health.protocolMinors : [],
+    },
+    features: Array.isArray(status?.features) ? status.features : [],
+    generatedAt: status?.generatedAt,
+    data: status?.data ?? {},
+    env: status?.env ?? {},
+    checks: classification.checks ?? [],
+    remediations: Array.isArray(status?.remediations) ? status.remediations : [],
+  }
+}
+
+/** GET /api/dsh-bio-genie/metabolic —— 代谢建模域（dsh-bio-gem）适配器。 */
+async function handleMetabolic(req, res) {
+  return handleDomainRequest(domainById('gem'), req, res, {
+    shapeLegacy: (probe) => legacyMetabolicValue(probe),
+    shapeLive: (probe, classification, health, status) => liveMetabolicValue(probe, classification, health, status),
+  })
+}
+
+/** GET /api/dsh-bio-genie/editing —— 基因编辑域（dsh-bio-graft）适配器。 */
+async function handleEditing(req, res) {
+  return handleDomainRequest(domainById('graft'), req, res, {
+    shapeLegacy: (probe) => graftLegacyValue(probe),
+    shapeLive: (probe, classification, health, status) => graftLiveValue(probe, classification, health, status),
+  })
 }
 
 export function registerApiRoutes(ctx, config = {}) {
@@ -812,6 +693,8 @@ export function registerApiRoutes(ctx, config = {}) {
     { kind: 'exact', path: `${ROUTE_PREFIX}/addons`,          handler: guard((req, res) => handleAddons(req, res, config)) },
     // 代谢建模域插件面板数据：dsh-bio-gem 未安装时返回 installed:false，前端据此不渲染该分页
     { kind: 'exact', path: `${ROUTE_PREFIX}/metabolic`,       handler: guard((req, res) => handleMetabolic(req, res, config)) },
+    // 基因编辑域插件面板数据：dsh-bio-graft 未安装时返回 installed:false，前端据此不渲染该分页
+    { kind: 'exact', path: `${ROUTE_PREFIX}/editing`,         handler: guard((req, res) => handleEditing(req, res, config)) },
   ]) {
     disposers.push(ctx.webServer.register(route))
   }
