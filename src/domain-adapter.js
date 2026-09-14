@@ -30,10 +30,11 @@ export const GEM_TOOLS = [
   'gem_secretion', 'gem_double_knockout', 'gem_enrichment', 'gem_targets', 'gem_precursor_scan',
 ]
 
-/** dsh-bio-graft 对外暴露的 7 个语义化工具。 */
+/** dsh-bio-graft 对外暴露的 11 个语义化工具。 */
 export const GRAFT_TOOLS = [
-  'graft_profiles', 'graft_design', 'graft_score', 'graft_offtarget',
-  'graft_backend_status', 'graft_plan_save', 'graft_plan_load',
+  'graft_profiles', 'graft_design', 'graft_score', 'graft_rank', 'graft_offtarget',
+  'graft_base_edit', 'graft_strategy', 'graft_validation_plan', 'graft_backend_status',
+  'graft_plan_save', 'graft_plan_load',
 ]
 
 /**
