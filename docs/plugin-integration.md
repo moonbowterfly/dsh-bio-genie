@@ -242,3 +242,75 @@ GET  /api/dsh-bio-gem/integration/v1/jobs/:id     # 任务状态（批次 2 预�
 3. genie preset skill / persona 增加能力域路由段（条件句 + 辅助路由表），只增不改
 4. 本契约追加「资产权威源」条款（模型/预测/导出三类）
 5. 双方跑一次真实 agent 会话的 before/after 对照 + 五态矩阵，证明路由生效与契约传导
+
+> **执行状态（2026-09-14）**：gem 与 graft 均已按本清单接入，见 §15。第 3 条的实现形态已从
+> 「preset skill」收敛为 **persona 条件句 + 工具 description**（web profile 下 skill 平面可达性
+> 已验证，但路由的常驻载体仍是 persona——这是 agent 每回合都看得到的那一层）。
+> 第 5 条的 before/after 对照在 graft 上已完成（见 §15.5）。
+
+## 15. 第二个接入方：dsh-bio-graft（基因编辑域，2026-09-14 落地）
+
+### 15.1 身份与形态
+
+| 项 | 值 |
+|---|---|
+| 包名 / 仓库 | `@dsh-bio/dsh-bio-graft` · https://github.com/moonbowterfly/dsh-bio-graft |
+| 工具命名空间 | `graft_*`（7 个：profiles / design / score / offtarget / backend_status / plan_save / plan_load） |
+| skill | `graft-expert`（provider=`dsh-bio-graft`） |
+| 集成协议 | v1（`protocolMajor=1`），首个支持版本 **0.1.1** → 低于它判 `legacy` |
+| 必检项（requiredCheckIds） | `python.interpreter` / `runtime.casoffinder` / `plans.dir` |
+| features | `status` / `editor-registry` / `editplans` / `offtarget-backend` / `plan-write` |
+| 宿主分页 | `/api/dsh-bio-genie/editing`（routeKey=`editing`，label=「基因编辑设计」） |
+| 能力声明 | 仓库根 `capabilities.json`（`dsh-bio/capabilities@1`） |
+
+### 15.2 宿主侧实现（提炼为声明式注册表）
+
+`src/domain-adapter.js` 引入 `DOMAINS` 注册表（gem / graft 各一条声明）+ 通用机制：
+`detectDomain`（模块解析 → 同级目录回退）、`classifyDomainState`（六态）、
+`fetchDomainIntegration`（node:http 直连）、`handleDomainRequest`（条件分页分发）。
+
+- **gem 行为零漂移**：`scripts/test-gem-adapter.mjs` 与 `scripts/test-gem-http.mjs` **零修改**通过；
+  `server.js` 保留 `classifyGemState` / `fetchGemIntegration` / `GEM_INTEGRATION_*` 兼容别名。
+- 新增 `scripts/test-graft-adapter.mjs`（11 断言）：六态矩阵 + 缺必检项不得判 ready +
+  status/checks 矛盾判 installed-unavailable + gem 语义无漂移守卫。
+- 这是契约 §0「两个领域扩展出现后提炼通用机制」的兑现；提炼范围仍严格限定在机械重复部分
+  （不引入通用 UI 框架、不引入 capabilities 自动拼装）。
+
+### 15.3 唯一所有者表（本域新增行）
+
+| 资源 / 动作 | 唯一所有者 | 说明 |
+|---|---|---|
+| CRISPR/编辑**设计**（候选枚举、切割位点几何、脱靶解释、EditPlan、碱基编辑） | **graft** | 深水区结论（进报告/方案的数字）必须走 `graft_*` |
+| 编辑后序列比对（wild-type vs edited） | genie（`bio_crispr_verify`） | 通用序列操作，不属编辑设计语义 |
+| 参考基因组获取/assembly 信息 | genie（`bio_ref_genome` / `bio_entrez_*`） | graft 只做基因组体检与扫描，不实现下载 |
+| 验证引物设计 | genie（`bio_primer3_design` 等） | graft 只产出验证**要求**（后续批次）与交接 |
+| 轻量模板内 CRISPR 快查 | genie（`bio_crispr_guide`，**Tier 0 兜底层**） | 其 0-100 分为启发式，不得作为设计结论引用 |
+
+### 15.4 资产权威源（本域）
+
+**EditPlan = 编辑设计结论的唯一权威源**：`~/.dsh/dsh-bio-graft/plans/<name>.editplan.json`
++ append-only `plans/<name>/runs/`（run 号单调只增、写入原子、同名默认拒绝覆盖）。
+
+- 引用候选/推荐必须带 plan 路径 + run 号；「为什么昨天 B 今天 D」只能由 `runs/` 时间线回答。
+- schema 0.2 起含 `ranking_policy` / `off_target_summary` / `coordinate_systems`（口径随数字走）。
+- 坐标口径：`start_0/end_0` 为 0-based 半开含 PAM；`cut_site_0` 位于 `cut_site_0-1` 与 `cut_site_0`
+  之间；`cut_site_verified=false` 的编辑器几何禁止当既定事实。
+- 质量铁律沿用：脱靶**永不说安全**（只能「在当前搜索参数下未检出」）；不打综合分
+  （只给评分向量 + 声明式 objective）。
+
+### 15.5 验证矩阵（已执行）
+
+| 级别 | 动作 | 结果 |
+|---|---|---|
+| ① 端点直调 | `curl /api/dsh-bio-genie/editing?probe=install` 与完整请求 | `installed:true` / `state=ready` / checks 三项 ok / 5 计划 / 6 编辑器 / 7 工具 / remediations 空 |
+| ② bundle 内容 | boot manifest → 拉 `@dsh-bio/dsh-bio-genie/client.js` | 新分页文案与组件全部命中（60KB bundle） |
+| ③ 真实浏览器 | webbridge：设置 → BioGenie → 分页列表 | 出现「代谢建模」与「基因编辑设计」两个域分页；分页正文渲染完整（含证据分级列）；**抓到并按修复了**说明符口径 bug（`env.interpreter.selected` 是路径字符串） |
+| ④ 路由 before/after | 真实会话（同一工作区、同一任务） | 修复前：agent 手抄数据到 Python 排序、2 次工具失败；修复后：`skill(graft-expert)` → `graft_profiles` → `graft_design` → `graft_score` → `graft_plan_save`，**全程 0 次 `bio_crispr_guide`**、无因工具故障的绕道 |
+| ⑤ gem 回归 | `npm run bench` | exit 0（含 gem 两个既有测试零修改通过 + graft 适配器 + bio_crispr_guide 语义标签门） |
+
+### 15.6 本域特有纪律（接入方与宿主都适用）
+
+1. **脱靶 API 不得有 `safe: true`**（批次 C 将落地 `assessment.safety_conclusion='not_supported'`
+   + `search_completeness` 枚举：mismatch=searched / bulge=not_searched）。
+2. **几何 ≠ 效率**：`verified` 只表示「PAM/几何已对一手文献核对」，不代表活性可预测。
+3. **负证据语义**：`0` / `null` / `not_searched` / `not_applicable` 必须可区分。
