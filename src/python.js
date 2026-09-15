@@ -68,7 +68,12 @@ export function spawnPython(exe, script, payload, { cwd, timeoutMs, signal } = {
         settle({ ...parsed, exitCode: code, timedOut: didTimeout })
       } else {
         const reason = didTimeout
-          ? `python execution timed out after ${timeoutMs} ms (exit ${code})`
+          ? `python execution timed out after ${timeoutMs} ms (exit ${code})。` +
+            '提示：该操作在限定时间内未返回结果、已被终止——常见于远程服务调用' +
+            '（如 NCBI BLAST qblast）遇到的排队或限流（短时间连续请求易触发）。' +
+            '建议：① 稍后重试，并避免连续高频调用同一远程服务；' +
+            '② 考虑替代路径（如 Entrez 直接下载数据做本地比对）；' +
+            '③ 用 bio_log 查看本次调用记录。'
           : `python returned no valid JSON (exit ${code})`
         settle({ ok: false, stdout, stderr, error: reason, exitCode: code, timedOut: didTimeout })
       }
