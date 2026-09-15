@@ -122,3 +122,32 @@ time.sleep(0.4)                            # 3 req/s 限流：请求间留间隔
 - 中文 Windows 下文件可能 GBK 编码——读写用 `encoding='utf-8', errors='replace'` 或先按字节读再降级解码（bio_seq_io_read 已内置容错）。
 - matplotlib 保存中文图：先 `from figurelib.setup_style import setup_style; setup_style(lang='zh')`（找不到 CJK 字体会抛清晰错误，先 `bio_fig_qa` 探测）。
 - 统计结论必须带检验（scipy）+ 校正（见 bio-proto-statistics）；误差棒图注写 SD/SEM/CI+n。
+
+## 8. Biopython 1.88 常见 API 陷阱
+
+> 三条都来自真实报错现场，已在本机 1.88 上逐条实测复现（`uv run --with biopython --with reportlab --with rlPyCairo`，输出见下方各条）。撞上 `ImportError` / `TypeError` 先对照本节，按下面的正确写法改，别反复试错。与 §2「库存在但 API 变」互补。
+
+### 8.1 Tm 计算
+
+- ❌ `from Bio.SeqUtils import melting_temp` → `ImportError: cannot import name 'melting_temp' from 'Bio.SeqUtils'`
+- ✅ `from Bio.SeqUtils import MeltingTemp`；`MeltingTemp.Tm_NN(seq)`（实测 27nt 序列 → `57.413`，返回值单位 ℃）
+- 原因：Tm 计算的入口是 `Bio.SeqUtils.MeltingTemp` 子模块，`melting_temp` 这个名字不存在（也不是模块名）。
+
+### 8.2 SeqFeature 的 strand
+
+- ❌ `SeqFeature(location=..., type='CDS', strand=-1)` → `TypeError: SeqFeature.__init__() got an unexpected keyword argument 'strand'`（1.88 的 `__init__` 只剩 `location / type / id / qualifiers / sub_features`）
+- ✅ `SeqFeature(location=SimpleLocation(start, end, strand=-1), type='CDS')`；方向用 `feature.location.strand` 读（实测 -1；旧的 `feature.strand` 属性已移除 → `AttributeError`，`start`/`end` 同样从 `feature.location` 取）
+- 原因：1.88 的特征坐标统一由 `Location` 对象（`SimpleLocation` 等）承载，strand 必须建在 location 上，不再是 SeqFeature 自己的构造参数。
+
+### 8.3 GenomeDiagram 的线宽
+
+- ❌ `diagram.draw(format='linear', linewidth=2)` → `TypeError: Diagram.draw() got an unexpected keyword argument 'linewidth'`（`draw()` 只接布局参数：`format / pagesize / orientation / x…yb / start / end / tracklines / fragments / fragment_size / track_size / circular / circle_core / cross_track_links`）
+- ✅ 线宽属于轨道里的 Graph 对象：`gset = track.new_set(type='graph')` → `graph = gset.new_graph(data, style='line', linewidth=5)`（或建好后 `graph.linewidth = 5`）——实测该值真的进入输出（渲染出的 reportlab 图形里出现 `strokeWidth=5`）
+- 🕳 同轮实测的两个连带坑：① 在 `GraphSet` 上赋值 `gset.linewidth = 5` **静默无效**（graph 仍是默认 1，图上不出现 5）；② `FeatureSet`/`Feature` 没有 `linewidth` 属性（特征框线宽在渲染器里硬编码 1）——特征框线宽不可调，要可控线宽就用 graph。
+- 原因：线宽是 `GraphData`（`style='line'`）自己的属性，不是 Diagram 的绘制参数。
+
+### 8.4 附带：GenomeDiagram 导出 PNG 的后端
+
+- ❌ 环境缺 `rlPyCairo` 时 `diagram.write('x.png', 'PNG')` → `RenderPMError: cannot import desired renderPM backend rlPyCairo`
+- ✅ 插件自带环境已预装 `reportlab + rlPyCairo`（见 §2 库矩阵 builtin），直接 `write(path, 'PNG')` 即可（实测 44KB PNG 正常落盘）；自建 venv 时要补装 `rlPyCairo`。
+- 原因：reportlab 渲染 PNG 的后端是 rlPyCairo，缺它时渲染直接失败（不是静默降级）。
