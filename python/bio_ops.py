@@ -1601,11 +1601,95 @@ def op_fig_qa(args):
 
 # ---- BLAST / 多序列比对 / 系统发育 ----
 
+# 短核酸查询的 e-value 天然偏高：BLASTN 的 e-value 随查询变短而急剧变大
+# （E ∝ m·n·2^-S'，短查询能达到的比对分 S' 低），23nt 查询在 nt 库中的命中
+# e-value 常见于 0.1-10 量级——严格 expect 会在服务端把命中全部过滤掉。
+# 下方自动参数与 NCBI BLAST 网页版对短查询的调整一致（word_size=7 / expect=1000）。
+_SHORT_BLASTN_MAX_LEN = 30
+_SHORT_BLASTN_WORD_SIZE = 7
+_SHORT_BLASTN_EXPECT = 1000.0
+_STRICT_EXPECT_THRESHOLD = 10.0
+
+
+def _decide_blast_params(sequence, program, user_word_size=None, user_expect=None):
+    """纯函数（无网络/无副作用）：决定实际传给 qblast 的参数 + 参数告警。
+
+    规则：program=='blastn' 且 len(sequence) < 30（短核苷酸查询）时——
+      - 调用方未显式传 word_size → word_size=7（blastn 默认 11 对 <30nt 查询几乎不出命中）；
+      - 调用方未显式传 expect   → expect=1000.0（短查询 e-value 天然 0.1-10 量级）；
+      - 调用方显式传了 expect 且 <10 → 保留调用方值，但给出 warnings（该阈值会让命中全灭）。
+    其他情况：仅透传调用方显式给出的参数（保持历史行为，不改变既有调用语义）。
+
+    返回 (kwargs, warnings)；kwargs 即待展开进 NCBIWWW.qblast 的参数。
+    """
+    kwargs = {}
+    warnings = []
+    is_short_blastn = program == 'blastn' and len(sequence) < _SHORT_BLASTN_MAX_LEN
+
+    if user_word_size is not None:
+        kwargs['word_size'] = int(user_word_size)
+    elif is_short_blastn:
+        kwargs['word_size'] = _SHORT_BLASTN_WORD_SIZE
+
+    if user_expect is not None:
+        expect_value = float(user_expect)
+        kwargs['expect'] = expect_value
+        if is_short_blastn and expect_value < _STRICT_EXPECT_THRESHOLD:
+            warnings.append(
+                f'短序列（len={len(sequence)}）配合严格 expect={user_expect}：'
+                f'短查询的 e-value 通常为 0.1-10 量级，严格阈值会过滤全部命中'
+                f'——查短序列同源建议 expect>={_STRICT_EXPECT_THRESHOLD:g} 或不设 expect'
+                f'（本次仍按你给的值传参；若 hit_count=0 请调大 expect 后重试）。'
+            )
+    elif is_short_blastn:
+        kwargs['expect'] = _SHORT_BLASTN_EXPECT
+
+    return kwargs, warnings
+
+
+def _blast_diagnostics(sequence, program, params_used, warnings, hit_count,
+                       query_length=None):
+    """纯函数（无网络/无副作用）：BLAST 返回体的 diagnostics 段。
+
+    params_used = 实际传给 qblast 的参数回执；hit_count==0 时追加针对性解释——
+    短序列场景下「0 命中」多半是 e-value 阈值过严/查询过短，而不是 NCBI 服务故障。
+    """
+    length = len(sequence) if query_length is None else query_length
+    notes = list(warnings)
+    expect_used = params_used.get('expect')
+    if hit_count == 0:
+        if program == 'blastn' and length < _SHORT_BLASTN_MAX_LEN:
+            if expect_used is not None and float(expect_used) < _STRICT_EXPECT_THRESHOLD:
+                notes.append(
+                    f'未命中（hit_count=0）是参数结果而非服务故障：查询仅 {length} nt，'
+                    f'实际使用 expect={expect_used} 的严格阈值——短核苷酸查询在 nt 库中的 '
+                    f'e-value 通常为 0.1-10 量级，服务端会在 e-value 过滤阶段丢弃全部命中。'
+                    f'请调大 expect（建议 >=10，或不传 expect 让工具自动放宽）后重试；'
+                    f'更稳的做法是取更长的查询区段（>=30 nt）。'
+                )
+            else:
+                notes.append(
+                    f'未命中（hit_count=0）：已对短查询 {length} nt 自动放宽参数'
+                    f'（word_size={params_used.get("word_size")}, expect={expect_used}）后仍无命中——'
+                    f'通常说明库中确无显著同源序列（短查询本身灵敏度低），'
+                    f'或 database/program 选择不当。可改用更长的查询区段，'
+                    f'或核对 program/database 是否与序列类型匹配。'
+                )
+        else:
+            notes.append(
+                f'未命中（hit_count=0）：当前参数（{params_used}）下没有满足阈值的命中——'
+                f'可放宽 expect、更换 database/program，或核对输出格式与库物种范围后重试。'
+            )
+    return {'query_length': length, 'params_used': dict(params_used), 'notes': notes}
+
+
 @retry_on_network_error(max_retries=2, delay=5)
 def op_blast_search(args):
     """远程 BLAST 搜索：NCBIWWW.qblast + NCBIXML 解析。
 
     返回每个命中的 accession/描述/e-value/score/一致性/比对坐标。
+    另附 diagnostics（实际参数回执 + 0 命中解释）：短核酸查询的 e-value 天然在
+    0.1-10 量级，严格 expect 会让服务端过滤掉全部命中——0 命中不等于服务故障。
     qblast 在 NCBI 服务端排队执行，通常耗时 1-10 分钟，属正常现象。
     """
     import io
@@ -1615,14 +1699,29 @@ def op_blast_search(args):
     program = args.get('program', 'blastn')  # blastn / blastp / blastx
     database = args.get('database') or ('nt' if program in ('blastn', 'blastx') else 'nr')
     hitlist_size = int(args.get('hitlist_size', 10))
-    expect = args.get('expect')  # e-value 阈值，可选
 
-    kwargs = {'hitlist_size': hitlist_size}
-    if expect is not None:
-        kwargs['expect'] = float(expect)
+    # 「参数决策」抽成纯函数：可离线单测（scripts/test-blast-params.py），不依赖真实网络。
+    blast_kwargs, warnings = _decide_blast_params(
+        sequence, program,
+        user_word_size=args.get('word_size'),
+        user_expect=args.get('expect'),  # e-value 阈值，可选
+    )
+    kwargs = {'hitlist_size': hitlist_size, **blast_kwargs}
 
-    handle = NCBIWWW.qblast(program, database, sequence, **kwargs)
-    xml = handle.read()
+    try:
+        handle = NCBIWWW.qblast(program, database, sequence, **kwargs)
+        xml = handle.read()
+    except (ConnectionError, TimeoutError, OSError) as e:
+        # 走到这里说明 @retry_on_network_error 的重试已耗尽（装饰器会重试本函数，
+        # 最终抛出上一次的异常）。把原始网络异常换成带回退指引的文案——main() 以
+        # ok:false + error 返回给 agent，避免 agent 把「NCBI 不可达/被限流」误判成
+        # 插件故障而反复无效重试。
+        raise ConnectionError(
+            'NCBI BLAST 服务可能暂时不可达或被限流——可稍后重试，'
+            '或改用 Entrez 直接下载序列做本地比对。'
+            f'（原始错误: {type(e).__name__}: {e}）'
+        ) from e
+
     if isinstance(xml, bytes):
         xml = xml.decode('utf-8', errors='replace')
     record = NCBIXML.read(io.StringIO(xml))
@@ -1652,6 +1751,12 @@ def op_blast_search(args):
         'query_length': record.query_length,
         'hit_count': len(record.alignments),
         'hits': hits,
+        # 参数告警（短序列 + 严格 expect 等）与逐条诊断：0 命中时 notes 含针对性解释
+        'warnings': warnings,
+        'diagnostics': _blast_diagnostics(
+            sequence, program, kwargs, warnings,
+            hit_count=len(record.alignments), query_length=record.query_length,
+        ),
     }
 
 
