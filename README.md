@@ -22,7 +22,7 @@
 |------|------|
 | 🪄 **许愿式分析（Wish Coding）** | 说人话就能分析：*"这条序列的 GC 含量和 EcoRI 酶切位点？"* |
 | 🧩 **全功能覆盖** | `bio_python` 执行器可运行任意 Biopython 代码（比对、PDB、Phylo、motif、BLAST…），配合 22 个领域/研究 skill 配方 |
-| ⚡ **高频语义化工具** | 49 个固定参数工具（GC 含量、翻译、限制酶、k-mer、文件 IO、BLAST、多序列比对、系统发育树、Entrez 检索、通路富集、PubMed 文献、参考基因组、出版级绘图、机器学习、DNA 设计、Primer3 引物/多约束 DNA 优化/克隆模拟/SBOL 标准化/生产包络线/CRISPR 向导设计/编辑验证/合成可行性检查、基因回路编译/动力学仿真、差异表达/GSEA）+ 5 个执行器/元工具（bio_python / bio_env / bio_log / bio_memory / bio_goal）——省 token、输出稳定、参数有校验 |
+| ⚡ **高频语义化工具** | 57 个固定参数工具（GC 含量、翻译、限制酶、k-mer、文件 IO、BLAST、多序列比对、系统发育树、Entrez 检索、通路富集、PubMed 文献、参考基因组、Addgene 质粒库检索、UniProt 蛋白知识库、内含子外显子、点阵图、树比较、RNA 二级结构、单细胞 QC、出版级绘图、机器学习、DNA 设计、Primer3 引物/多约束 DNA 优化/克隆模拟/SBOL 标准化/生产包络线/CRISPR 向导设计/编辑验证/合成可行性检查、基因回路编译/动力学仿真、差异表达/GSEA）+ 5 个执行器/元工具（bio_python / bio_env / bio_log / bio_memory / bio_goal）——省 token、输出稳定、参数有校验 |
 | 📦 **零安装** | 自动下载隔离的 Python 环境（uv + venv + Biopython 绘图栈）到 `$DSH_HOME/dsh-bio-genie/`，不污染系统 |
 | 🇨🇳 **网络自动适配** | 默认直连官方源，任一环节失败自动切换国内镜像（uv→清华 PyPI、CPython→npmmirror、PyPI 包→清华镜像），无需任何配置 |
 | 🛡️ **环境隔离** | Python 子进程以 `-I`（isolated）模式运行，不受宿主 PYTHONPATH 污染 |
@@ -30,8 +30,8 @@
 | 📜 **透明性日志** | 每次代码执行/工具调用异步记 JSONL 日志（哈希/预览/耗时），`bio_log` 可回溯任何一次分析；日志自动 30 天轮转清理 |
 | 🧬 **科学严谨性约束** | persona 强制「生物学结论必须可溯源到工具输出」，纯推断标注 [推断-未验证] |
 | 🧠 **会话记忆** | 成功代码模式 + 错误→修复经验自动沉淀（本地 JSON），`bio_memory` 查询，越用越聪明 |
-| ⚙️ **设置面板** | dsh 设置面板（⚙️ 齿轮）侧栏「BioGenie」菜单——标签页：总览（包元信息/配置默认值）、Skill 模块（49 个条目按主 skill/领域/研究/协议/指南分组）、Python 环境（venv 包列表）、工具调试；同实例安装 dsh-bio-gem 时还显示其只读「代谢建模」五态面板 |
-| 📚 **协议知识库** | 17 个高频任务协议（质控/比对/BLAST/克隆/建树/结构/富集/出版级绘图/坐标系统/统计检验/差异表达/GSEA…），每个含可执行代码模板 + 常见坑，随插件打包 |
+| ⚙️ **设置面板** | dsh 设置面板（⚙️ 齿轮）侧栏「BioGenie」菜单——标签页：总览（包元信息/配置默认值）、Skill 模块（50 个条目按主 skill/领域/研究/协议/指南分组）、Python 环境（venv 包列表）、工具调试；同实例安装 dsh-bio-gem 时还显示其只读「代谢建模」五态面板 |
+| 📚 **协议知识库** | 19 个高频任务协议（质控/比对/BLAST/克隆/建树/结构/富集/出版级绘图/坐标系统/统计检验/差异表达/GSEA/NGS 流程…），每个含可执行代码模板 + 常见坑，随插件打包 |
 
 ---
 
@@ -136,6 +136,14 @@ cp -r src index.js cordis.patch.yml package.json skills prompts python docs \
 | `bio_pubmed_search` | PubMed 文献检索（PMID/标题/期刊/作者/DOI） | 查文献、PubMed |
 | `bio_pubmed_abstract` | 按 PMID 取结构化摘要（标题/摘要全文/作者/日期/DOI） | 读摘要、PMID |
 | `bio_ref_genome` | 参考基因组 assembly 信息（Ensembl：assembly 名/染色体/下载目录） | 参考基因组、基因组版本 |
+| `bio_plasmid_search` | Addgene 质粒库检索（13,000+ 质粒：ID/名称/用途/沉积者/文献/插入片段；实时抓取公开目录页） | 质粒库、找质粒、Addgene |
+| `bio_plasmid_info` | 按 Addgene ID 取完整元数据（30+ 字段：抗性/拷贝数/启动子/生长菌株/插入片段/许可） | 质粒详情、质粒抗性 |
+| `bio_uniprot` | UniProt 蛋白知识库（`mode=entry/ptm/xref/pathway/sequence/search`：功能注释/PTM 位点+证据码/100+ 库交叉引用/通路/FASTA） | UniProt、PTM、蛋白注释 |
+| `bio_seq_introns` | 内含子-外显子结构 + 剪接位点（GenBank 多段 CDS → 外显子/内含子坐标、GT-AG 判定） | 内含子、外显子、剪接位点 |
+| `bio_seq_dotplot` | 序列点阵图（滑窗一致性矩阵 → 相似区段/重复/重排 + 300 DPI PNG） | 点阵图、dotplot、共线性 |
+| `bio_phylo_compare` | 系统发育树比较（Robinson-Foulds 距离 + 归一化 + 拓扑差异明细） | 树比较、RF 距离 |
+| `bio_rna_fold` | RNA 二级结构预测（ViennaRNA：MFE 结构/ΔG/碱基对/集合自由能 + 结构示意图；首次调用自动装） | RNA 二级结构、折叠、MFE |
+| `bio_sc_qc` | 单细胞 RNA-seq 质控（scanpy：QC 指标 → MAD 过滤 → 出图 → 保存 h5ad；首次调用自动装） | 单细胞、scRNA-seq、QC、h5ad |
 
 ### 序列类型自动判断
 
@@ -148,7 +156,7 @@ X 与 gap 在翻译时按未知碱基处理（Biopython 标准行为），含 X/
 
 ---
 
-## 📚 Skill 体系（49 个）
+## 📚 Skill 体系（50 个）
 
 ### 主 skill：`dsh-bio-genie`
 工具分层决策树：**先查语义化工具表 → 命中就用；否则用 bio_python 执行器写 Biopython 代码**。
@@ -185,13 +193,13 @@ X 与 gap 在翻译时按未知碱基处理（Biopython 标准行为），含 X/
 
 ### 它是什么
 
-- **人设文件**（`preset/bio-genie/preset.yml` + `agent.cordis.yml`）——覆盖 base persona，告诉 AI「你手头有 54 个工具 + 49 个 skill」。
+- **人设文件**（`preset/bio-genie/preset.yml` + `agent.cordis.yml`）——覆盖 base persona，告诉 AI「你手头有 62 个工具 + 50 个 skill」。
 - **入门口诀**（`skills/dsh-bio-genie-expert.md`）——一个 meta-skill：「先看工作区 → 二选一（语义化工具 / `bio_python`） → 失败按 ACR 三层修 → 报告带可追溯链」。
 - **一键安装**：`pnpm install` 跑 postinstall 钩子会自动把 preset 复制到 `~/.dsh/.agent-presets/bio-genie/`；无需手动操作。
 
 ### 它**不是**
 
-- ❌ **不接管 54 个工具**——所有 `bio_*` 工具仍由本插件的 `cordis.patch.yml` 注入，preset **不重声明**任何工具，避免冲突。
+- ❌ **不接管 62 个工具**——所有 `bio_*` 工具仍由本插件的 `cordis.patch.yml` 注入，preset **不重声明**任何工具，避免冲突。
 - ❌ **不抢默认人设**——postinstall 装完后，「生物基因精灵」出现在 dsh 预设选择器里；用户**主动选择**才激活。`agent-presets.default` 不会被改成 `bio-genie`。
 - ❌ **不破坏其他插件**——presets 与 plugins 是 dsh 的两个独立 seam，共存不冲突。
 

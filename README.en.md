@@ -22,7 +22,7 @@
 |---------|-------------|
 | 🪄 **Wish-style Analysis (Wish Coding)** | Plain language in, results out: *"What's the GC content and EcoRI cut sites of this sequence?"* |
 | 🧩 **Full Coverage** | The `bio_python` executor runs arbitrary Biopython code (alignment, PDB, Phylo, motif, BLAST…), backed by 22 domain/research skill recipes |
-| ⚡ **High-Frequency Semantic Tools** | 49 fixed-parameter tools (GC content, translation, restriction enzymes, k-mer, file IO, BLAST, multiple sequence alignment, phylogenetic trees, Entrez, pathway enrichment, PubMed literature, reference genome, publication-grade plotting, machine learning, DNA design, Primer3 primers/multi-constraint DNA optimization/clone simulation/SBOL standardization/production envelope/gene circuit compile & simulation, differential expression/GSEA) + 5 executor/meta tools (bio_python / bio_env / bio_log / bio_memory / bio_goal) — token-efficient, stable output, validated arguments |
+| ⚡ **High-Frequency Semantic Tools** | 57 fixed-parameter tools (GC content, translation, restriction enzymes, k-mer, file IO, BLAST, multiple sequence alignment, phylogenetic trees, Entrez, pathway enrichment, PubMed literature, reference genome, publication-grade plotting, machine learning, DNA design, Primer3 primers/multi-constraint DNA optimization/clone simulation/SBOL standardization/production envelope/gene circuit compile & simulation, differential expression/GSEA) + 5 executor/meta tools (bio_python / bio_env / bio_log / bio_memory / bio_goal) — token-efficient, stable output, validated arguments |
 | 📦 **Zero Installation** | Automatically downloads an isolated Python environment (uv + venv + Biopython) to `$DSH_HOME/dsh-bio-genie/`, no system pollution |
 | 🇨🇳 **China-Network Ready** | Auto network adaptation: official sources by default, automatic switch to domestic mirrors on any failure (uv→Tsinghua PyPI, CPython→npmmirror, PyPI packages→Tsinghua), zero configuration required |
 | 🛡️ **Environment Isolation** | Python subprocesses run in `-I` (isolated) mode, immune to host PYTHONPATH pollution |
@@ -30,7 +30,7 @@
 | 📜 **Transparency Log** | Every code execution / tool call appends an async JSONL log (hash/preview/duration); `bio_log` traces back any analysis; logs are auto-rotated after 30 days |
 | 🧬 **Scientific Rigor Guardrails** | Persona enforces "biological conclusions must trace to tool output"; pure inference is marked [inferred — unverified] |
 | 🧠 **Session Memory** | Successful code patterns + error→fix lessons accumulate automatically (local JSON); query via `bio_memory`, gets smarter over time |
-| ⚙️ **Settings Panel** | "BioGenie" menu in dsh Settings sidebar (⚙️) — tabs: Overview (package info/config defaults), Skill Modules (49 entries grouped by main/domain/research/protocol/guide), Python Environment (venv packages), Tool Debug; when dsh-bio-gem shares the instance, an additional read-only five-state Metabolic Modeling tab |
+| ⚙️ **Settings Panel** | "BioGenie" menu in dsh Settings sidebar (⚙️) — tabs: Overview (package info/config defaults), Skill Modules (50 entries grouped by main/domain/research/protocol/guide), Python Environment (venv packages), Tool Debug; when dsh-bio-gem shares the instance, an additional read-only five-state Metabolic Modeling tab |
 | 📚 **Protocol Knowledge Base** | 17 high-frequency task protocols (QC/alignment/BLAST/cloning/trees/structure/enrichment/publication figures/coordinate systems/statistics/differential expression/GSEA…), each with runnable code templates + pitfalls, bundled with the plugin |
 
 ---
@@ -114,6 +114,14 @@ Finally restart the dsh web service.
 | `bio_pubmed_search` | PubMed literature search (PMID/title/journal/authors/DOI) | literature, PubMed |
 | `bio_pubmed_abstract` | Structured abstracts by PMID (title/full abstract/authors/date/DOI) | read abstract, PMID |
 | `bio_ref_genome` | Reference genome assembly info (Ensembl: assembly name/chromosomes/download dirs) | reference genome, assembly |
+| `bio_plasmid_search` | Addgene plasmid repository search (13,000+ plasmids: ID/name/purpose/depositor/publication/insert; live scrape of public catalog) | plasmid library, find plasmid, Addgene |
+| `bio_plasmid_info` | Full metadata by Addgene ID (30+ fields: resistance/copy number/promoter/growth strain/insert/license) | plasmid details, plasmid resistance |
+| `bio_uniprot` | UniProt protein knowledge base (`mode=entry/ptm/xref/pathway/sequence/search`: function/PTM sites+evidence codes/100+ DB cross-refs/pathways/FASTA) | UniProt, PTM, protein annotation |
+| `bio_seq_introns` | Intron-exon structure + splice sites (multi-part GenBank CDS → exon/intron coordinates, GT-AG classification) | intron, exon, splice site |
+| `bio_seq_dotplot` | Sequence dotplot (sliding-window identity matrix → similar regions/repeats/rearrangements + 300 DPI PNG) | dotplot, synteny, repeats |
+| `bio_phylo_compare` | Phylogenetic tree comparison (Robinson-Foulds distance + normalized RF + differing splits) | tree comparison, RF distance |
+| `bio_rna_fold` | RNA secondary structure prediction (ViennaRNA: MFE structure/ΔG/base pairs/ensemble + diagram; auto-installs on first call) | RNA structure, folding, MFE |
+| `bio_sc_qc` | Single-cell RNA-seq QC (scanpy: QC metrics → MAD filtering → plots → filtered h5ad; auto-installs on first call) | single-cell, scRNA-seq, QC, h5ad |
 
 ### Automatic Sequence-Type Detection
 
@@ -126,7 +134,7 @@ X and gaps are treated as unknown bases during translation (Biopython standard b
 
 ---
 
-## 📚 Skill System (49 total)
+## 📚 Skill System (50 total)
 
 ### Master skill: `dsh-bio-genie`
 Tool-layering decision tree: **check the semantic tool table first → use it if matched; otherwise write Biopython code with the bio_python executor**.
@@ -163,13 +171,13 @@ This plugin also ships a **dsh agent preset** — `bio-genie` — that turns the
 
 ### What it is
 
-- **Persona files** (`preset/bio-genie/preset.yml` + `agent.cordis.yml`) — override the base persona, telling AI: "you have 53 tools + 49 skills at hand".
+- **Persona files** (`preset/bio-genie/preset.yml` + `agent.cordis.yml`) — override the base persona, telling AI: "you have 62 tools + 50 skills at hand".
 - **Onboarding mantra** (`skills/dsh-bio-genie-expert.md`) — a meta-skill: "1. Inspect workspace → 2. Pick semantic tool / `bio_python` → 3. Fail by ACR three-layer repair → 4. Report with traceable chain".
 - **One-shot install**: `pnpm install` runs postinstall hook to copy the preset to `~/.dsh/.agent-presets/bio-genie/`; no manual steps.
 
 ### What it is **not**
 
-- ❌ **Does NOT own the 53 tools** — every `bio_*` tool is still injected by the plugin's `cordis.patch.yml`; the preset **does not redeclare** any tool to avoid conflicts.
+- ❌ **Does NOT own the 62 tools** — every `bio_*` tool is still injected by the plugin's `cordis.patch.yml`; the preset **does not redeclare** any tool to avoid conflicts.
 - ❌ **Does NOT change the default persona** — after postinstall, "生物基因精灵" appears in dsh's preset selector; users **actively pick** it to activate. `agent-presets.default` is **not** changed to `bio-genie`.
 - ❌ **Does NOT break other plugins** — presets and plugins are two independent seams in dsh; they coexist without conflict.
 

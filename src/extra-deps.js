@@ -34,6 +34,15 @@ export const EXTRA_DEPS = {
   // differential_plot 等关键基因标注防重叠。MIT，纯 Python 无二进制依赖。
   // 挂在 fig_lint op 上（agent 画完图 lint 时预装，供 bio_python 桥的标注配方 import）。
   fig_lint: ['adjustText>=1.1'],
+  // RNA 二级结构预测（2026-09-16，能力补缺）：ViennaRNA 有 Windows wheel
+  // （cp310-cp313 win_amd64，实测 2.7.2 在 CPython 3.12 装成功）。
+  // ⚠️ 许可：ViennaRNA 为自定义学术许可（非 OSI 标准），本项目只作**按需依赖**
+  // 由用户环境安装，不 vendor、不随包分发源码。
+  rna_fold: ['ViennaRNA>=2.7'],
+  // 单细胞 RNA-seq 质控（2026-09-16，能力补缺）：scanpy/anndata 为 py3-none-any
+  // 纯 Python wheel，但要求 Python ≥3.12（引导器即 CPython 3.12，实测可装）。
+  // 体积较大（含 numba/igraph 等传递依赖），故放第二层按需安装而非第一层。
+  sc_qc: ['scanpy>=1.10', 'anndata', 'h5py'],
   // Phase 2 预留：
   // cobra_model: ['cobra', 'glpk'],
 }

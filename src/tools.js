@@ -910,6 +910,146 @@ function semanticTools(config) {
       op: 'stats_test',
       timeoutMs: 120_000,
     }),
+    // ---- 质粒库检索（2026-09-16 新增，Addgene 公开目录页零登录可达）----
+    bioTool(config, {
+      name: 'bio_plasmid_search',
+      description:
+        '检索 Addgene 质粒库（全球最大质粒库，13,000+ 条），返回 Addgene ID、名称、用途、' +
+        '沉积者、相关文献、插入片段、使用场景与热门度。用于"找现成质粒"这一上游步骤——' +
+        '拿到 ID 后可接 bio_plasmid_info 取全字段、再走 bio_plasmid_map/bio_clone_simulate 做下游设计。' +
+        '注意：本工具只提供检索与公开元数据，不提供质粒序列（Addgene 序列下载需登录其账号）。' +
+        '触发词：质粒库、找质粒、Addgene、现成质粒、质粒检索、有没有质粒。',
+      parameters: {
+        query: { type: 'string', required: true, description: '关键词，如 "CRISPR Cas9"、"lentiviral GFP"、"dox inducible"；支持基因名、载体类型、应用场景' },
+        limit: { type: 'number', description: '返回条数，默认 20，上限 50' },
+        sort: { type: 'string', enum: ['relevance', 'newest', 'oldest', 'alpha_asc', 'alpha_desc'], description: '排序，默认 relevance' },
+      },
+      op: 'plasmid_search',
+      timeoutMs: 120_000,
+      cache: true,
+    }),
+    bioTool(config, {
+      name: 'bio_plasmid_info',
+      description:
+        '按 Addgene ID 取质粒完整公开元数据（30+ 字段，按节分组）：用途、载体类型、抗性、' +
+        '拷贝数、生长菌株/温度、启动子、标签、插入片段尺寸、克隆位点、测序引物、载体骨架、' +
+        '许可条款等，并探测该质粒的序列获取方式。' +
+        '触发词：质粒详情、Addgene ID、质粒信息、质粒抗性、质粒拷贝数。',
+      parameters: {
+        plasmid_id: { type: 'string', required: true, description: 'Addgene 数字 ID，如 "52961"（lentiCRISPR v2）' },
+      },
+      op: 'plasmid_info',
+      timeoutMs: 120_000,
+      cache: true,
+    }),
+    // ---- 能力补缺（2026-09-16，对标生信 MCP 工具集的缺口，全部真实现）----
+    bioTool(config, {
+      name: 'bio_seq_introns',
+      description:
+        '内含子-外显子结构与剪接位点分析：解析 GenBank 注释里的多段 CDS/mRNA，' +
+        '返回每个基因的外显子坐标、内含子坐标与长度、供体/受体二核苷酸（GT-AG 判定）。' +
+        '输入 NCBI 登录号（基因组/RefSeqGene 记录，如 NG_005905）或本地 GenBank 文件。' +
+        '注意：成熟 mRNA 记录（无内含子）与原核记录本就没有内含子，会明确说明。' +
+        '触发词：内含子、外显子、剪接位点、基因结构、splice site。',
+      parameters: {
+        accession: { type: 'string', description: 'NCBI 登录号（需为基因组类记录，如 NG_/NC_）' },
+        genbank_file: { type: 'string', description: '或本地 GenBank 文件路径' },
+        gene: { type: 'string', description: '只分析指定基因（按 gene/locus_tag/product 匹配）' },
+        max_features: { type: 'number', description: '最多返回转录本数，默认 10' },
+      },
+      op: 'seq_introns',
+      timeoutMs: 300_000,
+      cache: true,
+    }),
+    bioTool(config, {
+      name: 'bio_seq_dotplot',
+      description:
+        '序列点阵图（dotplot）：滑窗一致性矩阵识别两条序列的相似区段、重复与重排，' +
+        '输出 300 DPI PNG 及相似度统计。适合比对结果的直观验证（同源区段=主对角，' +
+        '反向重复=副对角，串联重复=平行带）。' +
+        '触发词：点阵图、dotplot、序列相似性可视化、重复序列、共线性。',
+      parameters: {
+        seq1: { type: 'string', required: true, description: '序列 1（内容或文件路径）' },
+        seq2: { type: 'string', required: true, description: '序列 2（内容或文件路径）' },
+        window: { type: 'number', description: '滑窗大小，默认 15' },
+        threshold: { type: 'number', description: '窗口一致性阈值 0-1，默认 0.7' },
+        output_file: { type: 'string', description: '输出 PNG 路径，默认工作区 dotplot.png' },
+      },
+      op: 'seq_dotplot',
+      timeoutMs: 180_000,
+    }),
+    bioTool(config, {
+      name: 'bio_uniprot',
+      description:
+        'UniProt 蛋白知识库查询（真实 REST API）：功能注释、翻译后修饰（PTM）、' +
+        '交叉引用（PDB/InterPro/Pfam/GO/KEGG/Reactome 等 100+ 库）、通路、序列。' +
+        'mode=entry 取完整条目摘要；mode=ptm 取修饰残基位点与证据码；mode=xref 取交叉引用；' +
+        'mode=pathway 取通路；mode=sequence 取 FASTA；mode=search 按关键词检索。' +
+        '触发词：UniProt、蛋白注释、PTM、翻译后修饰、蛋白交叉引用、蛋白通路、蛋白序列。',
+      parameters: {
+        accession: { type: 'string', description: 'UniProt 登录号，如 P38398（BRCA1）' },
+        mode: { type: 'string', enum: ['entry', 'ptm', 'xref', 'pathway', 'sequence', 'search'], description: '查询模式，默认 entry' },
+        query: { type: 'string', description: 'search 模式的检索式，如 "BRCA1 AND organism_id:9606"' },
+        limit: { type: 'number', description: 'search 模式返回条数，默认 10' },
+      },
+      op: 'uniprot',
+      timeoutMs: 120_000,
+      cache: true,
+    }),
+    bioTool(config, {
+      name: 'bio_phylo_compare',
+      description:
+        '系统发育树比较：Robinson-Foulds 距离（无根树分裂对称差）+ 归一化 RF + ' +
+        '拓扑差异明细（只在一棵树中出现的分裂组成）。用于评估不同建树方法/参数/' +
+        'bootstrap 阈值得到的树是否拓扑一致。两棵树的叶名须为同一套（自动剪除缺失叶并列出）。' +
+        '触发词：树比较、RF 距离、拓扑差异、Robinson-Foulds、建树一致性。',
+      parameters: {
+        tree1: { type: 'string', required: true, description: 'Newick 字符串或文件路径' },
+        tree2: { type: 'string', required: true, description: 'Newick 字符串或文件路径' },
+        detail: { type: 'boolean', description: '是否返回差异分裂明细，默认 true' },
+      },
+      op: 'phylo_compare',
+      timeoutMs: 120_000,
+    }),
+    bioTool(config, {
+      name: 'bio_rna_fold',
+      description:
+        'RNA 二级结构预测（ViennaRNA 热力学模型，首次调用自动安装）：返回最小自由能（MFE）' +
+        '结构（dot-bracket）、ΔG、碱基对列表，可选集合自由能与平均碱基对距离（结构稳定性指标），' +
+        '可输出结构示意图 PNG。用于设计验证与稳定性评估。' +
+        '触发词：RNA 二级结构、RNA 折叠、MFE、发夹、茎环、ViennaRNA、RNA 稳定性。',
+      parameters: {
+        sequence: { type: 'string', required: true, description: 'RNA 序列（DNA 会自动 T→U），内容或文件路径' },
+        output_file: { type: 'string', description: '可选，结构示意图 PNG 路径' },
+        also_ensemble: { type: 'boolean', description: '是否附加集合自由能/平均碱基对距离，默认 true' },
+      },
+      op: 'rna_fold',
+      timeoutMs: 180_000,
+    }),
+    bioTool(config, {
+      name: 'bio_sc_qc',
+      description:
+        '单细胞 RNA-seq 质控（scanpy / scverse 最佳实践，首次调用自动安装）：' +
+        '计算每细胞计数/基因数/线粒体·核糖体·血红蛋白比例 → MAD 离群过滤（默认 5/5/3）→ ' +
+        '基因低检出过滤 → 出 QC 图与前后对比图 → 保存过滤后 .h5ad。' +
+        '输入 .h5ad 或 10X Cell Ranger 的 .h5；species 决定线粒体基因前缀（human=MT-，mouse=mt-）。' +
+        '触发词：单细胞、scRNA-seq、质控、QC、MAD 过滤、线粒体比例、h5ad、10X。',
+      parameters: {
+        input_file: { type: 'string', required: true, description: '.h5ad 或 10X .h5 文件路径' },
+        output_dir: { type: 'string', description: '输出目录，默认工作区 sc_qc/' },
+        species: { type: 'string', enum: ['human', 'mouse', 'zebrafish', 'other'], description: '物种（决定 MT-/Rps 前缀），默认 human' },
+        mad_counts: { type: 'number', description: '总计数 MAD 阈值，默认 5' },
+        mad_genes: { type: 'number', description: '基因数 MAD 阈值，默认 5' },
+        mad_mt: { type: 'number', description: '线粒体比例 MAD 阈值，默认 3' },
+        min_genes: { type: 'number', description: '细胞最少检出基因数，默认 200' },
+        min_cells: { type: 'number', description: '基因最少被检出细胞数，默认 3' },
+        mt_cap: { type: 'number', description: '线粒体比例硬上限（可选，叠加在 MAD 之上）' },
+        apply_filter: { type: 'boolean', description: '是否保存过滤后 h5ad，默认 true' },
+        make_plots: { type: 'boolean', description: '是否出图，默认 true' },
+      },
+      op: 'sc_qc',
+      timeoutMs: 600_000,
+    }),
     // ---- DNA/质粒设计（2026-08-22 新增）----
     bioTool(config, {
       name: 'bio_primer_design',

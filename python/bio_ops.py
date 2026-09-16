@@ -36,6 +36,13 @@ from crispr_tools import op_crispr_guide, op_crispr_verify
 from syncheck_tools import op_dna_syncheck
 from wetlab_tools import op_wetlab_design
 from circuit_tools import op_circuit_compile, op_circuit_simulate
+# 质粒库检索（Addgene 公开目录页，零新增依赖：stdlib urllib + re）
+from plasmid_repo import op_plasmid_search, op_plasmid_info
+# 能力补缺（内含子外显子/点阵图/UniProt/树比较/RNA 折叠，2026-09-16）
+from analysis_ext import (op_seq_introns, op_seq_dotplot, op_uniprot,
+                          op_phylo_compare, op_rna_fold)
+# 单细胞 RNA-seq 质控（scanpy，第二层按需依赖，2026-09-16）
+from sc_tools import op_sc_qc
 socket.setdefaulttimeout(20)
 from retry_utils import retry_on_network_error
 
@@ -1988,6 +1995,16 @@ OPS = {
     'dna_syncheck': op_dna_syncheck,
     # 湿实验方案设计（2026-08-25 新增）
     'wetlab_design': op_wetlab_design,
+    # 质粒库检索（2026-09-16 新增，Addgene 公开目录页）
+    'plasmid_search': op_plasmid_search,
+    'plasmid_info': op_plasmid_info,
+    # 能力补缺（2026-09-16 新增，对标生信 MCP 工具集的缺口）
+    'seq_introns': op_seq_introns,
+    'seq_dotplot': op_seq_dotplot,
+    'uniprot': op_uniprot,
+    'phylo_compare': op_phylo_compare,
+    'rna_fold': op_rna_fold,
+    'sc_qc': op_sc_qc,
 }
 
 

@@ -2,7 +2,7 @@
 language: none
 ---
 
-# Skill 体系导航（49 个注册条目）
+# Skill 体系导航（50 个注册条目）
 
 > skill 是插件内置的可加载知识库（配方/工作流/坑）。加载方式：用 skill 工具按名字加载。**写非平凡代码前先加载对应领域 skill；命中协议场景直接加载协议。**
 
@@ -16,10 +16,10 @@ language: none
 |---|---|---|
 | 主 skill | `dsh-bio-genie`（唯一） | **路由中枢**：工具分层决策树、协议映射、调用规则。任何生物分析先加载它 |
 | 领域 skill | `bio-*`（17 个） | 按 **能力域**划分——按 Biopython 模块（io/seq/align/…）教「某个模块怎么用」；研究方法（生存分析/变异分析/文献综述/论文写作/证据分级）单列一类 |
-| 协议 skill | `bio-proto-*`（17 个） | 按 **高频任务**划分（质控/建树/富集/绘图/差异表达/GSEA…）——教「某类任务怎么完整做完」，含可执行代码模板 + 常见坑 |
+| 协议 skill | `bio-proto-*`（19 个） | 按 **高频任务**划分（质控/建树/富集/绘图/差异表达/GSEA…）——教「某类任务怎么完整做完」，含可执行代码模板 + 常见坑 |
 | 指南 skill | `dsh-bio-genie-guide-*`（8 个） | 插件**整体说明书**——教「这个插件怎么用」，按主题划分 |
 
-合计：主 1 + 领域 17 + 研究 5 + 协议 18 + 指南 8 = **49 个注册条目（不含主 skill 为 48 个）**。
+合计：主 1 + 领域 17 + 研究 5 + 协议 19 + 指南 8 = **50 个注册条目（不含主 skill 为 49 个）**。
 
 ### 维度二：按语言解释器（这个 skill 的代码跑在哪个环境）
 
@@ -94,6 +94,8 @@ language: none
 | `bio-proto-enrichment-workflow` | 富集解读：多库交叉/背景集/冗余消除/OLS4 消歧 |
 | `bio-proto-literature-review` | 文献调研：PubMed 检索式/批量摘要/OpenAlex 补充 |
 | `bio-proto-pub-figure` | **出版级出图执行**：10 类图配方/显著性标注/多面板 GridSpec/figurelib 调用/自检闭环 |
+| `bio-proto-differential-figure` | 差异结果出图：volcano/MA 图配方（阈值线/标注/配色合规） |
+| `bio-proto-ngs-pipeline` | **NGS 重型流程**（nf-core/Nextflow）：环境门（Docker/Java/Nextflow 必须全过）→ 测试档先行 → 样本表脚本校验 → 决策点确认 → 产物验证（MultiQC + 日志 + 文件三条都看） |
 | `bio-proto-coords` | 基因组坐标：0/1-based 转换/BED-GFF-VCF 惯例/GRCh37-38/左对齐 |
 | `bio-proto-statistics` | 统计：检验选择/scipy+statsmodels 模板/多重校正/效应量对照/样本量与功效规划 |
 

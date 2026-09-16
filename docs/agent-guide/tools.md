@@ -2,7 +2,7 @@
 language: none
 ---
 
-# 工具全参考（53 个）
+# 工具全参考（62 个）
 
 > 每个工具：功能 → 参数（★=必填）→ 返回关键字段 → 典型触发词。**选工具第一优先，`bio_python` 执行器第二优先**。
 
@@ -93,6 +93,16 @@ language: none
 
 **bio_seq_restriction** — 限制酶位点：`sequence ★`、`enzymes`（酶名列表，不传=全部商业常用酶 ~700 种）、`enzyme_set`（commonly/all）、`linear`（默认 true）、`detail`（默认 `false` 摘要模式：**未指定酶时每位点仅返回识别位点+计数**（避免全库扫描超长输出），指定酶时每酶最多 10 个坐标 + `cut_positions_truncated` 标记；`true` 返回全部坐标）。返回 `{sites: {酶名: {cut_positions, recognition_site, count}}, coordinate_base, cut_positions_are, requested?, missing_enzymes?}`。cut_positions 是 **1-based 切点坐标**（切点后第一个碱基，≠ 识别位点起始，偏移由酶切模式决定）。
 
+**bio_seq_introns** — 内含子-外显子结构：`accession`（**基因组类**登录号 NG_/NC_，如 `NG_005905`）或 `genbank_file`（二选一）、`gene`（按 gene/locus_tag **精确**匹配，不区分大小写）、`max_features`（默认 10）。返回 `{record_id, record_length, organism, count, available_genes, transcripts[{feature_type, name, gene, strand, location, exon_count, intron_count, exons[{start,end,length}], introns[{start,end,length,donor_dinucleotide,acceptor_dinucleotide,splice_class}], protein_length_aa, coding_length_bp}], splice_summary{total_introns, canonical_GT_AG, canonical_fraction}}`。
+**坐标约定**：均为基因组坐标的 **1-based 闭区间**，且**按转录方向（5′→3′）排序**——负链基因的外显子坐标因此**递减**；其 donor/acceptor 已反向互补到转录方向后再判定 GT-AG（直接取基因组首末二核苷酸会把正负链混为一谈，经典 GT-AG 会全判错）。
+**基因过滤为精确匹配**：product 描述常提及邻近基因名（NBR1 的 product 写着 "next to BRCA1 gene 1 protein"），子串匹配会让查 BRCA1 的用户拿到 NBR1。未匹配时返回 `available_genes` 全清单便于纠正。
+**其他**：同一基因同时有 CDS 与 mRNA 注释时只返回 CDS（外显子集合相同且不含 UTR）；成熟 mRNA 与原核记录本无内含子，工具会明确说明（不会返回空结果冒充"没查到"）。
+
+**bio_rna_fold** — RNA 二级结构预测（ViennaRNA，首次调用自动装）：`sequence ★`（RNA；DNA 自动 T→U）、`output_file`（可选结构示意图 PNG）、`also_ensemble`（默认 true）。返回 `{sequence_length, structure_dot_bracket, mfe_kcal_per_mol, base_pairs, pair_list[{i,j,pair}], gc_fraction, ensemble{free_energy_ensemble_kcal_per_mol, mfe_structure_agrees, mean_base_pair_distance}}`。**ΔG 越负越稳**；`mean_base_pair_distance` 越小结构越确定（越大说明存在多个竞争构象）。预测结构非实验结构，引用时注明。
+
+**bio_sc_qc** — 单细胞 RNA-seq 质控（scanpy，首次调用自动装）：`input_file ★`（`.h5ad` 或 10X `.h5`）、`output_dir`（默认工作区 `sc_qc/`）、`species`（human/mouse/zebrafish/other，**决定线粒体基因前缀：human=`MT-`，mouse=`mt-`，选错 MT% 恒为 0**）、`mad_counts`/`mad_genes`/`mad_mt`（MAD 阈值，默认 5/5/3）、`min_genes`（默认 200）、`min_cells`（默认 3）、`mt_cap`（线粒体%硬上限，可选）、`apply_filter`（默认 true）、`make_plots`（默认 true）。
+返回 `{cells_raw, genes_raw, cells_after_filter, cells_removed, cells_retained_fraction, qc_before{median_*}, thresholds{counts_range, genes_range, pct_mt_max, ...}, filter_breakdown{failed_counts_mad, failed_genes_mad, failed_mt_mad, failed_min_genes}, genes_after_filter, filtered_file, with_qc_file, qc_figure, comparison_figure}`。MAD 过滤按 scverse 最佳实践（先 log1p 再算中位数绝对偏差）。
+
 ### 比对与系统发育
 
 **bio_blast_search** — 远程 BLAST（NCBI qblast）：`sequence ★`、`program`（blastn/blastp/blastx，默认 blastn）、`database`（默认 nt 或 nr）、`hitlist_size`（默认 10）、`expect`。**qblast 服务端排队 1-10 分钟属正常，不要重复调用**。返回命中 accession/描述/e-value/score/一致性。
@@ -100,6 +110,10 @@ language: none
 **bio_msa** — 多序列比对：`sequences`（FASTA 字符串）或 `file_path`（二选一）、`program`（clustalw/muscle，默认 clustalw）。调用本机 clustalw/muscle 二进制；缺失时返回 `status=program_missing` 友好提示。返回 Clustal+FASTA 双格式比对、共识序列、保守性统计。
 
 **bio_phylo_build** — 建树：`alignment`（可接 bio_msa 的 alignment_fasta）或 `alignment_file`、`format`（默认 fasta）、`method`（nj/upgma）、`out_file`（可选写 Newick）。返回 Newick 字符串、叶节点数、总枝长。
+
+**bio_phylo_compare** — 树比较：`tree1 ★` / `tree2 ★`（Newick 字符串或文件路径）、`detail`（默认 true）。返回 `{shared_leaves, tree1_splits, tree2_splits, shared_splits, robinson_foulds_distance, max_possible_rf, normalized_rf, trees_identical_topology, splits_only_in_tree1[], splits_only_in_tree2[]}`。**RF 为无根树分裂对称差**（0 = 拓扑完全一致；归一化值 0-1）。两棵树叶名须为同一套，缺失叶自动剪除并在 `dropped_from_*` 列出；<4 个共有叶会拒绝比较。
+
+**bio_seq_dotplot** — 序列点阵图：`seq1 ★` / `seq2 ★`（内容或文件路径）、`window`（默认 15）、`threshold`（一致性阈值 0-1，默认 0.7）、`output_file`（默认工作区 `dotplot.png`）。返回 `{dots, dot_density, main_diagonal_hits, self_comparison, output_file, anchor_step}`。同源区段=主对角，反向重复=副对角，串联重复=平行带。锚点超 3000 自动步进降采样。
 
 ### 数据检索（网络）
 
@@ -116,6 +130,13 @@ language: none
 **bio_pubmed_abstract** — 结构化摘要：`ids ★`（PMID 列表）、`email`。返回 `{db, count, results[{pmid, title, abstract, authors[], journal, date, doi}]}`。一次 ≤30 个 PMID。
 
 **bio_ref_genome** — 参考基因组信息：`species ★`（human/mouse/rat/zebrafish/fly/yeast/arabidopsis/ecoli 等常用名或 Ensembl 目录名）。返回 `{species, assembly_name, assembly_accession, assembly_date, karyotype, chromosomes[{name, length}], scaffold_count, download_urls}`。
+
+**bio_uniprot** — UniProt 蛋白知识库（真实 REST）：`accession`（UniProt 号，如 P38398）、`mode`（`entry` 默认完整摘要 / `ptm` 修饰位点+证据码 / `xref` 交叉引用按库归并 / `pathway` 通路 / `sequence` FASTA / `search` 关键词检索）、`query`（search 模式检索式）、`limit`（search 默认 10）。
+`entry` 返回 `{protein{accession, entry_name, protein_name, genes[], organism, taxon_id, length, mass_da, function[]}, feature_counts, key_features[], xref_database_count}`；`ptm` 返回 `{ptm_counts, total_sites, sites_by_type}`（Modified residue / Cross-link / Glycosylation / Lipidation / Disulfide bond，位点为 1-based 序列坐标 + ECO 证据码）；`xref` 返回 `{database_counts, database_total, xref_total}`（GO/RefSeq/PDB/Reactome/KEGG 等，100+ 库）。**蛋白注释不要绕道 bio_entrez_fetch**，UniProt 粒度远高。
+
+**bio_plasmid_search** — Addgene 质粒库检索（实时抓取公开目录页，无需登录）：`query ★`、`limit`（默认 20，上限 50）、`sort`（relevance/newest/oldest/alpha_asc/alpha_desc）。返回 `{total_matches, returned, truncated, results[{addgene_id, name, category, purpose, depositor, publication, insert, use, popularity, url}]}`。**只给检索与元数据，不给序列**——序列需用户在 Addgene 登录后获取。空结果只代表 Addgene 确无匹配；结构变化会**响亮报错**而非静默返回空。
+
+**bio_plasmid_info** — 按 ID 取质粒完整元数据：`plasmid_id ★`（如 `"52961"` = lentiCRISPR v2）。返回 `{name, description, fields{...30+ 字段}, sections{按节分组}, sequence_access{sequences_page, login_required, how_to_get}}`。字段含 Purpose / Bacterial Resistance(s) / Copy number / Growth Strain(s) / Growth Temperature / Vector type / Selectable markers / Total vector size (bp) / Promoter / Tag / Insert Size (bp) / Cloning method / 5′·3′ cloning site 与测序引物等。
 
 ### 出版级绘图
 
@@ -145,6 +166,14 @@ language: none
 | "这组基因富集到哪些通路" | `bio_enrichr`（×2-3 个库交叉） |
 | "查 CRISPR 相关文献" | `bio_pubmed_search` → `bio_pubmed_abstract` |
 | "人类参考基因组版本" | `bio_ref_genome species=human` |
+| "找个现成的 CRISPR 质粒 / 有没有人做过" | `bio_plasmid_search` → `bio_plasmid_info` |
+| "这个质粒的抗性/拷贝数/启动子" | `bio_plasmid_info plasmid_id=52961` |
+| "这个蛋白的功能/PTM/结构/通路" | `bio_uniprot`（mode 切换；PTM 用 mode=ptm） |
+| "这个基因的内含子外显子/剪接位点" | `bio_seq_introns`（需 NG_/NC_ 登录号） |
+| "两棵进化树是否一致" | `bio_phylo_compare`（RF 距离） |
+| "看序列有没有重复/重排" | `bio_seq_dotplot` |
+| "这条 RNA 的二级结构/稳不稳" | `bio_rna_fold` |
+| "单细胞数据质控/过滤低质量细胞" | `bio_sc_qc` |
 | "这组数据怎么画/画成论文图" | `bio_fig_profile` → bio_python 画 → `bio_fig_export` 审计 |
 | "中文图会不会出方框" | `bio_fig_qa` |
 | "图配色/投稿自查" | 画完 → `bio_fig_lint`（红绿对/rainbow/灰度/统计元数据自检） |

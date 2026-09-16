@@ -1,5 +1,5 @@
 /**
- * dsh-bio-genie — skill 目录（39 个领域/研究/协议 skill + 1 个 genie 主 skill + 8 份指南，共 48 个注册条目）
+ * dsh-bio-genie — skill 目录（41 个领域/研究/协议 skill + 1 个 genie 主 skill + 8 份指南，共 50 个注册条目）
  *
  * 每个 skill body 在插件加载时从 skills/*.md 读入，经 ctx.skills.register
  * 注册为 embedded runtime skill（不依赖文件系统发现，实现"one is all"）。
@@ -8,7 +8,7 @@
  *   - main:     主 skill（dsh-bio-genie，注册见 src/index.js 的 GENIE_SKILL_CONTENT）
  *   - domain:   Biopython 领域（17 个）
  *   - research: 科研方法（5 个，含证据分级与结论强度）
- *   - protocol: 协议库——高频任务的可执行工作流（17 个）
+ *   - protocol: 协议库——高频任务的可执行工作流（19 个）
  *   - guide:    docs/agent-guide 说明书（走 GUIDE_MANIFEST，8 份）
  *
  * @module dsh-bio-genie/skills
@@ -231,6 +231,12 @@ export const SKILL_MANIFEST = [
     description: '统计分析协议：检验选择决策树、scipy/statsmodels 模板、多重校正、效应量对照、样本量与功效规划、实验设计、统计陷阱表。',
     file: 'protocols/statistics.md',
   },
+  {
+    name: 'bio-proto-ngs-pipeline',
+    category: 'protocol',
+    description: 'NGS 重型流程协议（nf-core/Nextflow）：环境门、测试档先行、样本表校验、决策点、产物验证。',
+    file: 'protocols/ngs-pipeline.md',
+  },
   // ---- 科研专精（preset skills，含统计严谨性 + 完整代码模板）----
   {
     name: 'bio-survival-analysis',
@@ -435,6 +441,13 @@ language: mixed
 | bio_entrez_search / bio_entrez_fetch | NCBI 检索/取序列（db=gene 有基因元数据摘要） |
 | bio_enrichr | 通路/GO 富集分析（基因符号列表 → p 值排序条目） |
 | bio_pubmed_search / bio_pubmed_abstract | PubMed 文献检索 / 结构化摘要 |
+| bio_plasmid_search / bio_plasmid_info | Addgene 质粒库检索（找现成质粒）/ 按 ID 取完整元数据（抗性/拷贝数/启动子/插入片段） |
+| bio_uniprot | UniProt 蛋白知识库（mode=entry/ptm/xref/pathway/sequence/search） |
+| bio_seq_introns | 内含子-外显子结构与剪接位点（GenBank 多段 CDS → 外显子/内含子坐标 + GT-AG 判定） |
+| bio_seq_dotplot | 序列点阵图（滑窗一致性 → 相似区段/重复/重排 + 300 DPI PNG） |
+| bio_phylo_compare | 系统发育树比较（Robinson-Foulds 距离 + 拓扑差异明细） |
+| bio_rna_fold | RNA 二级结构预测（ViennaRNA MFE + ΔG + 碱基对，可出结构图） |
+| bio_sc_qc | 单细胞 RNA-seq 质控（scanpy：指标 → MAD 过滤 → 出图 → 保存 h5ad） |
 | bio_ref_genome | 参考基因组 assembly 信息（Ensembl） |
 | bio_fig_profile | 数据剖析 + 图型建议（画统计图前先跑） |
 | bio_fig_export | 图文件合规审计（DPI/格式/尺寸/字体嵌入）+ 可选 PNG 预览 |
@@ -531,6 +544,10 @@ language: mixed
 19. DNA 合成前置检查：合成前用 bio_dna_syncheck 评估可合成性（GC/同聚物/发夹/重复），critical 问题需先解决再送合成公司；合成后用 bio_dna_syncheck 复查合成产物序列。
 21. 文献与证据路由：系统综述/PRISMA 流程用 bio-literature-review；判断「这批文献谁更强、结论能说多强」用 bio-evidence-appraisal（证据层级 + GRADE + 四轴 + 措辞边界）；所有引用必须经 bio_pubmed_search 核验，**禁止凭记忆写 PMID/DOI**。
 20. 湿实验方案：干实验结论转湿实验 protocol 用 bio_wetlab_design（protocol_type 指定方案类型，input_data 传上游工具输出）。典型链路：bio_primer3_design → bio_wetlab_design(pcr_amplification)；bio_clone_simulate → bio_wetlab_design(gibson_assembly)；bio_crispr_guide → bio_wetlab_design(crispr_editing)；bio_gene_knockout(optknock) → bio_wetlab_design(strain_construction)。
+22. 质粒库检索路由：用户要"找现成质粒/有没有人做过"（描述功能而非给 ID）→ bio_plasmid_search 检索 Addgene，命中后用 bio_plasmid_info 取完整字段（抗性/拷贝数/启动子/生长菌株/插入片段），再按需接 bio_plasmid_map / bio_clone_simulate / bio_dna_syncheck 做下游设计。**边界：本工具只给检索与公开元数据，不给序列**——序列需用户在 Addgene 登录后自行下载；不要声称已取得序列、不要编造序列。引用质粒必须给出 Addgene ID 与名称。检索为实时抓取，结构化失败会响亮报错（空结果只代表 Addgene 确实无匹配）。
+23. 蛋白注释路由：查蛋白功能/PTM/交叉引用/通路/序列用 bio_uniprot（mode 参数切换），**不要用 bio_entrez_fetch 绕道去取蛋白注释**——UniProt 的注释粒度远高于 GenBank。PTM 位点为序列坐标且带证据码；通路取自交叉引用，可再交叉核对 KEGG（bio_pathway_search）。
+24. 基因结构路由：内含子-外显子与剪接位点用 bio_seq_introns（需**基因组类**登录号 NG_/NC_；gene 参数是**精确匹配**——product 描述常提及邻近基因名，子串匹配会串基因；未匹配时工具返回 available_genes 供纠正；坐标按转录方向排序，负链递减）；建树一致性用 bio_phylo_compare（RF 距离 0 = 拓扑一致；比较前两棵树叶名须归一）；序列相似区段/重复/重排的可视化核验用 bio_seq_dotplot。
+25. RNA 结构与单细胞路由：RNA 二级结构/稳定性用 bio_rna_fold（MFE ΔG 越负越稳；mean_base_pair_distance 越小结构越确定）；单细胞数据质控用 bio_sc_qc（species 选错会导致 MT% 恒为 0——human 用 MT- 前缀、mouse 用 mt-）。二者首次调用自动装依赖（ViennaRNA / scanpy），提示用户等待。
 
 
 ## 自动代码修复（ACR）— 三层职责边界
