@@ -10,12 +10,23 @@
  *
  * 注意：直接调 spawnPython（本测试为此将其导出）；真 bridge 用例用系统 python。
  */
-import { writeFileSync, mkdtempSync, rmSync } from 'node:fs'
-import { join } from 'node:path'
-import { tmpdir } from 'node:os'
+import { writeFileSync, mkdtempSync, rmSync, existsSync } from 'node:fs'
+import { join, resolve } from 'node:path'
+import { tmpdir, homedir } from 'node:os'
 import { spawnPython } from '../src/python.js'
 
-const PYTHON = process.argv[2] || 'C:/Users/shuai/miniconda3/python.exe'
+// python 解析（与 test-ops.mjs 的 findPython 同款优先级）：
+//   DSH_BIO_PYTHON 环境变量 → DSH_HOME/dsh-bio-genie/python-env → PATH 上的 python
+// 注意必须用 bundled venv：bridge.py 需要 Biopython，系统 python 会被自检拒绝。
+function findPython() {
+  if (process.env.DSH_BIO_PYTHON) return process.env.DSH_BIO_PYTHON
+  const home = process.env.DSH_HOME ?? join(homedir(), '.dsh')
+  const venv = join(home, 'dsh-bio-genie', 'python-env')
+  const exe = process.platform === 'win32' ? join(venv, 'Scripts', 'python.exe') : join(venv, 'bin', 'python')
+  return existsSync(exe) ? exe : 'python'
+}
+
+const PYTHON = process.argv[2] || findPython()
 
 const tmp = mkdtempSync(join(tmpdir(), 'genie-exitcode-'))
 const fakeBridge = join(tmp, 'fake_bridge.py')

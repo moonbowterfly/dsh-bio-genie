@@ -15,6 +15,7 @@
 import io
 import os
 import sys
+import time
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(_HERE, '..', 'python'))
@@ -31,7 +32,7 @@ def check(cond, msg):
         print(f'  FAIL {msg}')
 
 
-from bio_ops import _decide_blast_params, _blast_diagnostics, op_blast_search  # noqa: E402
+from bio_ops import _decide_blast_params, _blast_diagnostics, op_blast_search, BlastQueueTimeout  # noqa: E402
 from Bio.Blast import NCBIWWW  # noqa: E402
 import retry_utils  # noqa: E402
 
@@ -245,6 +246,49 @@ check(raised is not None and
       'NCBI BLAST 服务可能暂时不可达或被限流——可稍后重试，或改用 Entrez 直接下载序列做本地比对' in str(raised),
       '重试耗尽文案含指定回退指引')
 check(sleep_calls == [5, 10], f'@retry_on_network_error 重试保留（延迟序列 {sleep_calls} → 共 3 次尝试）')
+
+retry_utils.time.sleep = _real_sleep
+NCBIWWW.qblast = _real_qblast
+
+# ================================================================ 4) qblast 排队 deadline（2026-09-19 修复）
+# 真实事故：23nt + expect=0.001 的 qblast 在服务端排队 >600s，被 TS 执行层硬杀、无返回体。
+# 修复：本地施加总 deadline（默认 540s < 600s 硬杀线），超时主动放弃并抛
+# BlastQueueTimeout（刻意不继承 TimeoutError/OSError → 不触发网络重试——排队重试无意义）。
+print('[4] qblast 排队 deadline（本地主动放弃，不参与网络重试）')
+
+_deadline_calls = []
+
+
+def _slow_qblast(program, database, sequence, **kwargs):
+    _deadline_calls.append(1)
+    time.sleep(3)  # 模拟 NCBI 服务端排队（3s > 1s deadline）
+    return io.StringIO(_XML_HEAD.format(qlen=len(sequence), hits=''))
+
+
+# 注意：**不要** stub retry_utils.time.sleep——它与被测代码共享同一个 time 模块，
+# 会把上面模拟排队的 sleep 也变成 no-op。deadline 正确生效时本路径不会发生重试，
+# sleep 不会被调用；若代码错误地进入重试路径，_deadline_calls 计数断言会抓住它。
+NCBIWWW.qblast = _slow_qblast
+
+raised = None
+_t0 = time.time()
+try:
+    op_blast_search({'sequence': SEQ23, 'expect': 0.001, 'queue_deadline_s': 1})
+except BaseException as e:  # noqa: BLE001 - 测试要捕获任意异常类型做断言
+    raised = e
+_elapsed = time.time() - _t0
+
+check(isinstance(raised, BlastQueueTimeout),
+      f'排队超时 → BlastQueueTimeout（实际 {type(raised).__name__}）')
+check(raised is not None and '排队' in str(raised) and '稍后重试' in str(raised),
+      '超时文案含排队解释与可行动指引')
+check(len(_deadline_calls) == 1,
+      f'排队超时不触发网络重试（qblast 调用 {len(_deadline_calls)} 次，期望 1）')
+check(_elapsed < 2.5, f'1s deadline 快速返回（实际 {_elapsed:.1f}s，未等满 3s 的排队模拟）')
+
+# 4b) deadline 参数缺省时用模块默认值；非法值被钳制到 >=1s（防御）
+check(1.0 <= float(getattr(__import__('bio_ops'), '_QBLAST_DEADLINE_S', 0)) <= 600,
+      '_QBLAST_DEADLINE_S 默认值在执行层硬杀线（600s）以内')
 
 retry_utils.time.sleep = _real_sleep
 NCBIWWW.qblast = _real_qblast

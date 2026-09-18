@@ -380,6 +380,14 @@ def op_seq_kmer(args):
     }
 
 
+# 常用 Entrez 数据库清单（报错指引用；2026-09-19 审计 P2：db='patents' 时
+# Bio.Entrez 的 'Invalid db name' 原样透传、调用方无从知道可用库）。不拦截
+# 合法用法（E-utilities 直通），只在「Invalid db name」报错时给出可行动清单。
+_ENTREZ_COMMON_DBS = ('pubmed', 'protein', 'nucleotide', 'nuccore', 'gene', 'genome',
+                      'assembly', 'bioproject', 'biosample', 'snp', 'structure',
+                      'taxonomy', 'pmc', 'mesh', 'geo')
+
+
 @retry_on_network_error(max_retries=2, delay=3)
 def op_entrez_search(args):
     """NCBI Entrez 检索：esearch + efetch 摘要。"""
@@ -390,8 +398,18 @@ def op_entrez_search(args):
     email = args.get('email', None)
     if email:
         Entrez.email = email
-    handle = Entrez.esearch(db=db, term=term, retmax=retmax)
-    search = Entrez.read(handle)
+    try:
+        handle = Entrez.esearch(db=db, term=term, retmax=retmax)
+        search = Entrez.read(handle)
+    except RuntimeError as e:
+        if 'Invalid db name' in str(e):
+            raise ValueError(
+                f'不支持的 Entrez 数据库: {db!r}（NCBI 报错原文: {e}）。'
+                f'常用库: {", ".join(_ENTREZ_COMMON_DBS)}。'
+                f'注意：本工具走 NCBI E-utilities，不包含专利库；完整 db 列表见 '
+                f'https://www.ncbi.nlm.nih.gov/books/NBK25497/'
+            ) from e
+        raise
     handle.close()
     ids = search.get('IdList', [])
     summaries = []
@@ -1690,6 +1708,52 @@ def _blast_diagnostics(sequence, program, params_used, warnings, hit_count,
     return {'query_length': length, 'params_used': dict(params_used), 'notes': notes}
 
 
+# ── qblast 排队 deadline（2026-09-19 审计修复）──────────────────────────────
+# 真实事故（会话 924dd607）：23nt + expect=0.001 的 qblast 在 NCBI 服务端排队
+# >600s，被 TS 执行层硬杀（python execution timed out after 600000 ms），agent
+# 只拿到裸超时文案、无任何指引。qblast 的排队时长由 NCBI 控制、进程内无法中断
+# 其轮询，因此在本层施加**总 deadline** 主动放弃（默认 540s，后于执行层 600s
+# 硬杀线留 60s 余量），换取结构化、可行动的返回文案。
+_QBLAST_DEADLINE_S = 540
+
+
+class BlastQueueTimeout(Exception):
+    """BLAST 服务端排队超过本地等待上限——主动放弃本次等待。
+
+    **刻意不继承** TimeoutError/OSError：@retry_on_network_error 会重试那两类，
+    而排队超时重试只会再排一次队（每次 9 分钟）——正确处置是带指引冒泡给调用方。
+    """
+
+
+def _qblast_with_deadline(program, database, sequence, kwargs, deadline_s=_QBLAST_DEADLINE_S):
+    """在 daemon 线程里跑 NCBIWWW.qblast 并施加总 deadline；超时抛 BlastQueueTimeout。"""
+    import threading
+    from Bio.Blast import NCBIWWW
+
+    deadline_s = max(1.0, float(deadline_s))
+    holder: dict = {}
+
+    def _worker():
+        try:
+            handle = NCBIWWW.qblast(program, database, sequence, **kwargs)
+            holder['xml'] = handle.read()
+        except BaseException as exc:  # noqa: BLE001 - 原样带回主线程重抛
+            holder['error'] = exc
+
+    t = threading.Thread(target=_worker, name='dshbio-qblast', daemon=True)
+    t.start()
+    t.join(timeout=deadline_s)
+    if t.is_alive():
+        raise BlastQueueTimeout(
+            f'BLAST 服务端排队超过本地等待上限（{int(deadline_s)} 秒），已主动放弃本次等待。'
+            f'qblast 排队时长由 NCBI 控制（1-10 分钟属常态，繁忙时更长）——'
+            f'建议稍后重试，或缩小 hitlist_size / 换更长的查询区段 / 改用 Entrez 下载候选做本地比对。'
+        )
+    if 'error' in holder:
+        raise holder['error']
+    return holder['xml']
+
+
 @retry_on_network_error(max_retries=2, delay=5)
 def op_blast_search(args):
     """远程 BLAST 搜索：NCBIWWW.qblast + NCBIXML 解析。
@@ -1716,8 +1780,11 @@ def op_blast_search(args):
     kwargs = {'hitlist_size': hitlist_size, **blast_kwargs}
 
     try:
-        handle = NCBIWWW.qblast(program, database, sequence, **kwargs)
-        xml = handle.read()
+        xml = _qblast_with_deadline(program, database, sequence, kwargs,
+                                    deadline_s=float(args.get('queue_deadline_s') or _QBLAST_DEADLINE_S))
+    except BlastQueueTimeout:
+        # 排队超时：不参与网络重试（见类文档），直接带指引冒泡给调用方
+        raise
     except (ConnectionError, TimeoutError, OSError) as e:
         # 走到这里说明 @retry_on_network_error 的重试已耗尽（装饰器会重试本函数，
         # 最终抛出上一次的异常）。把原始网络异常换成带回退指引的文案——main() 以

@@ -30,6 +30,15 @@ function callOp(op, args = {}) {
     encoding: 'utf8',
     timeout: 180_000,
   })
+  // 桥契约：bio_ops.py 恒正常退出——异常也以 ok:false JSON 返回、exit 0。
+  // status !== 0（含 null=被信号杀/超时）= 契约被破坏：即使 stdout 是合法 JSON
+  // 也必须判失败（2026-09-19 审计 P1：旧实现只解析 stdout，异常退出被静默吞掉）。
+  if (r.status !== 0) {
+    return {
+      ok: false,
+      error: `python 非正常退出 (status=${r.status}, signal=${r.signal ?? 'null'}): ${String(r.stderr).slice(-300)}`,
+    }
+  }
   try {
     const line = (r.stdout ?? '').trim().split('\n').pop()
     return JSON.parse(line)

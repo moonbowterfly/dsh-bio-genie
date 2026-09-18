@@ -25,15 +25,18 @@ const GUIDES_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'docs', '
 /** Cordis 插件名（cordis.patch.yml 的 row id）。 */
 export const name = 'dsh-bio-genie'
 
-/** 需要的服务。
+/** 需要的**必选**服务。
  *
- * tools/skills/systemPrompt 之外新增 'webServer'：浏览器侧设置面板的
- * /api/dsh-bio-genie/* 路由（skill 清单 / Python 包列表）
- * 注册在 webServer 上，路由细节见 src/server.js。webServer 是 dsh 宿主
- * 服务，第三方插件无法在缺少它的部署中提供面板的动态数据；这种部署
- * 下面板会优雅降级（静态部分照常渲染，RPC 端点返回 ok:false）。
+ * webServer 是**可选**服务（非 web 部署不提供）——曾经它在这里，导致缺少
+ * webServer 的宿主中整个插件保持 pending、apply() 永不执行、全部工具注册为 0
+ * （2026-09-19 审计发现，与 dsh-bio-gem 同款问题的修复模式对齐）。
+ *
+ * 现在改用 apply() 内的动态注入 ctx.inject(['webServer'], cb)（官方 dsh 插件
+ * 同款模式）：webServer 可用时注册浏览器侧设置面板的 /api/dsh-bio-genie/*
+ * 路由（skill 清单 / Python 包列表 / addons / 代谢与编辑域数据）；不可用时
+ * 62 个工具与 50 个 skill 照常注册，面板静态部分照常渲染。
  */
-export const inject = ['tools', 'skills', 'systemPrompt', 'webServer']
+export const inject = ['tools', 'skills', 'systemPrompt']
 
 /** 插件配置默认值（不导出 schemastery schema，避免版本差异）。 */
 const DEFAULT_CONFIG = {
@@ -59,10 +62,12 @@ export function apply(ctx, config) {
   // 内部全部 try/catch，任何异常不影响 agent 循环。
   registerRigorGuard(ctx)
 
-  // 设置面板 RPC 路由（loopback-only）：skill 清单 / Python 包列表。
-  // registerApiRoutes 内部用 ctx.webServer.register 注册路由，若 webServer
-  // 不可用 cordis 会自动降级（inject = ['webServer'] 排队等待）。
-  ctx.effect(() => registerApiRoutes(ctx, cfg), 'dsh-bio-genie: api routes')
+  // 设置面板 RPC 路由（loopback-only）：skill 清单 / Python 包列表 / 域数据。
+  // webServer 是可选服务——动态注入：可用时注册路由；不可用时什么都不做，
+  // 插件其余部分（62 工具 + 50 skill + rigor-guard）已在上方完成注册。
+  ctx.inject(['webServer'], (webCtx) => {
+    webCtx.effect(() => registerApiRoutes(webCtx, cfg), 'dsh-bio-genie: api routes')
+  })
 
   // 后台预热（不阻塞加载；失败不致命，工具调用时会重试）
   if (cfg.warmUp !== false) {
