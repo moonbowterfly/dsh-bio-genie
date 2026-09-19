@@ -50,6 +50,10 @@ npx -y @deepseek-ai/dsh plugin --profile web add github:moonbowterfly/dsh-bio-ge
 
 # 方式三：从本地目录安装（开发调试）
 npx -y @deepseek-ai/dsh plugin --profile web add ./dsh-bio-genie
+
+# 方式四：从本地 tarball 安装（npm pack 产物＝发布形态；适合发布前冷启动验证）
+cd /path/to/dsh-bio-genie && npm pack
+npx -y @deepseek-ai/dsh plugin --profile web add ./dsh-bio-dsh-bio-genie-0.6.35.tgz
 ```
 
 `--profile <name>` 是**必填选项**（不传报 `required option '--profile <name>' not specified`），Web 端固定用 `web`。
@@ -69,7 +73,7 @@ pnpm v11 默认拦截依赖的 lifecycle 脚本，而本包的 `postinstall` 正
 `~/.dsh/.agent-presets/bio-genie/`**。安装时若打印：
 
 ```
-[ERR_PNPM_IGNORED_BUILDS] Ignored build scripts: @dsh-bio/dsh-bio-genie@0.6.25
+[ERR_PNPM_IGNORED_BUILDS] Ignored build scripts: @dsh-bio/dsh-bio-genie@0.6.35
 ```
 
 表示 preset 没装上——工具都在，但 dsh 预设选择器里**没有「生物基因精灵」**。在 profile 目录批准一次即可：
@@ -79,7 +83,14 @@ cd ~/.dsh/profiles/web && pnpm approve-builds     # 或 pnpm approve-builds --al
 ```
 
 批准后 pnpm 会把确切的键写进 `~/.dsh/profiles/web/pnpm-workspace.yaml` 的 `allowBuilds`。
-注意键会随安装方式变化：**从 GitHub 源安装时键含 commit 哈希，仓库每更新一次 commit 就得重新批准一次**；从 npm 安装的键是版本号，只在升版本时变。
+注意键会随安装方式变化：**从 GitHub 源安装时键含 commit 哈希，仓库每更新一次 commit 就得重新批准一次**；
+从 npm 安装的键是版本号，只在升版本时变；**从本地 tarball 安装的键含 tgz 文件路径**。
+
+**免交互批准（脚本化 / 远程场景，2026-09-19 实测）**：不用开交互式的 `pnpm approve-builds`——
+直接编辑 `~/.dsh/profiles/web/pnpm-workspace.yaml`，把 `allowBuilds` 下对应键的值从
+占位符 `set this to true or false` 改成 `true`，然后**重跑一次同一条 `dsh plugin add` 命令**，
+pnpm 会自动补跑被拦的 postinstall（输出 `[install-preset] preset installed → ...`）。等价流程也可用
+`pnpm approve-builds` 完成（它写的就是同一个键）。
 
 兜底：`node scripts/install-preset.js` 手动复制（见下文「手动安装 / 卸载」）。
 
