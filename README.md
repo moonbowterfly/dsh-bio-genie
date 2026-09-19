@@ -53,10 +53,12 @@ npx -y @deepseek-ai/dsh plugin --profile web add ./dsh-bio-genie
 
 # 方式四：从本地 tarball 安装（npm pack 产物＝发布形态；适合发布前冷启动验证）
 cd /path/to/dsh-bio-genie && npm pack
-npx -y @deepseek-ai/dsh plugin --profile web add ./dsh-bio-dsh-bio-genie-0.6.35.tgz
+npx -y @deepseek-ai/dsh plugin --profile web add ./dsh-bio-dsh-bio-genie-0.6.36.tgz
 ```
 
 `--profile <name>` 是**必填选项**（不传报 `required option '--profile <name>' not specified`），Web 端固定用 `web`。
+
+**引擎兼容（2026-09-19）**：本版本经 dsh **0.1.5-rc.2** 走廊逐卡走查（v0.1.3-alpha.2 → 0.1.5-rc.2 的 4 个边共 55 张变更卡全部核对：零适配命中）与实机验证（全新安装 + 工具注册 + Python 引导 + 设置面板 7 tab + 会话 E2E）。
 
 安装后重启 dsh web 服务，插件即被加载。首次启动时插件会在后台自动引导 Python
 环境（下载 uv → Python 3.12 → venv → biopython，约 1-2 分钟），之后秒级就绪。
@@ -73,7 +75,7 @@ pnpm v11 默认拦截依赖的 lifecycle 脚本，而本包的 `postinstall` 正
 `~/.dsh/.agent-presets/bio-genie/`**。安装时若打印：
 
 ```
-[ERR_PNPM_IGNORED_BUILDS] Ignored build scripts: @dsh-bio/dsh-bio-genie@0.6.35
+[ERR_PNPM_IGNORED_BUILDS] Ignored build scripts: @dsh-bio/dsh-bio-genie@0.6.36
 ```
 
 表示 preset 没装上——工具都在，但 dsh 预设选择器里**没有「生物基因精灵」**。在 profile 目录批准一次即可：
