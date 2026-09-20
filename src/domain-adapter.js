@@ -22,11 +22,15 @@ import http from 'node:http'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-/** dsh-bio-gem 对外暴露的 21 个语义化工具（面板只做展示）。 */
+/**
+ * dsh-bio-gem 对外暴露的工具清单 —— **fallback 视图**（面板在 capabilities 拉取不可用时展示）。
+ * 权威来源是 gem 自己的 /v1/capabilities（能力单源）；本清单仅覆盖 gem <0.1.13 或拉取失败场景。
+ * 同步纪律：gem 侧工具增减时由 scripts/test-gem-capabilities.mjs 的 fallback 尺寸断言提醒更新。
+ */
 export const GEM_TOOLS = [
-  'gem_build', 'gem_report', 'gem_validate', 'gem_gapfind', 'gem_gapfill', 'gem_gapseq',
+  'gem_build', 'gem_report', 'gem_validate', 'gem_quality', 'gem_gapfind', 'gem_gapfill', 'gem_gapseq',
   'gem_phenotype', 'gem_essentiality', 'gem_annotate', 'gem_media_resolve', 'gem_l3_fix',
-  'gem_biomass', 'gem_fluxscan', 'gem_sensitivity', 'gem_ledger', 'gem_benchmark',
+  'gem_biomass', 'gem_fluxscan', 'gem_sample', 'gem_sensitivity', 'gem_ledger', 'gem_benchmark',
   'gem_secretion', 'gem_double_knockout', 'gem_enrichment', 'gem_targets', 'gem_precursor_scan',
 ]
 
@@ -269,6 +273,7 @@ export async function handleDomainRequest(domain, req, res, { shapeLegacy, shape
 
   let health
   let status
+  let capabilities
   try {
     health = await fetchDomainIntegration(req, `${domain.integrationPrefix}/health`, 3_000)
     classification = classifyDomainState(domain, { probe, health })
@@ -278,12 +283,23 @@ export async function handleDomainRequest(domain, req, res, { shapeLegacy, shape
     // status 冷探测可能很慢（gem 的 WSL/gapseq 探测、graft 的计划目录扫描）；双方都有
     // 缓存 + 预热。给足余量，失败只记日志，不拖垮面板。
     status = await fetchDomainIntegration(req, `${domain.integrationPrefix}/v1/status`, 12_000)
+    // capabilities（能力单源，gem ≥0.1.13）：仅当对方在 features 里声明时才拉；
+    // 失败静默降级——面板退回域注册表里的静态工具清单（GEM_TOOLS/GRAFT_TOOLS），
+    // 不因增强项失败影响主展示路径。
+    if (Array.isArray(status?.features) && status.features.includes('capabilities')) {
+      try {
+        capabilities = await fetchDomainIntegration(req, `${domain.integrationPrefix}/v1/capabilities`, 5_000)
+      } catch (err) {
+        log.warn(`[dsh-bio-genie] ${domain.id} capabilities fetch failed (fallback to static manifest):`,
+          err?.message)
+      }
+    }
   } catch (err) {
     log.warn(`[dsh-bio-genie] ${domain.id} integration probe failed:`,
       err?.message, '| cause:', err?.cause?.message ?? err?.cause ?? 'none')
   }
   classification = classifyDomainState(domain, { probe, health, status })
-  return writeJson(res, 200, { ok: true, value: shapeLive(probe, classification, health, status) })
+  return writeJson(res, 200, { ok: true, value: shapeLive(probe, classification, health, status, capabilities) })
 }
 
 /** 域路由注册（loopback-only 由调用方的 guard 负责）。 */

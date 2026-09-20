@@ -539,8 +539,13 @@ function legacyMetabolicValue(gem) {
   }
 }
 
-function liveMetabolicValue(gem, classification, health, status) {
+function liveMetabolicValue(gem, classification, health, status, capabilities) {
   const runtimeVersion = status?.pluginVersion ?? health?.pluginVersion ?? gem.version
+  // 能力单源：gem ≥0.1.13 提供 /v1/capabilities 时以它为准（工具清单/能力元数据动态化），
+  // 未提供或拉取失败时退回域注册表里的静态清单（GEM_TOOLS）。
+  const dynamicTools = Array.isArray(capabilities?.tools) && capabilities.tools.length > 0
+    ? capabilities.tools.map((tool) => tool.name)
+    : null
   const base = {
     installed: true,
     state: classification.state,
@@ -548,7 +553,16 @@ function liveMetabolicValue(gem, classification, health, status) {
     installVersion: gem.version,
     pluginDir: gem.pluginDir,
     detectedBy: gem.detectedBy,
-    tools: GEM_TOOLS,
+    tools: dynamicTools ?? GEM_TOOLS,
+    ...(dynamicTools
+      ? {
+          capabilities: {
+            contractVersion: capabilities.contract_version,
+            toolCount: capabilities.tool_count ?? dynamicTools.length,
+            entries: capabilities.tools,
+          },
+        }
+      : {}),
   }
   if (classification.state === 'installed-unavailable') {
     return {
@@ -650,7 +664,8 @@ function graftLiveValue(graft, classification, health, status) {
 async function handleMetabolic(req, res) {
   return handleDomainRequest(domainById('gem'), req, res, {
     shapeLegacy: (probe) => legacyMetabolicValue(probe),
-    shapeLive: (probe, classification, health, status) => liveMetabolicValue(probe, classification, health, status),
+    shapeLive: (probe, classification, health, status, capabilities) =>
+      liveMetabolicValue(probe, classification, health, status, capabilities),
   })
 }
 

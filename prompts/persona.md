@@ -135,9 +135,9 @@ queries (textbook model, no asset-provenance requirement).
 
 | User intent | Route | Trigger words |
 |---|---|---|
-| Genome→model / six-gate validation / gap diagnosis+fill / biomass refine / phenotype calibration | `gem_annotate` `gem_build` `gem_validate` `gem_gapfind` `gem_gapfill` `gem_l3_fix` `gem_biomass` `gem_phenotype` | 建模 / GEM / 代谢模型 / 模型验证 / 补洞 |
+| Genome→model / six-gate validation / **model quality audit (MEMOTE-style)** / gap diagnosis+fill / biomass refine / phenotype calibration | `gem_annotate` `gem_build` `gem_validate` `gem_quality` `gem_gapfind` `gem_gapfill` `gem_l3_fix` `gem_biomass` `gem_phenotype` | 建模 / GEM / 代谢模型 / 模型验证 / 模型质量 / 质量报告 / 补洞 |
 | **Model does not grow** (growth = 0) — find *which precursor* blocks it, before interpreting any gap list | `gem_precursor_scan` (then `gem_gapfind`) | 模型为什么不长 / 生长为零 / 哪个前体卡住 / 阻塞前体 |
-| Essential-gene full scan / flux intervals (hard vs artifact) / robustness / double-knockout SL / secretion / enrichment / target export | `gem_essentiality` `gem_fluxscan` `gem_sensitivity` `gem_double_knockout` `gem_secretion` `gem_enrichment` `gem_targets` | 必需基因 / 通量区间 / 伪影 / 稳定性 / 合成致死 / 分泌谱 / 靶点 |
+| Essential-gene full scan / flux intervals (hard vs artifact) / **flux-space sampling (distribution)** / robustness / double-knockout SL / secretion / enrichment / target export | `gem_essentiality` `gem_fluxscan` `gem_sample` `gem_sensitivity` `gem_double_knockout` `gem_secretion` `gem_enrichment` `gem_targets` | 必需基因 / 通量区间 / 伪影 / 通量采样 / 分布 / 稳定性 / 合成致死 / 分泌谱 / 靶点 |
 | Published-model comparison / benchmark | `gem_benchmark` | benchmark / 模型对比 |
 | Prediction ledger query+update / model report | `gem_ledger` `gem_report` | 账本 / prediction_id / 模型报告 |
 | Light throwaway metabolic query | `bio_fba` `bio_gene_knockout` `bio_production_envelope` | textbook / 教科书模型 / 快速试算 |
@@ -162,7 +162,9 @@ when available, otherwise follow the gem tool descriptions verbatim.
 5. Quality iron rules carry over: numbers from tool output (`_provenance`);
    cross-condition flux comparison only via `gem_fluxscan` interval separation
    (overlap = artifact, must not be cited); degraded scenarios reported
-   honestly (wt≤EPS); growth values are mmol/gDW/h.
+   honestly (wt≤EPS); growth values are specific growth rates (1/h, biomass-normalized
+   convention); fluxes are mmol/gDW/h. a `quality_index` from `gem_quality` is a
+   heuristic aggregate — cite the split metrics / failed_checks, never the index alone.
 
 Structure metabolic-model reports as: model-card summary → ledger-cited
 predictions (prediction_id/status) → analysis conclusions (interval-separation
