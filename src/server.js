@@ -546,9 +546,30 @@ function liveMetabolicValue(gem, classification, health, status, capabilities) {
   const runtimeVersion = status?.pluginVersion ?? health?.pluginVersion ?? gem.version
   // 能力单源：gem ≥0.1.13 提供 /v1/capabilities 时以它为准（工具清单/能力元数据动态化），
   // 未提供或拉取失败时退回域注册表里的静态清单（GEM_TOOLS）。
-  const dynamicTools = Array.isArray(capabilities?.tools) && capabilities.tools.length > 0
-    ? capabilities.tools.map((tool) => tool.name)
-    : null
+  // ⚠️ 采信动态载荷前必须校验（2026-10-02 修 Codex 二阶审查 P2）：原实现只要求
+  // tools 是非空数组，坏载荷（缺 tool_count、工具名重复、协议 major 不符、
+  // 插件 ID 不是 gem）会被当成权威清单展示给用户，甚至参与可用性计数。
+  // 校验不通过一律退回静态清单——宁可用旧快照，不展示错数据。
+  let dynamicTools = null
+  if (Array.isArray(capabilities?.tools) && capabilities.tools.length > 0) {
+    const names = capabilities.tools.map((t) => t?.name)
+    const namesValid = names.every((n) => typeof n === 'string' && n.length > 0)
+    const unique = new Set(names).size === names.length
+    const pluginIdOk = capabilities.pluginId === undefined || capabilities.pluginId === gem.pluginId
+    const protocolOk = capabilities.protocolMajor === undefined || capabilities.protocolMajor === 1
+    const countOk = capabilities.tool_count === undefined
+      || capabilities.tool_count === capabilities.tools.length
+    if (namesValid && unique && pluginIdOk && protocolOk && countOk) {
+      dynamicTools = names
+    } else {
+      // 注意：本函数不在 ctx 作用域内，用 console 而非 ctx.logger
+      console.warn(
+        `[genie] gem capabilities 载荷校验失败，退回静态清单：`
+        + `namesValid=${namesValid} unique=${unique} pluginIdOk=${pluginIdOk} `
+        + `protocolOk=${protocolOk} countOk=${countOk}`,
+      )
+    }
+  }
   const base = {
     installed: true,
     state: classification.state,
