@@ -41,6 +41,14 @@ export const GRAFT_TOOLS = [
   'graft_plan_save', 'graft_plan_load',
 ]
 
+/** dsh-bio-galatea 对外暴露的 19 个语义化工具。 */
+export const GALATEA_TOOLS = [
+  'galatea_status', 'galatea_setup', 'galatea_mpnn', 'galatea_fold', 'galatea_interface',
+  'galatea_score', 'galatea_inspect', 'galatea_cluster', 'galatea_rank', 'galatea_rank_aggregate',
+  'galatea_loop', 'galatea_contact_consensus', 'galatea_contact_cluster', 'galatea_redesign',
+  'galatea_refold', 'galatea_ingest', 'galatea_portfolio', 'galatea_budget', 'galatea_coverage',
+]
+
 /**
  * 域注册表。每个域一条声明；新增域 = 加一条（不用碰分发/判定/拉取逻辑）。
  *   packageName          用于 require.resolve 探测（正确处理 pnpm 符号链接与 hoisting）
@@ -80,6 +88,20 @@ export const DOMAINS = [
     dataRootName: 'dsh-bio-graft',
     tools: GRAFT_TOOLS,
     unavailableMessage: '已安装，但当前不可用。请重新探测或确认 graft 的 integration API 已随同一实例启动。',
+  },
+  {
+    id: 'galatea',
+    packageName: '@dsh-bio/dsh-bio-galatea',
+    siblingDirName: 'dsh-bio-galatea',
+    integrationPrefix: '/api/dsh-bio-galatea/integration',
+    minIntegrationVersion: '0.1.1',
+    protocolMajor: 1,
+    requiredCheckIds: ['python.torch', 'runtime.mpnn', 'runtime.esmfold'],
+    routeKey: 'protein',
+    label: '蛋白设计',
+    dataRootName: 'dsh-bio-galatea',
+    tools: GALATEA_TOOLS,
+    unavailableMessage: '已安装，但当前不可用。请重新探测或确认 galatea 的 integration API 已随同一实例启动。',
   },
 ]
 

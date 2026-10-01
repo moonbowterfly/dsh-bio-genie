@@ -23,7 +23,7 @@
 import { spawn } from 'node:child_process'
 import http from 'node:http'
 import { createRequire } from 'node:module'
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync, writeFileSync, renameSync, mkdirSync, rmSync } from 'node:fs'
 import { dirname, join as pathJoin } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import os from 'node:os'
@@ -34,7 +34,7 @@ import { handleConfig } from './config_handler.js'
 import { writeJson } from './http-util.js'
 import { ADDON_MODULES } from './extra-deps.js'
 import { DOMAINS, domainById, detectDomain, classifyDomainState,
-  fetchDomainIntegration, handleDomainRequest, GEM_TOOLS, GRAFT_TOOLS }
+  fetchDomainIntegration, handleDomainRequest, GEM_TOOLS, GRAFT_TOOLS, GALATEA_TOOLS }
   from './domain-adapter.js'
 
 /** 路由前缀（与 @linxin666/dsh-client-ui-web-ui-settings 同风格）。 */
@@ -462,6 +462,8 @@ export const GEM_INTEGRATION_MIN_VERSION = domainById('gem').minIntegrationVersi
 export const GEM_INTEGRATION_PROTOCOL_MAJOR = domainById('gem').protocolMajor
 export const GRAFT_INTEGRATION_MIN_VERSION = domainById('graft').minIntegrationVersion
 export const GRAFT_INTEGRATION_PROTOCOL_MAJOR = domainById('graft').protocolMajor
+export const GALATEA_INTEGRATION_MIN_VERSION = domainById('galatea').minIntegrationVersion
+export const GALATEA_INTEGRATION_PROTOCOL_MAJOR = domainById('galatea').protocolMajor
 export const classifyGemState = (input) => classifyDomainState(domainById('gem'), input)
 export const fetchGemIntegration = (req, endpoint, timeoutMs) => fetchDomainIntegration(req, endpoint, timeoutMs)
 
@@ -677,6 +679,203 @@ async function handleEditing(req, res) {
   })
 }
 
+/** galatea 数据根（~/.dsh/dsh-bio-galatea，受 DSH_HOME 影响）。 */
+function galateaDataRoot() {
+  const dshHome = process.env.DSH_HOME ?? pathJoin(os.homedir(), '.dsh')
+  return pathJoin(dshHome, 'dsh-bio-galatea')
+}
+
+/**
+ * 解析 galatea 模型目录：GALATEA_MODELS_DIR env > <root>/config.json 的 modelsDir
+ * > <root>/models。语义与 galatea 自身的 resolveModelsDir / resolve_models_dir 一致。
+ */
+function resolveGalateaModels(dirRoot) {
+  const envDir = process.env.GALATEA_MODELS_DIR
+  if (typeof envDir === 'string' && envDir.trim()) return { dir: envDir.trim(), source: 'env' }
+  try {
+    const cfgPath = pathJoin(dirRoot, 'config.json')
+    if (existsSync(cfgPath)) {
+      const cfg = JSON.parse(readFileSync(cfgPath, 'utf8'))
+      if (cfg && typeof cfg.modelsDir === 'string' && cfg.modelsDir.trim()) {
+        return { dir: cfg.modelsDir.trim(), source: 'config' }
+      }
+    }
+  } catch { /* 无配置或坏配置 → 默认 */ }
+  return { dir: pathJoin(dirRoot, 'models'), source: 'default' }
+}
+
+/** 模型目录内容探测：mpnn/、esmfold/ 的文件数与字节数。 */
+function inspectGalateaModels(modelsDir) {
+  const components = []
+  let totalBytes = 0
+  let totalFiles = 0
+  for (const name of ['mpnn', 'esmfold']) {
+    const dir = pathJoin(modelsDir, name)
+    let files = []
+    try {
+      files = readdirSync(dir, { withFileTypes: true }).filter((entry) => entry.isFile()).map((entry) => entry.name)
+    } catch { /* 目录不存在 */ }
+    let bytes = 0
+    for (const file of files) {
+      try { bytes += statSync(pathJoin(dir, file)).size } catch { /* 忽略单个文件 */ }
+    }
+    totalBytes += bytes
+    totalFiles += files.length
+    components.push({ component: name, dir, fileCount: files.length, sizeBytes: bytes })
+  }
+  return { exists: existsSync(modelsDir), fileCount: totalFiles, sizeBytes: totalBytes, components }
+}
+
+/** 判断是否为绝对路径（盘符 / 正斜杠根 / UNC）——防手滑输入相对路径。 */
+function isAbsoluteTargetPath(target) {
+  return /^[A-Za-z]:/.test(target) || target.startsWith('/') || target.startsWith(String.fromCharCode(92, 92))
+}
+
+/**
+ * galatea 模型目录管理端点（BioGenie 面板「蛋白设计」页使用）：
+ *   GET  → 当前解析结果（dir/source/config 路径/占用）
+ *   POST { modelsDir } → 设置目录（空串 = 恢复默认），合并写
+ *        <DSH_HOME>/dsh-bio-galatea/config.json 的 modelsDir 字段（原子替换）。
+ * 写入后 galatea 下一次工具调用即按新目录解析（无需重启）；
+ * 面板的域探测有 60s 缓存，状态刷新最多延迟一分钟。
+ */
+async function handleGalateaModels(req, res) {
+  const dirRoot = galateaDataRoot()
+  const cfgPath = pathJoin(dirRoot, 'config.json')
+  const envOverride = typeof process.env.GALATEA_MODELS_DIR === 'string' && process.env.GALATEA_MODELS_DIR.trim() !== ''
+  if (req.method === 'GET') {
+    const resolved = resolveGalateaModels(dirRoot)
+    return writeJson(res, 200, {
+      ok: true,
+      value: {
+        dir: resolved.dir,
+        source: resolved.source,
+        configPath: cfgPath,
+        configExists: existsSync(cfgPath),
+        envOverride,
+        listing: inspectGalateaModels(resolved.dir),
+      },
+    })
+  }
+  const body = req.body ?? {}
+  const target = typeof body.modelsDir === 'string' ? body.modelsDir.trim() : ''
+  if (target && !isAbsoluteTargetPath(target)) {
+    return writeJson(res, 400, { ok: false, code: 'invalid-path', message: '请填写绝对路径（例如 F:/Models/AI_models）。' })
+  }
+  let cfg = {}
+  try {
+    if (existsSync(cfgPath)) {
+      const parsed = JSON.parse(readFileSync(cfgPath, 'utf8'))
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) cfg = parsed
+    }
+  } catch { cfg = {} }
+  if (target) {
+    try {
+      mkdirSync(target, { recursive: true })
+    } catch (err) {
+      return writeJson(res, 400, { ok: false, code: 'mkdir-failed', message: '无法创建或访问目录：' + target + '（' + (err && err.message ? err.message : String(err)) + '）' })
+    }
+    cfg.modelsDir = target
+  } else {
+    delete cfg.modelsDir
+  }
+  try {
+    mkdirSync(dirRoot, { recursive: true })
+    const tmp = cfgPath + '.' + Date.now() + '.tmp'
+    try {
+      writeFileSync(tmp, JSON.stringify(cfg, null, 2) + String.fromCharCode(10), 'utf8')
+      renameSync(tmp, cfgPath)
+    } catch (err) {
+      try { rmSync(tmp, { force: true }) } catch { /* 忽略清理失败 */ }
+      throw err
+    }
+  } catch (err) {
+    return writeJson(res, 500, { ok: false, code: 'write-failed', message: '写入配置失败：' + (err && err.message ? err.message : String(err)) })
+  }
+  const resolved = resolveGalateaModels(dirRoot)
+  return writeJson(res, 200, {
+    ok: true,
+    value: {
+      dir: resolved.dir,
+      source: resolved.source,
+      configPath: cfgPath,
+      configExists: true,
+      envOverride,
+      listing: inspectGalateaModels(resolved.dir),
+      applied: true,
+    },
+  })
+}
+
+/** galatea 的 legacy 兼容视图（仅文件系统摘要；低于 minIntegrationVersion 时使用）。 */
+function galateaLegacyValue(galatea) {
+  const root = galateaDataRoot()
+  return {
+    installed: true,
+    state: 'legacy',
+    version: galatea.version,
+    minimumVersion: GALATEA_INTEGRATION_MIN_VERSION,
+    pluginDir: galatea.pluginDir,
+    detectedBy: galatea.detectedBy,
+    dataRoot: root,
+    dataRootExists: existsSync(root),
+    tools: GALATEA_TOOLS,
+  }
+}
+
+/** galatea 的实时视图（数据来自 galatea 自己的 integration API）。 */
+function galateaLiveValue(galatea, classification, health, status) {
+  const base = {
+    installed: true,
+    state: classification.state,
+    version: status?.pluginVersion ?? health?.pluginVersion ?? galatea.version,
+    installVersion: galatea.version,
+    pluginDir: galatea.pluginDir,
+    detectedBy: galatea.detectedBy,
+    tools: GALATEA_TOOLS,
+  }
+  if (classification.state === 'installed-unavailable') {
+    return {
+      ...base,
+      availabilityMessage: '已安装，但当前不可用。请重新探测或确认 galatea 的 integration API 已随同一实例启动。',
+    }
+  }
+  if (classification.state === 'incompatible') {
+    return {
+      ...base,
+      minimumVersion: GALATEA_INTEGRATION_MIN_VERSION,
+      protocol: {
+        hostMajor: GALATEA_INTEGRATION_PROTOCOL_MAJOR,
+        galateaMajor: classification.protocolMajor,
+        galateaMinors: Array.isArray(health?.protocolMinors) ? health.protocolMinors : [],
+      },
+    }
+  }
+  return {
+    ...base,
+    protocol: {
+      hostMajor: GALATEA_INTEGRATION_PROTOCOL_MAJOR,
+      galateaMajor: health?.protocolMajor,
+      galateaMinors: Array.isArray(health?.protocolMinors) ? health.protocolMinors : [],
+    },
+    features: Array.isArray(status?.features) ? status.features : [],
+    generatedAt: status?.generatedAt,
+    data: status?.data ?? {},
+    env: status?.env ?? {},
+    checks: classification.checks ?? [],
+    remediations: Array.isArray(status?.remediations) ? status.remediations : [],
+  }
+}
+
+/** GET /api/dsh-bio-genie/protein —— 蛋白设计域（dsh-bio-galatea）适配器。 */
+async function handleGalatea(req, res) {
+  return handleDomainRequest(domainById('galatea'), req, res, {
+    shapeLegacy: (probe) => galateaLegacyValue(probe),
+    shapeLive: (probe, classification, health, status) => galateaLiveValue(probe, classification, health, status),
+  })
+}
+
+
 export function registerApiRoutes(ctx, config = {}) {
   const guard = (handler) => async (req, res) => {
     if (!isLoopbackRequest(req)) {
@@ -710,6 +909,10 @@ export function registerApiRoutes(ctx, config = {}) {
     { kind: 'exact', path: `${ROUTE_PREFIX}/metabolic`,       handler: guard((req, res) => handleMetabolic(req, res, config)) },
     // 基因编辑域插件面板数据：dsh-bio-graft 未安装时返回 installed:false，前端据此不渲染该分页
     { kind: 'exact', path: `${ROUTE_PREFIX}/editing`,         handler: guard((req, res) => handleEditing(req, res, config)) },
+    // 蛋白设计域插件面板数据：dsh-bio-galatea 未安装时返回 installed:false，前端据此不渲染该分页
+    { kind: 'exact', path: `${ROUTE_PREFIX}/protein`,         handler: guard((req, res) => handleGalatea(req, res, config)) },
+    // galatea 模型目录管理（读写 <DSH_HOME>/dsh-bio-galatea/config.json 的 modelsDir）
+    { kind: 'exact', path: `${ROUTE_PREFIX}/galatea-models`,  handler: guard((req, res) => handleGalateaModels(req, res, config)) },
   ]) {
     disposers.push(ctx.webServer.register(route))
   }

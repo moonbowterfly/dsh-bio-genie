@@ -30,7 +30,7 @@
 | 📜 **透明性日志** | 每次代码执行/工具调用异步记 JSONL 日志（哈希/预览/耗时），`bio_log` 可回溯任何一次分析；日志自动 30 天轮转清理 |
 | 🧬 **科学严谨性约束** | persona 强制「生物学结论必须可溯源到工具输出」，纯推断标注 [推断-未验证] |
 | 🧠 **会话记忆** | 成功代码模式 + 错误→修复经验自动沉淀（本地 JSON），`bio_memory` 查询，越用越聪明 |
-| ⚙️ **设置面板** | dsh 设置面板（⚙️ 齿轮）侧栏「BioGenie」菜单——标签页：总览（包元信息/配置默认值）、Skill 模块（50 个条目按主 skill/领域/研究/协议/指南分组）、Python 环境（venv 包列表）、工具调试；同实例安装 dsh-bio-gem 时还显示其只读「代谢建模」五态面板 |
+| ⚙️ **设置面板** | dsh 设置面板（⚙️ 齿轮）侧栏「BioGenie」菜单——标签页：总览（包元信息/配置默认值）、Skill 模块（50 个条目按主 skill/领域/研究/协议/指南分组）、Python 环境（venv 包列表）、工具调试；同实例安装 dsh-bio-gem / dsh-bio-graft / dsh-bio-galatea 时还分别显示「代谢建模」「基因编辑设计」「蛋白设计」只读五态面板（**蛋白设计页含「模型目录」管理：可把 galatea 大模型安装到其他磁盘**） |
 | 📚 **协议知识库** | 19 个高频任务协议（质控/比对/BLAST/克隆/建树/结构/富集/出版级绘图/坐标系统/统计检验/差异表达/GSEA/NGS 流程…），每个含可执行代码模板 + 常见坑，随插件打包 |
 
 ---
@@ -53,7 +53,7 @@ npx -y @deepseek-ai/dsh plugin --profile web add ./dsh-bio-genie
 
 # 方式四：从本地 tarball 安装（npm pack 产物＝发布形态；适合发布前冷启动验证）
 cd /path/to/dsh-bio-genie && npm pack
-npx -y @deepseek-ai/dsh plugin --profile web add ./dsh-bio-dsh-bio-genie-0.6.37.tgz
+npx -y @deepseek-ai/dsh plugin --profile web add ./dsh-bio-dsh-bio-genie-0.6.38.tgz
 ```
 
 `--profile <name>` 是**必填选项**（不传报 `required option '--profile <name>' not specified`），Web 端固定用 `web`。
