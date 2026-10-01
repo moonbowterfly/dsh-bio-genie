@@ -53,12 +53,12 @@ npx -y @deepseek-ai/dsh plugin --profile web add ./dsh-bio-genie
 
 # 方式四：从本地 tarball 安装（npm pack 产物＝发布形态；适合发布前冷启动验证）
 cd /path/to/dsh-bio-genie && npm pack
-npx -y @deepseek-ai/dsh plugin --profile web add ./dsh-bio-dsh-bio-genie-0.6.36.tgz
+npx -y @deepseek-ai/dsh plugin --profile web add ./dsh-bio-dsh-bio-genie-0.6.37.tgz
 ```
 
 `--profile <name>` 是**必填选项**（不传报 `required option '--profile <name>' not specified`），Web 端固定用 `web`。
 
-**引擎兼容（2026-09-19）**：本版本经 dsh **0.1.5-rc.2** 走廊逐卡走查（v0.1.3-alpha.2 → 0.1.5-rc.2 的 4 个边共 55 张变更卡全部核对：零适配命中）与实机验证（全新安装 + 工具注册 + Python 引导 + 设置面板 7 tab + 会话 E2E）。
+**引擎兼容**：0.1.x 侧经 dsh **0.1.5-rc.2** 走廊逐卡走查（v0.1.3-alpha.2 → 0.1.5-rc.2 的 4 个边共 55 张变更卡全部核对：零适配命中）与实机验证（全新安装 + 工具注册 + Python 引导 + 设置面板 7 tab + 会话 E2E）。**0.2.0+ 侧（含官方桌面端）已适配**：peer 声明放宽为 `^0.1.0-rc.6 || ^0.2.0-rc.1`（0.2.0-rc.2 上零豁免直装）；agent preset 改由插件自带声明提供（见「精灵专家人设」一节）；双端实机验证通过（0.2.0-rc.2：preset 自动出现 + 工具全量注册 + skill 动态定位；0.1.5-rc.2：启动正常、preset 行自动跳过）。
 
 安装后重启 dsh web 服务，插件即被加载。首次启动时插件会在后台自动引导 Python
 环境（下载 uv → Python 3.12 → venv → biopython，约 1-2 分钟），之后秒级就绪。
@@ -69,16 +69,23 @@ npx -y @deepseek-ai/dsh plugin --profile web add ./dsh-bio-dsh-bio-genie-0.6.36.
 npx -y @deepseek-ai/dsh --profile web --dump-config   # 输出中应包含 "# == dsh-bio-genie" 层
 ```
 
-### 安装后必须批准构建脚本（否则没有 agent preset）
+### 安装后批准构建脚本（0.1.x 必需；0.2.0+ 可选）
 
-pnpm v11 默认拦截依赖的 lifecycle 脚本，而本包的 `postinstall` 正是**把 agent preset 复制到
-`~/.dsh/.agent-presets/bio-genie/`**。安装时若打印：
+**两代引擎的 preset 供给机制不同：**
+
+- **DSH 0.2.0+（含官方桌面端）**：preset 由插件自带声明（`cordis.patch.yml` 中的
+  `@deepseek-ai/dsh-agent-preset` 行）自动提供——**装完即有「生物基因精灵」，无需任何后置动作**；
+  构建脚本批不批准都不影响（postinstall 的复制动作在此仅是冗余保险）。
+- **DSH 0.1.x**：preset 走 `postinstall` **把文件复制到 `~/.dsh/.agent-presets/bio-genie/`**；
+  pnpm v11 默认拦截 lifecycle 脚本，**批准一次后**才会复制。
+
+0.1.x 上安装时若打印：
 
 ```
-[ERR_PNPM_IGNORED_BUILDS] Ignored build scripts: @dsh-bio/dsh-bio-genie@0.6.36
+[ERR_PNPM_IGNORED_BUILDS] Ignored build scripts: @dsh-bio/dsh-bio-genie@0.6.37
 ```
 
-表示 preset 没装上——工具都在，但 dsh 预设选择器里**没有「生物基因精灵」**。在 profile 目录批准一次即可：
+表示文件式副本没装上（0.1.x 预设选择器里没有「生物基因精灵」）。在 profile 目录批准一次即可：
 
 ```sh
 cd ~/.dsh/profiles/web && pnpm approve-builds     # 或 pnpm approve-builds --all 全批准
@@ -206,19 +213,19 @@ X 与 gap 在翻译时按未知碱基处理（Biopython 标准行为），含 X/
 
 ### 它是什么
 
-- **人设文件**（`preset/bio-genie/preset.yml` + `agent.cordis.yml`）——覆盖 base persona，告诉 AI「你手头有 62 个工具 + 50 个 skill」。
+- **人设源文件**（`preset/bio-genie/`：`preset.yml` + `agent.cordis.yml` + `skills/`）——覆盖 base persona，告诉 AI「你手头有 62 个工具 + 50 个 skill」；`cordis.patch.yml` 的 preset 段由 `scripts/build-preset-patch.mjs` 从此目录生成（单一数据源，勿手改生成物）。
 - **入门口诀**（`skills/dsh-bio-genie-expert.md`）——一个 meta-skill：「先看工作区 → 二选一（语义化工具 / `bio_python`） → 失败按 ACR 三层修 → 报告带可追溯链」。
-- **一键安装**：`pnpm install` 跑 postinstall 钩子会自动把 preset 复制到 `~/.dsh/.agent-presets/bio-genie/`；无需手动操作。
+- **一键安装**：0.2.0+ 由插件自带的 preset 声明直接提供（装完即有，零后置动作）；0.1.x 由 `postinstall` 钩子把 preset 复制到 `~/.dsh/.agent-presets/bio-genie/`（需先批准构建脚本，见上文）。
 
 ### 它**不是**
 
 - ❌ **不接管 62 个工具**——所有 `bio_*` 工具仍由本插件的 `cordis.patch.yml` 注入，preset **不重声明**任何工具，避免冲突。
-- ❌ **不抢默认人设**——postinstall 装完后，「生物基因精灵」出现在 dsh 预设选择器里；用户**主动选择**才激活。`agent-presets.default` 不会被改成 `bio-genie`。
+- ❌ **不抢默认人设**——安装后「生物基因精灵」出现在 dsh 预设选择器里；用户**主动选择**才激活。`agent-presets.default` 不会被改成 `bio-genie`。
 - ❌ **不破坏其他插件**——presets 与 plugins 是 dsh 的两个独立 seam，共存不冲突。
 
 ### 怎么用
 
-1. **安装本插件**：`pnpm add @dsh-bio/dsh-bio-genie`（postinstall 会自动装 preset）。
+1. **安装本插件**：`pnpm add @dsh-bio/dsh-bio-genie`（0.2.0+ 装完即有 preset；0.1.x 见上文的构建脚本批准说明）。
 2. **重启 dsh web**。
 3. **设置面板** → 选「**生物基因精灵**」人设。
 4. 之后 AI 启动会话即说：「我是生物基因精灵……你的工作区是 `{{cwd}}`……先看看你有什么数据再开工」。
@@ -226,7 +233,7 @@ X 与 gap 在翻译时按未知碱基处理（Biopython 标准行为），含 X/
 ### 手动安装 / 卸载
 
 ```bash
-# 手动复制（postinstall 失败时）
+# 手动复制（0.1.x 专用；0.2.0+ 通常不需要——preset 由插件声明提供）
 node scripts/install-preset.js
 
 # 强制覆盖（用户就地编辑过 preset 时也覆盖）
@@ -242,9 +249,13 @@ node scripts/install-preset.js --dry-run
 
 ### 故障排除
 
-- **预设选择器看不见「生物基因精灵」** → 检查 `~/.dsh/.agent-presets/bio-genie/preset.yml` 是否存在；不存在则 `node scripts/install-preset.js` 手动装。
+- **预设选择器看不见「生物基因精灵」**：
+  - 0.2.0+：确认插件版本 ≥ 0.6.37 且已加载（`dsh --profile <p> --dump-config` 输出中应有 `preset-bio-genie` 行）；重启一次 dsh 再试。
+  - 0.1.x：检查 `~/.dsh/.agent-presets/bio-genie/preset.yml` 是否存在；不存在则 `node scripts/install-preset.js` 手动装。
 - **切到 preset 后工具没出现** → 工具由插件注入，与 preset 无关；检查插件是否真在 `dependencies`（`pnpm ls @dsh-bio/dsh-bio-genie`）。
-- **想自定义 persona** → 直接编辑 `~/.dsh/.agent-presets/bio-genie/agent.cordis.yml`（不被自动覆盖除非 `--force`）。
+- **想自定义 persona**：
+  - 0.2.0+：在 profile 的 `cordis.patch.yml` 按行 id `preset-bio-genie` 写覆盖补丁（覆盖 `config.plugins`）。
+  - 0.1.x：直接编辑 `~/.dsh/.agent-presets/bio-genie/agent.cordis.yml`（不被自动覆盖除非 `--force`）。
 
 ---
 

@@ -54,6 +54,8 @@ npx -y @deepseek-ai/dsh plugin --profile web add ./dsh-bio-genie
 
 `--profile <name>` is **mandatory** (`required option '--profile <name>' not specified` otherwise); use `web` for the web app.
 
+**Engine compatibility**: on DSH **0.2.0+ (incl. the official desktop app)** the plugin installs with **zero version exemptions** (relaxed peers `^0.1.0-rc.6 || ^0.2.0-rc.1`) and the `bio-genie` preset ships with the plugin itself (no post-steps needed). On DSH **0.1.x** everything keeps working through the postinstall file-based preset. Both engines verified on real machines (2026-10-01).
+
 Restart the dsh web service to activate. On first startup the plugin bootstraps the Python environment in the background (download uv → Python 3.12 → venv → biopython, ~1-2 min); subsequent starts are ready in seconds.
 
 Verify the plugin layer is active (no boot needed):
@@ -171,19 +173,19 @@ This plugin also ships a **dsh agent preset** — `bio-genie` — that turns the
 
 ### What it is
 
-- **Persona files** (`preset/bio-genie/preset.yml` + `agent.cordis.yml`) — override the base persona, telling AI: "you have 62 tools + 50 skills at hand".
+- **Persona source files** (`preset/bio-genie/`: `preset.yml` + `agent.cordis.yml` + `skills/`) — override the base persona, telling AI: "you have 62 tools + 50 skills at hand"; the preset section of `cordis.patch.yml` is generated from this directory by `scripts/build-preset-patch.mjs` (single source of truth; do not hand-edit the generated file).
 - **Onboarding mantra** (`skills/dsh-bio-genie-expert.md`) — a meta-skill: "1. Inspect workspace → 2. Pick semantic tool / `bio_python` → 3. Fail by ACR three-layer repair → 4. Report with traceable chain".
-- **One-shot install**: `pnpm install` runs postinstall hook to copy the preset to `~/.dsh/.agent-presets/bio-genie/`; no manual steps.
+- **One-shot install**: on DSH 0.2.0+ the preset is shipped by the plugin’s own declaration (available immediately after install, zero post-steps); on DSH 0.1.x the `postinstall` hook copies the preset to `~/.dsh/.agent-presets/bio-genie/` (requires approving the build script — see the Chinese README’s 「安装后批准构建脚本」 section).
 
 ### What it is **not**
 
 - ❌ **Does NOT own the 62 tools** — every `bio_*` tool is still injected by the plugin's `cordis.patch.yml`; the preset **does not redeclare** any tool to avoid conflicts.
-- ❌ **Does NOT change the default persona** — after postinstall, "生物基因精灵" appears in dsh's preset selector; users **actively pick** it to activate. `agent-presets.default` is **not** changed to `bio-genie`.
+- ❌ **Does NOT change the default persona** — after installation, "生物基因精灵" appears in dsh's preset selector; users **actively pick** it to activate. `agent-presets.default` is **not** changed to `bio-genie`.
 - ❌ **Does NOT break other plugins** — presets and plugins are two independent seams in dsh; they coexist without conflict.
 
 ### How to use
 
-1. **Install this plugin**: `pnpm add @dsh-bio/dsh-bio-genie` (postinstall handles the preset copy).
+1. **Install this plugin**: `pnpm add @dsh-bio/dsh-bio-genie` (on 0.2.0+ the preset comes with the plugin; on 0.1.x see the build-script approval note).
 2. **Restart dsh web**.
 3. **Settings panel** → select "**生物基因精灵**" persona.
 4. The AI now opens each session with: "I'm the biological-data genie… your working directory is `{{cwd}}`… let me see what data you have first".
@@ -191,7 +193,7 @@ This plugin also ships a **dsh agent preset** — `bio-genie` — that turns the
 ### Manual install / uninstall
 
 ```bash
-# Manual copy (when postinstall fails)
+# Manual copy (for 0.1.x only; 0.2.0+ usually does not need this — the preset comes from the plugin declaration)
 node scripts/install-preset.js
 
 # Force overwrite (overrides user-edited preset files)
@@ -207,9 +209,13 @@ node scripts/install-preset.js --dry-run
 
 ### Troubleshooting
 
-- **Preset selector doesn't show "生物基因精灵"** → check `~/.dsh/.agent-presets/bio-genie/preset.yml` exists; otherwise run `node scripts/install-preset.js` manually.
+- **Preset selector doesn't show "生物基因精灵"**:
+  - 0.2.0+: make sure the plugin version is >= 0.6.37 and loaded (`dsh --profile <p> --dump-config` should contain a `preset-bio-genie` row); restart dsh once.
+  - 0.1.x: check `~/.dsh/.agent-presets/bio-genie/preset.yml` exists; otherwise run `node scripts/install-preset.js` manually.
 - **After switching to preset, tools are missing** → tools are injected by the plugin, not the preset; double-check the plugin is in `dependencies` (`pnpm ls @dsh-bio/dsh-bio-genie`).
-- **Customize persona** → edit `~/.dsh/.agent-presets/bio-genie/agent.cordis.yml` directly (not auto-overwritten unless `--force`).
+- **Customize persona**:
+  - 0.2.0+: override by row id `preset-bio-genie` in the profile's `cordis.patch.yml` (override `config.plugins`).
+  - 0.1.x: edit `~/.dsh/.agent-presets/bio-genie/agent.cordis.yml` directly (not auto-overwritten unless `--force`).
 
 ---
 
