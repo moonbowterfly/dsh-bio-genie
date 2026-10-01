@@ -25,8 +25,12 @@ function test(name, fn) {
 
 const graft = adapter.domainById('graft')
 
-test('registry declares both hosted domains with distinct route keys and tool prefixes', () => {
-  assert.deepEqual(adapter.DOMAINS.map((d) => d.id).sort(), ['gem', 'graft'])
+test('registry keeps gem and graft with distinct route keys and tool prefixes', () => {
+  const ids = adapter.DOMAINS.map((d) => d.id)
+  const routeKeys = adapter.DOMAINS.map((d) => d.routeKey)
+  assert.ok(ids.includes('gem') && ids.includes('graft'))
+  assert.equal(new Set(ids).size, ids.length)
+  assert.equal(new Set(routeKeys).size, routeKeys.length)
   assert.equal(adapter.domainByRouteKey('editing').id, 'graft')
   assert.equal(adapter.domainByRouteKey('metabolic').id, 'gem')
   assert.equal(graft.integrationPrefix, '/api/dsh-bio-graft/integration')

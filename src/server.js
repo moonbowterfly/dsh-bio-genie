@@ -36,6 +36,7 @@ import { ADDON_MODULES } from './extra-deps.js'
 import { DOMAINS, domainById, detectDomain, classifyDomainState,
   fetchDomainIntegration, handleDomainRequest, GEM_TOOLS, GRAFT_TOOLS, GALATEA_TOOLS }
   from './domain-adapter.js'
+import { collectDomainOverview } from './domain-overview.js'
 
 /** 路由前缀（与 @linxin666/dsh-client-ui-web-ui-settings 同风格）。 */
 const ROUTE_PREFIX = '/api/dsh-bio-genie'
@@ -875,6 +876,14 @@ async function handleGalatea(req, res) {
   })
 }
 
+/** GET /api/dsh-bio-genie/domain-overview —— 四域只读聚合。 */
+async function handleDomainOverview(req, res) {
+  if (req.method !== 'GET') {
+    return writeJson(res, 405, { ok: false, code: 'method-not-allowed', message: `method not allowed: ${req.method}` })
+  }
+  return writeJson(res, 200, { ok: true, value: await collectDomainOverview(req) })
+}
+
 
 export function registerApiRoutes(ctx, config = {}) {
   const guard = (handler) => async (req, res) => {
@@ -905,6 +914,7 @@ export function registerApiRoutes(ctx, config = {}) {
     { kind: 'exact', path: `${ROUTE_PREFIX}/tool-schemas`,    handler: guard((req, res) => handleToolSchemas(req, res)) },
     { kind: 'exact', path: `${ROUTE_PREFIX}/execute-tool`,    handler: guard((req, res) => handleExecuteTool(req, res, config)) },
     { kind: 'exact', path: `${ROUTE_PREFIX}/addons`,          handler: guard((req, res) => handleAddons(req, res, config)) },
+    { kind: 'exact', path: `${ROUTE_PREFIX}/domain-overview`, handler: guard((req, res) => handleDomainOverview(req, res)) },
     // 代谢建模域插件面板数据：dsh-bio-gem 未安装时返回 installed:false，前端据此不渲染该分页
     { kind: 'exact', path: `${ROUTE_PREFIX}/metabolic`,       handler: guard((req, res) => handleMetabolic(req, res, config)) },
     // 基因编辑域插件面板数据：dsh-bio-graft 未安装时返回 installed:false，前端据此不渲染该分页

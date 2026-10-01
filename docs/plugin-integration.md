@@ -128,8 +128,14 @@ GET  /api/dsh-bio-gem/integration/v1/jobs/:id     # 任务状态（批次 2 预�
 | 协议兼容 | 存在非 ok check（`state=degraded`） | `degraded` | 展示准确缺项 + 修复责任方（owner） |
 | 协议兼容 | 全部就绪 | `ready` | 真实状态 + feature 列表 |
 
-适配器纪律：仅在子页打开 / 用户手动刷新 / 有任务运行时探测；短超时（3–5s）+ `AbortController`；
+适配器纪律：仅在子页或「域总览」打开 / 用户手动刷新 / 有任务运行时探测；宿主使用有界的 `node:http` 请求（health 3s、status 12s）；
 保留最后一次成功快照但标注「上次状态，已过期」；一次 fetch 异常**不得拖垮整个 BioGenie 面板**。
+
+### 3.1 宿主「域总览」只读消费端点
+
+`GET /api/dsh-bio-genie/domain-overview` 在面板首次打开「域总览」时并发聚合宿主与各已安装域的存在性、`health` 和 `v1/status`；未安装域不发 integration 请求。它仅消费上述既有协议，不要求域插件增加端点，也不改变域插件独立安装、发布或卸载。单域失败只影响自己的卡片；`health` 可达而 `status` 失败仍记已安装，并分别显示健康可达和状态不可读取。
+
+`availability.counts` 的三个数字（可用／探测中／缺依赖）只统计已核实的 `tool + action/engine` 操作切片，`coverage=partial` 表示**并非全域总数**。当前仅 `gem_build(engine=carveme|gapseq)` 有足够的检查项与 `env.engines.*.available` 三态可供分别统计；其余域或状态缺失时返回 `coverage=insufficient`、三项计数为 `null`，面板显示「粒度不足」，绝不按整工具的 capabilities 状态乘算。`warn` 只有同时有明确 `probing:true` 才计入探测中，其他不确定状态保持未判定。资产入口只导航到已有域分页/端点。
 
 ## 4. 唯一所有者表（资源级）
 
