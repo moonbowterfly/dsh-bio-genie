@@ -542,31 +542,29 @@ function legacyMetabolicValue(gem) {
   }
 }
 
-function liveMetabolicValue(gem, classification, health, status, capabilities) {
+export function liveMetabolicValue(gem, classification, health, status, capabilities) {
   const runtimeVersion = status?.pluginVersion ?? health?.pluginVersion ?? gem.version
   // 能力单源：gem ≥0.1.13 提供 /v1/capabilities 时以它为准（工具清单/能力元数据动态化），
   // 未提供或拉取失败时退回域注册表里的静态清单（GEM_TOOLS）。
-  // ⚠️ 采信动态载荷前必须校验（2026-10-02 修 Codex 二阶审查 P2）：原实现只要求
-  // tools 是非空数组，坏载荷（缺 tool_count、工具名重复、协议 major 不符、
-  // 插件 ID 不是 gem）会被当成权威清单展示给用户，甚至参与可用性计数。
+  // 采信动态载荷前校验单源契约；字段名与域返回的 snake_case 保持一致。
+  // 缺少必需元数据或工具清单不一致时退回静态清单。
   // 校验不通过一律退回静态清单——宁可用旧快照，不展示错数据。
   let dynamicTools = null
   if (Array.isArray(capabilities?.tools) && capabilities.tools.length > 0) {
     const names = capabilities.tools.map((t) => t?.name)
     const namesValid = names.every((n) => typeof n === 'string' && n.length > 0)
     const unique = new Set(names).size === names.length
-    const pluginIdOk = capabilities.pluginId === undefined || capabilities.pluginId === gem.pluginId
-    const protocolOk = capabilities.protocolMajor === undefined || capabilities.protocolMajor === 1
-    const countOk = capabilities.tool_count === undefined
-      || capabilities.tool_count === capabilities.tools.length
-    if (namesValid && unique && pluginIdOk && protocolOk && countOk) {
+    const pluginIdOk = capabilities.plugin_id === 'dsh-bio-gem'
+    const contractOk = capabilities.contract_version === '1'
+    const countOk = capabilities.tool_count === capabilities.tools.length
+    if (namesValid && unique && pluginIdOk && contractOk && countOk) {
       dynamicTools = names
     } else {
       // 注意：本函数不在 ctx 作用域内，用 console 而非 ctx.logger
       console.warn(
         `[genie] gem capabilities 载荷校验失败，退回静态清单：`
         + `namesValid=${namesValid} unique=${unique} pluginIdOk=${pluginIdOk} `
-        + `protocolOk=${protocolOk} countOk=${countOk}`,
+        + `contractOk=${contractOk} countOk=${countOk}`,
       )
     }
   }
@@ -640,8 +638,26 @@ function graftLegacyValue(graft) {
   }
 }
 
-/** graft 的实时视图（数据全部来自 graft 自己的 integration API，宿主不读它的内部实现）。 */
-function graftLiveValue(graft, classification, health, status) {
+/** graft 的实时视图；工具清单以域 capabilities 为准，旧版或坏载荷退回静态清单。 */
+export function graftLiveValue(graft, classification, health, status, capabilities) {
+  let dynamicTools = null
+  if (Array.isArray(capabilities?.tools) && capabilities.tools.length > 0) {
+    const names = capabilities.tools.map((tool) => tool?.name)
+    const namesValid = names.every((name) => typeof name === 'string' && name.length > 0)
+    const unique = new Set(names).size === names.length
+    const pluginIdOk = capabilities.plugin_id === 'dsh-bio-graft'
+    const contractOk = capabilities.contract_version === '1'
+    const countOk = capabilities.tool_count === capabilities.tools.length
+    if (namesValid && unique && pluginIdOk && contractOk && countOk) {
+      dynamicTools = names
+    } else {
+      console.warn(
+        `[genie] graft capabilities 载荷校验失败，退回静态清单：`
+        + `namesValid=${namesValid} unique=${unique} pluginIdOk=${pluginIdOk} `
+        + `contractOk=${contractOk} countOk=${countOk}`,
+      )
+    }
+  }
   const base = {
     installed: true,
     state: classification.state,
@@ -649,7 +665,16 @@ function graftLiveValue(graft, classification, health, status) {
     installVersion: graft.version,
     pluginDir: graft.pluginDir,
     detectedBy: graft.detectedBy,
-    tools: GRAFT_TOOLS,
+    tools: dynamicTools ?? GRAFT_TOOLS,
+    ...(dynamicTools
+      ? {
+          capabilities: {
+            contractVersion: capabilities.contract_version,
+            toolCount: capabilities.tool_count,
+            entries: capabilities.tools,
+          },
+        }
+      : {}),
   }
   if (classification.state === 'installed-unavailable') {
     return {
@@ -694,10 +719,11 @@ async function handleMetabolic(req, res) {
 }
 
 /** GET /api/dsh-bio-genie/editing —— 基因编辑域（dsh-bio-graft）适配器。 */
-async function handleEditing(req, res) {
+export async function handleEditing(req, res) {
   return handleDomainRequest(domainById('graft'), req, res, {
     shapeLegacy: (probe) => graftLegacyValue(probe),
-    shapeLive: (probe, classification, health, status) => graftLiveValue(probe, classification, health, status),
+    shapeLive: (probe, classification, health, status, capabilities) =>
+      graftLiveValue(probe, classification, health, status, capabilities),
   })
 }
 

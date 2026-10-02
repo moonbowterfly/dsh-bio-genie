@@ -34,7 +34,7 @@ export const GEM_TOOLS = [
   'gem_secretion', 'gem_double_knockout', 'gem_enrichment', 'gem_targets', 'gem_precursor_scan',
 ]
 
-/** dsh-bio-graft 对外暴露的 11 个语义化工具。 */
+/** dsh-bio-graft 的工具 fallback；新版本的权威清单来自 /v1/capabilities。 */
 export const GRAFT_TOOLS = [
   'graft_profiles', 'graft_design', 'graft_score', 'graft_rank', 'graft_offtarget',
   'graft_base_edit', 'graft_strategy', 'graft_validation_plan', 'graft_backend_status',
@@ -309,7 +309,7 @@ export async function handleDomainRequest(domain, req, res, { shapeLegacy, shape
     // status 冷探测可能很慢（gem 的 WSL/gapseq 探测、graft 的计划目录扫描）；双方都有
     // 缓存 + 预热。给足余量，失败只记日志，不拖垮面板。
     status = await fetchDomainIntegration(req, `${domain.integrationPrefix}/v1/status`, 12_000)
-    // capabilities（能力单源，gem ≥0.1.13）：仅当对方在 features 里声明时才拉；
+    // capabilities（域插件的能力单源）：仅当对方在 features 里声明时才拉；
     // 失败静默降级——面板退回域注册表里的静态工具清单（GEM_TOOLS/GRAFT_TOOLS），
     // 不因增强项失败影响主展示路径。
     if (Array.isArray(status?.features) && status.features.includes('capabilities')) {
