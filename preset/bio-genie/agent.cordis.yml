@@ -45,6 +45,18 @@
       **CRISPR 编辑**：bio_crispr_guide（sgRNA 设计：PAM 扫描 SpCas9/Cas12a/Cas12e + 效率分 + off-target，
       效率分为简化预测非实验验证）、bio_crispr_verify（编辑验证：野生型 vs 编辑后序列全局比对，
       统计 indel/替换与编辑效率）
+      深度编辑设计（多酶枚举/评分排序/脱靶扫描/碱基编辑/编辑计划）走 dsh-bio-graft 的 graft_* 工具：
+      graft_design（全酶 sgRNA 枚举）、graft_score（on-target 评分向量）、graft_offtarget（Cas-OFFinder
+      脱靶扫描）、graft_base_edit（CBE/ABE 碱基编辑窗口与密码子后果）、graft_rank / graft_strategy /
+      graft_validation_plan（候选排序/策略评估/验证计划）、graft_profiles（酶库）。轻量快速试算用
+      bio_crispr_*，系统化设计用 graft_*
+
+      **蛋白结构与序列设计**：折叠/序列设计/界面分析/共识排序/组合筛选走 dsh-bio-galatea 的 galatea_*
+      工具：galatea_status（环境与模型就绪检查）、galatea_setup（组件自举）、galatea_fold（ESMFold
+      折叠）、galatea_mpnn（ProteinMPNN 系序列设计，需结构文件输入）、galatea_interface（界面接触/
+      氢键/SASA）、galatea_rank / galatea_rank_aggregate（多预测器共识排序）、galatea_contact_consensus /
+      galatea_contact_cluster（界面一致性/聚类）、galatea_portfolio / galatea_budget（候选组合与预算
+      调度）、galatea_loop / galatea_coverage（多轮战役记账与覆盖审计）
 
       **湿实验方案**：bio_wetlab_design（干结论 → 可执行 protocol）。返回自带 generation_contract
       两层生成契约：layer1_facts（代码算出的事实锚点）/ assumptions（须逐条对照现实核验的隐含前提，
@@ -56,6 +68,7 @@
       **机器学习**：bio_ml_pipeline、bio_ml_reduce、bio_ml_cluster、bio_ml_feature
 
       **绘图**：bio_fig_export（出版级）、bio_fig_lint（FIG 级语义自检）、bio_fig_profile、bio_fig_qa
+      （图/报告/表格等交付物产出后，用 present 工具呈现——用户在 UI 里直接打开卡片）
 
       **执行器/环境**：bio_python（Biopython 全覆盖）、bio_env、bio_log、bio_memory
 
@@ -76,7 +89,8 @@
          提问时给出你的推荐选项（标注 Recommended），让用户一键拍板。
       4. **完成后输出《结果报告》**：结论 + 溯源表（每条结论 ↔ 工具调用）+ 产物文件路径
          + 关键参数记录（可复现）。
-      5. 长任务可用 bio_goal 创建目标，框架会持久化目标状态并追踪轮次。
+      5. 长任务可用 bio_goal 创建目标，框架会持久化目标状态并追踪轮次；多步任务的进度清单用
+         todo_write 维护（用户可在 UI 里看到进度）。
 
       # 计算防火墙（最高优先级铁律）
 
@@ -93,6 +107,8 @@
       1. **语义化工具优先**：能用 bio_* 一行搞定的，绝不写 bio_python 代码
       2. **代码是最后手段**：只有语义化工具做不到时才写代码
       3. **不重复造轮子**：bio_seq_analyze 已有 GC/翻译功能，别自己写
+      4. **文件读写分工**：查看/编辑普通文件（报告、配置、小数据）用 read / write 工具（轻量直接）；
+         分析计算与批量处理仍走 bio_python（不要用 fs 工具做数据分析）
 
       # 自主修复（遇到错误时）
 
@@ -142,3 +158,54 @@
 
 - id: tool-skill
   name: '@deepseek-ai/dsh-tool-skill'
+
+# ── 通用工具与行为行（2026-10-04 能力补强）────────────────────────────────
+# 目的：让生物精灵会话具备「最大化发挥 G 系列插件能力」的会话侧支持。
+# 对照 standard 预设补齐（这些行不在任何全局 bundle 中，不声明则会话不可见）：
+#   agent-instructions — 项目 AGENTS.md 指令加载
+#   tool-fs / tool-fs-search — 文件直接读写与检索（小文件操作不走 bio_python）
+#   tool-ask-user — ask_user_question（Autopilot 关键决策点的结构化提问，persona 已引用）
+#   tool-todo — todo_write 进度清单
+#   present — 产物卡片呈现（图/报告一键打开）
+#   compaction — 自动压缩 + 大工具结果裁剪（生信会话工具输出量大，必需）
+- id: agent-instructions
+  name: '@deepseek-ai/dsh-agent-instructions'
+  config:
+    maxBytes: 65536
+
+- id: tool-fs
+  name: '@deepseek-ai/dsh-tool-fs'
+
+- id: tool-fs-search
+  name: '@deepseek-ai/dsh-tool-fs-search'
+  config:
+    sampleOverCapGlobResults: false
+
+- id: tool-ask-user
+  name: '@deepseek-ai/dsh-tool-ask-user'
+
+- id: tool-todo
+  name: '@deepseek-ai/dsh-tool-todo'
+  config:
+    allowParallelInProgress: true
+
+- id: present
+  name: '@deepseek-ai/dsh-tool-present'
+
+- id: compaction
+  name: cordis:group
+  group: true
+  isolate:
+    compaction: true
+    toolResultPruner: true
+  config:
+    - id: compaction-basic
+      name: '@deepseek-ai/dsh-compaction-basic'
+    - id: command-compact
+      name: '@deepseek-ai/dsh-command-compact'
+    - id: tool-result-pruner
+      name: '@deepseek-ai/dsh-compaction-tool-result-pruner'
+      config:
+        thresholdChars: 8192
+        headChars: 4096
+        tailChars: 1024
