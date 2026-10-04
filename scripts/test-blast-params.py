@@ -36,7 +36,7 @@ from bio_ops import _decide_blast_params, _blast_diagnostics, op_blast_search, B
 from Bio.Blast import NCBIWWW  # noqa: E402
 import retry_utils  # noqa: E402
 
-SEQ23 = 'ATGCGTACGTAGCTAGCTAGCTA'          # 23 nt（真实事故现场序列长度）
+SEQ23 = 'ATGCGTACGTAGCTAGCTAGCTA'          # 23 nt（短查询防护触发长度）
 SEQ29 = 'ATGCGTACGTAGCTAGCTAGCTAAGTC'      # 29 nt（边界：仍触发短序列防护）
 SEQ30 = 'ATGCGTACGTAGCTAGCTAGCTAAGTCACG'   # 30 nt（边界：不触发短序列防护）
 SEQ60 = 'ATGCGTACGTAGCTAGCTAGCTAAGTCACGTAGCTAGCTAGCTAAGTCACGTAGCTAGCTAGCTA'
@@ -250,8 +250,8 @@ check(sleep_calls == [5, 10], f'@retry_on_network_error 重试保留（延迟序
 retry_utils.time.sleep = _real_sleep
 NCBIWWW.qblast = _real_qblast
 
-# ================================================================ 4) qblast 排队 deadline（2026-09-19 修复）
-# 真实事故：23nt + expect=0.001 的 qblast 在服务端排队 >600s，被 TS 执行层硬杀、无返回体。
+# ================================================================ 4) qblast 排队 deadline
+# 短查询 + 严 expect（如 23nt + expect=0.001）易在服务端长时间排队，超 600s 会被执行层终止。
 # 修复：本地施加总 deadline（默认 540s < 600s 硬杀线），超时主动放弃并抛
 # BlastQueueTimeout（刻意不继承 TimeoutError/OSError → 不触发网络重试——排队重试无意义）。
 print('[4] qblast 排队 deadline（本地主动放弃，不参与网络重试）')
