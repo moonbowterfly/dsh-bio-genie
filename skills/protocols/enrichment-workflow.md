@@ -74,4 +74,4 @@ for d in docs[:5]:
 
 - ORA（Enrichr）：输入是**基因列表**（阈值截断后）——信息有损但简单。
 - GSEA/ranked：输入是**全基因组排序**（按 log2FC）——不丢信息、能检出"整体弱趋势"。
-- 插件当前只有 ORA 工具（bio_enrichr）；用户提供排序数据时可用 bio_python 手写 GSEA（纯 numpy 可行但繁琐）或如实告知走外部 gseapy（不在插件环境）。
+- 插件已提供两类工具：ORA（`bio_enrichr`）与 GSEA（`bio_gsea`，Python 实现，默认 hallmark 基因集，输入差异表达结果表）。用户提供全基因组排序数据时优先用 `bio_gsea`；复杂自定义基因集可回退 `bio_python` 手写。

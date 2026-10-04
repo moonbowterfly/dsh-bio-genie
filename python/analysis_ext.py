@@ -2,7 +2,7 @@
 
 补齐与其他生信工具集对标时发现的 5 类缺口。**全部走真实库/真实算法**——
 对标对象 `bach-biotools-server` 在这些位置返回的是 Math.random() 伪造数据
-或 mock 占位（详见 dsh-bio-genie-doc/生信MCP生态调研与能力缺口-2026-09-16.md），
+或 mock 占位；
 本模块的实现路线与之无关，一律基于 Biopython / UniProt REST / ViennaRNA。
 
 包含：

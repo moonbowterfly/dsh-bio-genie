@@ -2,7 +2,7 @@
 // 目录预算 / description 可区分性 lint；Python 代码块语法与 import 可解析（静态质量门）。
 // 用法：node scripts/test-skills.mjs
 //
-// 静态质量门（2026-09-11 引入，来源：评审裁决 v2 + aipoch MedSkillAudit 思路）：
+// 静态质量门（2026-09-11 引入，设计参考 aipoch MedSkillAudit 思路）：
 //   ① frontmatter: name/description/language 齐备（协议另需 domain/inputs/outputs/requires_network）
 //   ② description ≤ 120 字符（单条）
 //   ③ 目录字符预算：注入 agent 的 skill 目录整块 ≤ 9000 字符
@@ -27,7 +27,7 @@ const acceptanceFilled = []
 /** name → 是否已有「验收标准」节（供棘轮判定"改动且仍缺"用）。 */
 const acceptanceState = new Map()
 
-// 严格模式**默认开启**：缺 venv、probe 失败、probe 无输出一律 FAIL（评审 2026-09-12：
+// 严格模式**默认开启**：缺 venv、probe 失败、probe 无输出一律 FAIL（2026-09-12：
 // 原先默认只 WARN，干净 CI 可整段跳过 python 门禁却显示 ALL PASS，等于门禁不存在）。
 // 没有自举环境的本机（克隆后尚未跑过插件）可显式放行：DSH_SKILLS_ALLOW_SKIP=1
 const ALLOW_SKIP = /^(1|true|yes)$/i.test(process.env.DSH_SKILLS_ALLOW_SKIP || '')
@@ -108,7 +108,7 @@ for (const s of SKILL_MANIFEST) {
   assertLanguage(`skill ${s.name}`, text)
   if (s.file.startsWith('protocols/')) {
     assert(text.startsWith('---'), `${s.file} 以 frontmatter 开头`)
-    // 只在 frontmatter 块内校验字段（评审 2026-09-12：原先用 text.includes 全文匹配，
+    // 只在 frontmatter 块内校验字段（2026-09-12：原先用 text.includes 全文匹配，
     // 字段写进正文也能通过）
     const fm = frontmatterBlock(text)
     for (const field of ['name', 'domain', 'inputs', 'outputs', 'requires_network']) {
@@ -122,7 +122,7 @@ for (const s of SKILL_MANIFEST) {
   const hasAcceptance = /##\s*验收标准/.test(text)
   acceptanceState.set(s.name, hasAcceptance)
   if (hasAcceptance) {
-    // 光有标题不算——必须含至少一条 checklist 条目（评审 2026-09-12）
+    // 光有标题不算——必须含至少一条 checklist 条目（2026-09-12）
     const acc = text.split(/##\s*验收标准/)[1] || ''
     assert(/- \[[ x]\]/.test(acc.slice(0, 1500)), `${s.name} 验收标准含 checklist 条目`)
     if (GRANDFATHERED.has(s.name)) acceptanceFilled.push(s.name)
@@ -134,7 +134,7 @@ for (const s of SKILL_MANIFEST) {
 }
 
 // ── 棘轮收紧：自基线 commit 起**被改动过**的 skill 不得继续留在豁免名单 ──
-// 评审 2026-09-12：原基线是静态白名单，改动过的 skill 仍只 WARN，规则形同虚设。
+// 2026-09-12：原基线是静态白名单，改动过的 skill 仍只 WARN，规则形同虚设。
 {
   const base = BASELINE.baseline_commit
   let changed = []
@@ -149,7 +149,7 @@ for (const s of SKILL_MANIFEST) {
     warn(`git 不可用 → 跳过「改动即须达标」检查: ${String(err.message).slice(0, 80)}`)
   }
   // ⚠️ git 给的是 `skills/xxx.md`，manifest 的 s.file 是 `xxx.md`：不归一化就永远匹配不到，
-  // 检查会静默空转（评审 2026-09-12 实测：8 个改动文件匹配到 0 个）。
+  // 检查会静默空转（2026-09-12 实测：8 个改动文件匹配到 0 个）。
   // 取路径末段即可（git 给 `skills/x.md`，manifest 存 `x.md`）——用 split 而非正则，免去转义层踩坑
   const toSkillName = (f) => SKILL_MANIFEST.find((s) => s.file === f.split('/').pop())?.name
   const changedNames = new Set(changed.map(toSkillName).filter(Boolean))
@@ -166,17 +166,17 @@ for (const s of SKILL_MANIFEST) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// 纪律 A · 目录预算 + description 可区分性（评审裁决 v2，2026-09-11）
+// 纪律 A · 目录预算 + description 可区分性（2026-09-11）
 // ─────────────────────────────────────────────────────────────
 // 计量口径（实测可复现）：agent 侧 skill 目录 = 一行一条 `- \`name\`: description`，
 // 单条字符数 = name + description + 6（减号、空格、反引号、冒号、空格、换行）。
-// 整块 = 条目行 + 外壳文字（FRAME_CHARS，实测取自真实会话 session-fe7dd226 的
+// 整块 = 条目行 + 外壳文字（FRAME_CHARS，实测取自真实会话的
 // <system-reminder> 块：6454 整块 − 5717 条目行 = 737）。
 const DESC_MAX_LEN = 120
 const CATALOG_BUDGET = 9000
 const FRAME_CHARS = 737
-// 同装插件的目录占用预算（实测 2026-09-11：gem-expert 154 + kimi-webbridge 520 +
-// user-style-preferences 84 = 758，取 800 留余量）。宿主侧/第三方 skill 变化时重测。
+// 同装插件的目录占用预算（实测 2026-09-11：同装插件 skill 目录约占 758 字符，
+// 取 800 留余量）。宿主侧/第三方 skill 变化时重测。
 const FOREIGN_BUDGET = 800
 const entryChars = (name, desc) => name.length + desc.length + 6
 
@@ -196,7 +196,7 @@ console.log('\n[目录预算]')
   assert(over.length === 0, `description 单条 ≤ ${DESC_MAX_LEN} 字符（超限 ${over.length} 条${over.length ? ' → ' + over.map((e) => `${e.name}(${e.description.length})`).join(', ') : ''}）`)
 
   // 主词唯一性（**启发式 lint**）：比较 description 首个分隔符前的**完整**引导词。
-  // 它只拦"同名/同形标题"这类明显撞车；语义可区分性仍需人工判断（评审 2026-09-12：
+  // 它只拦"同名/同形标题"这类明显撞车；语义可区分性仍需人工判断（2026-09-12：
   // 截断到 14 字符既可能误判、也能改个前缀绕过，不应被当成语义合并门）。
   const lead = (s) => s.split(/[：:，,（(。；;]/)[0].trim()
   const byLead = new Map()

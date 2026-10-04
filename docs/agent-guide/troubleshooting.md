@@ -17,7 +17,7 @@ language: none
 
 ## 2. R 引擎（已移除）
 
-R 执行器（bio_r / bio_r_env）已从插件移除；差异表达/GSEA 改用 Python 语义化工具 `bio_deseq2` / `bio_gsea`。若用户要求「用 R 跑 DESeq2」，如实告知插件已迁移到 Python 实现，并用对应语义化工具完成。
+R 执行器（bio_r / bio_r_env）已从插件移除；差异表达/GSEA 改用 Python 语义化工具 `bio_deseq2` / `bio_gsea`。若用户明确要求「用 R 跑 DESeq2」：如实告知本插件不含 DESeq2 本体——`bio_deseq2` 是归一化 Welch 近似实现（**非完整 DESeq2**，缺 NB GLM/离散度/收缩，见返回体 `method` 元数据），不得将其描述为 DESeq2 的等价替代；如需严格 DESeq2，建议用户走外部 R/Bioconductor 环境。
 
 ## 3. bio_python 失败
 

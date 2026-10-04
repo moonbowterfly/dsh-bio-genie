@@ -203,7 +203,7 @@ X 与 gap 在翻译时按未知碱基处理（Biopython 标准行为），含 X/
 | `bio-ml` | scikit-learn 生物数据机器学习（分类/降维/聚类/特征重要性） |
 | `bio-dna-design` | DNA 设计（引物、密码子优化、质粒图谱） |
 
-研究方法 skill：`bio-survival-analysis`（生存分析）、`bio-variant-analysis`（变异分析）、`bio-literature-review`（文献检索与综述，含 PRISMA 2020 系统综述流程）、`bio-evidence-appraisal`（证据分级与结论强度：证据层级/GRADE/四轴评估/措辞边界）、`bio-paper-writing`（论文写作）。另有 17 个协议模板与 8 份 agent 使用指南，随插件打包。
+研究方法 skill：`bio-survival-analysis`（生存分析）、`bio-variant-analysis`（变异分析）、`bio-literature-review`（文献检索与综述，含 PRISMA 2020 系统综述流程）、`bio-evidence-appraisal`（证据分级与结论强度：证据层级/GRADE/四轴评估/措辞边界）、`bio-paper-writing`（论文写作）。另有 19 个协议模板与 8 份 agent 使用指南，随插件打包。
 
 ---
 
@@ -329,7 +329,7 @@ agent 自动（实测行为）：
 | 维度 | 要求 |
 |------|------|
 | **Node** | `^22.19 \|\| >=24`（与 dsh 一致） |
-| **dsh** | peer 依赖 `@deepseek-ai/dsh-tools` 等为 `^0.1.0-rc.6`，与 dsh 源码仓库当前构建版本匹配。若宿主 dsh 为 npm `latest` 旧版本（`0.0.1-rc.1`），可能解析出两份 `dsh-tools` 导致类型不匹配——建议使用与源码仓库同步构建的 dsh |
+| **dsh** | peer 依赖 `@deepseek-ai/dsh-tools` 等为 `^0.1.0-rc.6 || ^0.2.0-rc.1`（0.1.x 与 0.2.0+ 双线支持，含官方桌面端；安装方式见上文「安装」节） |
 | **平台** | Windows / macOS / Linux（x86_64 / arm64），按平台自动下载对应 uv/Python |
 
 ---

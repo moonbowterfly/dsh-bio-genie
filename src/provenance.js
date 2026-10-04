@@ -76,7 +76,7 @@ function collectNumbers(value, out, depth, limit, seen) {
 
 /**
  * 两个数是否"同一个数"（精确，或在相对容差内——与 isVerified 同口径）。
- * 去重与验证必须用同一套判定，否则近似值会白占槽位（评审 2026-09-12 指出）。
+ * 去重与验证必须用同一套判定，否则近似值会白占槽位（2026-09-12 修正）。
  */
 function sameNumber(a, b) {
   if (a === b) return true
@@ -106,7 +106,7 @@ export function stampProvenance(tool, result) {
  * 把工具结果中的数值记入该 agent 的台账。由 rigor-guard 在
  * tools/post-execute 钩子中调用。
  *
- * 两条不变量（2026-09-12 依评审 + 本地复现修正）：
+ * 两条不变量（2026-09-12 修正）：
  *  ① **无新增数值就不动台账**——旧实现在"本次结果有无数字"尚未可知时先砍掉一半旧数据，
  *     一个空结果就能把历史合法数值清掉，让 agent 引用它们时被误判无溯源（假阳性）。
  *  ② **按需淘汰**——只丢"刚好容纳新数值"所需的量，不再整段砍半。
@@ -121,10 +121,10 @@ export function recordResult(agent, tool, result) {
   const incoming = []
   collectNumbers(result, incoming, 0, PER_RESULT_CAP, new Set())
   if (incoming.length > 0) {
-    // LRU 语义（评审 2026-09-12 P1）：本次结果里出现的数值一律视为"刚被确认"，
+    // LRU 语义（2026-09-12 修正）：本次结果里出现的数值一律视为"刚被确认"，
     // 因此先把旧队列中与之等值（或容差内近似）的条目**整体移除**，再把 incoming 追加到队尾。
     // 旧实现是"先算 fresh 再淘汰"：被当前工具刚回显的最老值既不在 fresh 里、又正好落在
-    // 淘汰区 → 明明是当前工具刚证明过的数，却失去了溯源（回归实测复现）。
+    // 淘汰区 → 明明是当前工具刚证明过的数，却失去了溯源（实测复现）。
     const remaining = ledger.numbers.filter((v) => !incoming.some((n) => sameNumber(n, v)))
     const overflow = Math.max(0, remaining.length + incoming.length - LEDGER_CAP)
     ledger.numbers = remaining.slice(overflow).concat(incoming)

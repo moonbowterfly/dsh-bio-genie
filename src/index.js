@@ -5,7 +5,7 @@
  *  - 系统提示词段（许愿式分析指引，persona.md 可编辑）
  *  - skill 目录（17 领域 + 5 研究 + 19 协议 + 8 指南 + 1 主 skill，共 50 个注册条目）
  *  - bio_python 执行器 + bio_env + bio_log/bio_memory + bio_goal + 57 个语义化工具（共 62 个工具）
- *  - rigor-guard 计算防火墙（_provenance 台账 + turn-stopping 无溯源数字打回）
+ *  - rigor-guard 计算防火墙（_provenance 台账 + turn-stopping 无溯源数字提醒）
  *  - 后台预热 Python 环境（零依赖自举：uv + venv + biopython）
  *
  * @module dsh-bio-genie
@@ -58,7 +58,7 @@ export function apply(ctx, config) {
   registerSkills(ctx, SKILLS_DIR, GUIDES_DIR)
   registerTools(ctx, cfg)
 
-  // rigor-guard 计算防火墙：工具结果 provenance 台账 + 回合收尾扫描打回。
+  // rigor-guard 计算防火墙：工具结果 provenance 台账 + 回合收尾扫描提醒。
   // 内部全部 try/catch，任何异常不影响 agent 循环。
   registerRigorGuard(ctx)
 

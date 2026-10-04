@@ -16,7 +16,7 @@ node_modules/
 # 本地打包产物（npm/pnpm pack 试装用）
 *.tgz
 
-# ---- 本地测试/试跑产物（图/临时数据；2026-09-11 曾误入提交一次）----
+# ---- 本地测试/试跑产物（图/临时数据）----
 figs/
 out/
 tmp/
@@ -34,13 +34,10 @@ dist/
 *.tmp
 tmp/
 
-# ---- 内部开发文档（只存仓库外 dsh-bio-genie-doc，绝不入公开仓库）----
-docs/WB审查报告*.md
-docs/面向WB审查.md
-docs/待吸收报告*.md
-docs/可借鉴工具调研.md
-docs/dsh-bio-genie-功能增进建议*.md
-docs/R_REMOVAL_REPORT.md
+# ---- 本地草稿/调研产物（不入库；发布物以 package.json files 为准）----
+docs/drafts/
+docs/*.local.md
+*.draft.md
 
 # ---- 操作系统 / 编辑器 ----
 .DS_Store

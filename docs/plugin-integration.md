@@ -186,7 +186,7 @@ GET  /api/dsh-bio-gem/integration/v1/jobs/:id     # 任务状态（批次 2 预�
 4. **下游接口 = 接入方规范导出**（gem_targets 11 字段：target_id/type/genes/met_ids/condition/rationale/
    evidence_tier/status/growth_or_maxprod/source/exported_at）。靶点清单一律走 gem_targets，不自行编格式。
 5. **质量铁律沿用 genie 本体**：数字必须来自工具输出（_provenance）；区间制对比（overlap=伪影禁止引用）；
-   退化场景如实报告（wt≤EPS）；生长值单位 mmol/gDW/h。
+   退化场景如实报告（wt≤EPS）；生长值单位以返回元数据为准（归一化 biomass 反应为 1/h；一般反应通量为 mmol/gDW/h）。
 
 ## 9. 路由决策表（辅助意图识别，v1 原文保留）
 
@@ -230,7 +230,7 @@ GET  /api/dsh-bio-gem/integration/v1/jobs/:id     # 任务状态（批次 2 预�
 - 依赖顺序：协议与状态模型 → 接入方 health/status → genie 容错适配器 → （批次 2）config schema →
   genie 共享安装 job → 接入方私有 job → 第二个领域扩展出现后提炼通用机制。
 
-## 13. 风险与纪律（实施与评审的检查项）
+## 13. 风险与纪律（实施与集成检查项）
 
 1. **语义膨胀**：不得让「子插件」暗示安装顺序/生命周期联动（dsh 无此能力）。
 2. **双重事实源**：同一事实只能有一个权威源——genie 不得直读接入方数据目录后再由接入方 API 报告另一版本；
@@ -275,10 +275,8 @@ GET  /api/dsh-bio-gem/integration/v1/jobs/:id     # 任务状态（批次 2 预�
 `detectDomain`（模块解析 → 同级目录回退）、`classifyDomainState`（六态）、
 `fetchDomainIntegration`（node:http 直连）、`handleDomainRequest`（条件分页分发）。
 
-- **gem 行为零漂移**：`scripts/test-gem-adapter.mjs` 与 `scripts/test-gem-http.mjs` **零修改**通过；
-  `server.js` 保留 `classifyGemState` / `fetchGemIntegration` / `GEM_INTEGRATION_*` 兼容别名。
-- 新增 `scripts/test-graft-adapter.mjs`（11 断言）：六态矩阵 + 缺必检项不得判 ready +
-  status/checks 矛盾判 installed-unavailable + gem 语义无漂移守卫。
+- **gem 行为兼容**：`server.js` 保留 `classifyGemState` / `fetchGemIntegration` / `GEM_INTEGRATION_*` 兼容别名（由 `scripts/test-gem-adapter.mjs` / `test-gem-http.mjs` 覆盖）。
+- 新增 `scripts/test-graft-adapter.mjs`：六态矩阵 + 缺必检项不得判 ready + status/checks 矛盾判 installed-unavailable + gem 语义守卫。
 - 这是契约 §0「两个领域扩展出现后提炼通用机制」的兑现；提炼范围仍严格限定在机械重复部分
   （不引入通用 UI 框架、不引入 capabilities 自动拼装）。
 
@@ -289,7 +287,7 @@ GET  /api/dsh-bio-gem/integration/v1/jobs/:id     # 任务状态（批次 2 预�
 | CRISPR/编辑**设计**（候选枚举、切割位点几何、脱靶解释、EditPlan、碱基编辑） | **graft** | 深水区结论（进报告/方案的数字）必须走 `graft_*` |
 | 编辑后序列比对（wild-type vs edited） | genie（`bio_crispr_verify`） | 通用序列操作，不属编辑设计语义 |
 | 参考基因组获取/assembly 信息 | genie（`bio_ref_genome` / `bio_entrez_*`） | graft 只做基因组体检与扫描，不实现下载 |
-| 验证引物设计 | genie（`bio_primer3_design` 等） | graft 只产出验证**要求**（后续批次）与交接 |
+| 验证引物设计 | genie（`bio_primer3_design` 等） | graft 只产出验证**要求**（见 `graft_validation_plan`）与交接 |
 | 轻量模板内 CRISPR 快查 | genie（`bio_crispr_guide`，**Tier 0 兜底层**） | 其 0-100 分为启发式，不得作为设计结论引用 |
 
 ### 15.4 资产权威源（本域）
@@ -309,14 +307,14 @@ GET  /api/dsh-bio-gem/integration/v1/jobs/:id     # 任务状态（批次 2 预�
 | 级别 | 动作 | 结果 |
 |---|---|---|
 | ① 端点直调 | `curl /api/dsh-bio-genie/editing?probe=install` 与完整请求 | `installed:true` / `state=ready` / checks 三项 ok / 5 计划 / 6 编辑器 / 7 工具 / remediations 空 |
-| ② bundle 内容 | boot manifest → 拉 `@dsh-bio/dsh-bio-genie/client.js` | 新分页文案与组件全部命中（60KB bundle） |
-| ③ 真实浏览器 | webbridge：设置 → BioGenie → 分页列表 | 出现「代谢建模」与「基因编辑设计」两个域分页；分页正文渲染完整（含证据分级列）；**抓到并按修复了**说明符口径 bug（`env.interpreter.selected` 是路径字符串） |
-| ④ 路由 before/after | 真实会话（同一工作区、同一任务） | 修复前：agent 手抄数据到 Python 排序、2 次工具失败；修复后：`skill(graft-expert)` → `graft_profiles` → `graft_design` → `graft_score` → `graft_plan_save`，**全程 0 次 `bio_crispr_guide`**、无因工具故障的绕道 |
-| ⑤ gem 回归 | `npm run bench` | exit 0（含 gem 两个既有测试零修改通过 + graft 适配器 + bio_crispr_guide 语义标签门） |
+| ② bundle 内容 | boot manifest → 拉 `@dsh-bio/dsh-bio-genie/client.js` | 新分页文案与组件全部命中 |
+| ③ 真实浏览器 | 设置 → BioGenie → 分页列表 | 「代谢建模」与「基因编辑设计」两个域分页渲染完整（含证据分级列） |
+| ④ 路由验证 | 真实会话（同一工作区、同一任务） | `skill(graft-expert)` → `graft_profiles` → `graft_design` → `graft_score` → `graft_plan_save` 全链走通 |
+| ⑤ 回归 | `npm run bench` | exit 0（含 gem 适配器、graft 适配器与 bio_crispr_guide 语义标签门） |
 
 ### 15.6 本域特有纪律（接入方与宿主都适用）
 
-1. **脱靶 API 不得有 `safe: true`**（批次 C 将落地 `assessment.safety_conclusion='not_supported'`
+1. **脱靶 API 不得有 `safe: true`**（已落地 `assessment.safety_conclusion='not_supported'`
    + `search_completeness` 枚举：mismatch=searched / bulge=not_searched）。
 2. **几何 ≠ 效率**：`verified` 只表示「PAM/几何已对一手文献核对」，不代表活性可预测。
 3. **负证据语义**：`0` / `null` / `not_searched` / `not_applicable` 必须可区分。

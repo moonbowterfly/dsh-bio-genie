@@ -163,7 +163,7 @@ Tool-layering decision tree: **check the semantic tool table first → use it if
 | `bio-ml` | scikit-learn ML on biological data (classification / dimred / clustering / feature importance) |
 | `bio-dna-design` | DNA design (primers, codon optimization, plasmid maps) |
 
-Research-method skills: `bio-survival-analysis`, `bio-variant-analysis`, `bio-literature-review` (incl. PRISMA 2020 systematic-review workflow), `bio-evidence-appraisal` (evidence hierarchy / GRADE / claim-strength wording), `bio-paper-writing`. Plus 17 protocol templates and 8 agent guides bundled with the plugin.
+Research-method skills: `bio-survival-analysis`, `bio-variant-analysis`, `bio-literature-review` (incl. PRISMA 2020 systematic-review workflow), `bio-evidence-appraisal` (evidence hierarchy / GRADE / claim-strength wording), `bio-paper-writing`. Plus 19 protocol templates and 8 agent guides bundled with the plugin.
 
 ---
 
@@ -288,7 +288,7 @@ On first tool call (or background warm-up at dsh startup) the plugin automatical
 | Dimension | Requirement |
 |-----------|-------------|
 | **Node** | `^22.19 \|\| >=24` (same as dsh) |
-| **dsh** | Peer deps `@deepseek-ai/dsh-tools` etc. at `^0.1.0-rc.6`, matching the current dsh source-tree build. If your host dsh is the older npm `latest` (`0.0.1-rc.1`), two copies of `dsh-tools` may resolve and cause type mismatches — use a dsh built from the source repository |
+| **dsh** | Peer deps `@deepseek-ai/dsh-tools` etc. at `^0.1.0-rc.6 || ^0.2.0-rc.1` (both 0.1.x and 0.2.0+ incl. the official desktop app; see the Installation section above) |
 | **Platform** | Windows / macOS / Linux (x86_64 / arm64); platform-appropriate uv/Python is downloaded automatically |
 
 ---

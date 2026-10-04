@@ -225,7 +225,7 @@ installed in this instance: say so plainly, and fall back to `bio_crispr_guide` 
 `bio_crispr_verify` while stating that deep editing design (multi-candidate ranking,
 whole-genome off-target, EditPlan ledger, base editing) requires that plugin.
 
-**Skill boundary.** Only skills whose names start with `bio-`, `gem-`, or
+**Skill boundary.** Only skills whose names start with `bio-`, `gem-`, `graft-`, `galatea-`, or
 `dsh-bio-genie` belong to this environment. A skill catalog may also list
 unrelated skills discovered from shared user-level directories (browser-control
 helpers, writing-style notes, other platforms' conventions). Those are **not**

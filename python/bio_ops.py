@@ -119,7 +119,7 @@ def op_seq_analyze(args):
         elif seq_type == 'rna':
             result['complement'] = str(s.complement())
             # 与 DNA 分支一致：含 X 的 RNA（探针/引物常见修饰碱基）或 gap 序列翻译前
-            # X/gap → N，避免 XXA / --A 等模糊密码子抛 TranslationError（WB 第二轮 S2 确认）
+            # X/gap → N，避免 XXA / --A 等模糊密码子抛 TranslationError（实测确认）
             translate_rna = s.replace('X', 'N').replace('-', 'N').replace('.', 'N')
             frames = {}
             for frame in range(3):
@@ -693,7 +693,7 @@ def op_ref_genome(args):
 
     headers = {'User-Agent': 'dsh-bio-genie/0.1.4'}
     url = f'https://rest.ensembl.org/info/assembly/{species}?content-type=application/json'
-    # 网络策略（WB 审查发现）：部分代理环境对 rest.ensembl.org 超时/404，
+    # 网络策略（实测发现）：部分代理环境对 rest.ensembl.org 超时/404，
     # 直连稳定。因此直连优先，失败回退系统代理。
     # 注意：只有 rest.ensembl.org 一个 host —— asia.ensembl.org 是网页门户
     # 而非 REST API，/info/assembly/ 路径必然 404，不可作 fallback。
@@ -1710,7 +1710,7 @@ def _blast_diagnostics(sequence, program, params_used, warnings, hit_count,
 
 
 # ── qblast 排队 deadline（2026-09-19 审计修复）──────────────────────────────
-# 真实事故（会话 924dd607）：23nt + expect=0.001 的 qblast 在 NCBI 服务端排队
+# 真实事故（实测）：23nt + expect=0.001 的 qblast 在 NCBI 服务端排队
 # >600s，被 TS 执行层硬杀（python execution timed out after 600000 ms），agent
 # 只拿到裸超时文案、无任何指引。qblast 的排队时长由 NCBI 控制、进程内无法中断
 # 其轮询，因此在本层施加**总 deadline** 主动放弃（默认 540s，后于执行层 600s

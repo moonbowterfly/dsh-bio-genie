@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """op_entrez_search 的 db 报错体验（2026-09-19 审计修复，P2）。
 
-真实会话 c954a395：db='patents' → Bio.Entrez 的
+真实会话实测：db='patents' → Bio.Entrez 的
 ``RuntimeError: Invalid db name specified: patents`` 原样透传，调用方拿不到
 任何「有哪些库可用」的信息。修复：识别此类服务端报错，替换为带常用 db 清单
 与出处链接的 ValueError（不拦截合法 db，只改善错误路径）。

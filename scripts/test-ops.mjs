@@ -80,7 +80,7 @@ const protX = callOp('seq_analyze', { sequence: 'MKTX', seq_type: 'protein' })
 assert(protX.ok && protX.result.molecular_weight === null, '蛋白含 X 时分子量降级为 null 不崩溃')
 
 const rnaX = callOp('seq_analyze', { sequence: 'AUGXXA' })
-assert(rnaX.ok, `含 X 的 RNA 不崩溃(WB 第二轮 S2: RNA 分支缺 X→N)`)
+assert(rnaX.ok, `含 X 的 RNA 不崩溃(实测：RNA 分支缺 X→N)`)
 assert(rnaX.result.seq_type === 'rna', `含 X 的 RNA 判为 rna(实际=${rnaX.result?.seq_type})`)
 assert(rnaX.result.translations?.['+1'] === 'MX', 'RNA 含 X 翻译按 N 处理为 X 氨基酸')
 
@@ -90,7 +90,7 @@ assert(degenerate.ok && degenerate.result.seq_type === 'dna', '简并引物(N/S)
 const aa20 = callOp('seq_analyze', { sequence: 'ACDEFGHIKLMNPQRSTVWY' })
 assert(aa20.ok && aa20.result.seq_type === 'protein' && aa20.result.molecular_weight > 2000, '20 种标准氨基酸判为蛋白')
 
-// gap 字符(比对序列):2026-08-17 WB 审查 N3 延伸处理——含 gap 的 DNA 比对序列
+// gap 字符(比对序列):2026-08-17 实测延伸处理——含 gap 的 DNA 比对序列
 // 曾被误判 protein 且翻译遇 --A 崩;按设计修复:gap 入 IUPAC 字母表 + 翻译前 gap→N
 const gapDna = callOp('seq_analyze', { sequence: 'ATGCGT--ACGT--' })
 assert(gapDna.ok, '含 gap 的 DNA 不崩溃')

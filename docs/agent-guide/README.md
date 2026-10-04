@@ -10,7 +10,7 @@ language: none
 
 用户说人话（"这条序列的 GC 含量和 EcoRI 酶切位点？"），你做三件事：
 
-1. **选路径**：先查语义化工具表（48 个高频工具，快、省 token、参数有校验）→ 命中就用；没命中再用 `bio_python` 执行器写 Biopython/Python 代码。
+1. **选路径**：先查语义化工具表（57 个高频工具，快、省 token、参数有校验）→ 命中就用；没命中再用 `bio_python` 执行器写 Biopython/Python 代码。
 2. **执行**：调用工具，读返回，必要时修复重试（自动代码修复 ACR，最多 2 次修复）。
 3. **报告**：用中文输出可溯源的生物学结论 + 产出的文件路径。**结论必须来自工具输出**，纯推断要标 `[推断-未验证]`（详见 `dsh-bio-genie-guide-rigor`）。
 
@@ -18,7 +18,7 @@ language: none
 
 | 层 | 工具 | 何时用 |
 |---|---|---|
-| 语义化工具 ×48 | `bio_seq_analyze` / `bio_enrichr` / `bio_deseq2` / `bio_gsea` / `bio_fig_export` 等 | 高频稳定操作，**第一优先** |
+| 语义化工具 ×57 | `bio_seq_analyze` / `bio_enrichr` / `bio_deseq2` / `bio_gsea` / `bio_fig_export` 等 | 高频稳定操作，**第一优先** |
 | Python 执行器 | `bio_python`（Python：Biopython 全功能 + 出版级绘图） | 语义化工具覆盖不到的一切，**第二优先** |
 | 元工具 ×3 | `bio_env` / `bio_log` / `bio_memory` | 环境诊断、日志回溯、经验查询 |
 | Autopilot | `bio_goal`（目标状态机：create/status/pause/resume/complete/block） | 复杂任务注册为持久目标，配合 bio-autopilot 协议 |
