@@ -147,7 +147,7 @@ assertCount('src/index.js', /共 (\d+) 个注册条目/g, skillTotal, 'index.js 
 assertCount('lib/client.js', /(\d+) 个 skill、零依赖/g, skillTotal, 'client.js 面板文案 skill 数')
 assertCount('package.json', /\+ (\d+) 个 skill（1 主 skill/g, skillTotal, 'package.json description skill 数')
 
-// 组件计数（领域+研究）——外部评审 2026-09-12 指出：只断言总数会漏掉「21 应为 22」这类残留
+// 组件计数（领域+研究）——评审 2026-09-12 指出：只断言总数会漏掉「21 应为 22」这类残留
 const domainResearch = domainN + researchN
 assertCount('README.md', /配合 (\d+) 个领域\/研究 skill 配方/g, domainResearch, 'README 领域/研究 skill 数')
 assertCount('README.en.md', /backed by (\d+) domain\/research skill recipes/g, domainResearch, 'README.en 领域/研究 skill 数')

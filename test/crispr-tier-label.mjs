@@ -1,4 +1,4 @@
-// test/crispr-tier-label.mjs — bio_crispr_guide 的「语义标签」回归（GPT 裁决 #4）。
+// test/crispr-tier-label.mjs — bio_crispr_guide 的「语义标签」回归（设计决定 #4）。
 //
 // 背景：bio_crispr_guide 输出 0-100 启发式综合分，与 graft 的「禁综合分」哲学冲突。
 // 裁决是**保留行为、只改标签**（对既有用户零破坏）：返回值必须带

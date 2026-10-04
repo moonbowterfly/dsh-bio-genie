@@ -78,7 +78,7 @@ result = {'n': len(stats), 'stats': stats[:20]}
 
 # NCBI（bio_python 里直接调时必须自己守规矩）
 from Bio import Entrez
-Entrez.email = 'shuaihao264@gmail.com'     # 必设！
+Entrez.email = 'your.email@example.com'     # 必设！填你自己的邮箱
 Entrez.tool = 'dsh-bio-genie'
 import time
 handle = Entrez.esearch(db='nucleotide', term='NM_007294', retmax=1)

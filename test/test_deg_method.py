@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """bio_deseq2 统计口径 v2 回归测试（median-of-ratios 归一化 + log2 空间 Welch t）。
 
-背景（2026-10-05，round2 E2E）：v1 为原始计数上的等方差 t 检验且无文库归一化，
+背景（2026-10-05）：v1 为原始计数上的等方差 t 检验且无文库归一化，
 agent 实测反推发现「声称为 DESeq2 等效但既非负二项亦无归一化」——v2 修正为
 归一化 Welch 口径并新增 method 元数据 / out_csv 全量落盘。
 

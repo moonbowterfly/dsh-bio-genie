@@ -18,7 +18,7 @@ def op_assembly_design(args):
 
     # vector 真正参与组装：把线性化载体并入片段列表（作为环化起点）。
     # 此前 vector 是声明了却从未使用的死参数，导致「单个插入片段 + 载体」这种最常见的
-    # 组装表达被 len<2 直接拒掉——v0.6.26 E2E 实测 agent 连续两次撞
+    # 组装表达被 len<2 直接拒掉——v0.6.26 实测 agent 连续两次撞
     # 'at least 2 fragments required' 且无法从错误里自救。
     if vector:
         fragments = [vector] + fragments
@@ -237,7 +237,7 @@ def op_plasmid_map(args):
         )
 
     # 统计：按区间并集算覆盖碱基数，避免重叠特征被重复计数。
-    # （E2E 实测：eGFP 720bp 图上有 CDS(0-720) + 两端引物 + 起始/终止密码子等
+    # （实测：eGFP 720bp 图上有 CDS(0-720) + 两端引物 + 起始/终止密码子等
     #   子区间，简单求和得 776bp > 720bp → unannotated_bp = -56 这种无意义的负值。）
     spans = sorted((max(0, int(f.get('start', 0))), min(max_pos, int(f.get('end', 0))))
                    for f in features

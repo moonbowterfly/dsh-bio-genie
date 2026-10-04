@@ -146,7 +146,7 @@ export function registerRigorGuard(ctx) {
       //（"refuses retired plugin wrappers"）。旧值 {kind:'plugin', plugin:…} 会让
       // 本 spliced 事件的写入被拒 → **同批的最终回复+收尾事件全部无法落盘**、
       // 回合以 "format v4 message requires a producer-owned source kind" 报错、
-      // 会话尾部冻结（E2E 实测 5 个会话中招）。自报身份直接以插件名作 kind。
+      // 会话尾部冻结（实测 5 个会话中招）。自报身份直接以插件名作 kind。
       // 这是**本轮之后的提醒**（回复已放行）：要求下一轮给数字带上出处，
       // 不要求撤回、不要求停止本轮工作。
       agent.steer({

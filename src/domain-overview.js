@@ -183,7 +183,7 @@ export async function collectDomainCard(domain, req, {
 /** Data source for GET /api/dsh-bio-genie/domain-overview. */
 export async function collectDomainOverview(req, options = {}) {
   const domains = options.domains ?? DOMAINS
-  // ⚠️ 逐域兜底（2026-10-02 修 Codex 二阶审查 P2）：原用裸 Promise.all，
+  // ⚠️ 逐域兜底（2026-10-02 修复）：原用裸 Promise.all，
   // 任一域的 detect/integration 抛出未预期异常就会让**整个端点** 500，
   // 用户连其他域的卡片都看不到。改为逐卡 catch，异常域给出明确降级卡片。
   const domainCards = await Promise.all(domains.map(async (domain) => {

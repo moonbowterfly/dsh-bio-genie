@@ -281,7 +281,7 @@ def differential_plot(dz_frame: pd.DataFrame | str, *, effect_col: str = 'log2FC
     return fig, ax, meta
 
 
-# 别名（符合 GPT 所述"两个模板应共用同一数据语义"）
+# 别名（符合"两个模板应共用同一数据语义"的设计约定）
 volcano_plot = lambda *a, **k: differential_plot(*a, mode='volcano', **k)
 ma_plot = lambda *a, **k: differential_plot(*a, mode='ma', **k)
 

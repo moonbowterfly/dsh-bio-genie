@@ -76,7 +76,7 @@ function collectNumbers(value, out, depth, limit, seen) {
 
 /**
  * 两个数是否"同一个数"（精确，或在相对容差内——与 isVerified 同口径）。
- * 去重与验证必须用同一套判定，否则近似值会白占槽位（外部评审 2026-09-12 指出）。
+ * 去重与验证必须用同一套判定，否则近似值会白占槽位（评审 2026-09-12 指出）。
  */
 function sameNumber(a, b) {
   if (a === b) return true
@@ -106,7 +106,7 @@ export function stampProvenance(tool, result) {
  * 把工具结果中的数值记入该 agent 的台账。由 rigor-guard 在
  * tools/post-execute 钩子中调用。
  *
- * 两条不变量（2026-09-12 依外部评审 + 本地复现修正）：
+ * 两条不变量（2026-09-12 依评审 + 本地复现修正）：
  *  ① **无新增数值就不动台账**——旧实现在"本次结果有无数字"尚未可知时先砍掉一半旧数据，
  *     一个空结果就能把历史合法数值清掉，让 agent 引用它们时被误判无溯源（假阳性）。
  *  ② **按需淘汰**——只丢"刚好容纳新数值"所需的量，不再整段砍半。
@@ -121,7 +121,7 @@ export function recordResult(agent, tool, result) {
   const incoming = []
   collectNumbers(result, incoming, 0, PER_RESULT_CAP, new Set())
   if (incoming.length > 0) {
-    // LRU 语义（外部评审 2026-09-12 P1）：本次结果里出现的数值一律视为"刚被确认"，
+    // LRU 语义（评审 2026-09-12 P1）：本次结果里出现的数值一律视为"刚被确认"，
     // 因此先把旧队列中与之等值（或容差内近似）的条目**整体移除**，再把 incoming 追加到队尾。
     // 旧实现是"先算 fresh 再淘汰"：被当前工具刚回显的最老值既不在 fresh 里、又正好落在
     // 淘汰区 → 明明是当前工具刚证明过的数，却失去了溯源（回归实测复现）。
@@ -203,7 +203,7 @@ export function findUnverifiedNumbers(agent, text) {
     if (/[A-Za-z]\s*$/.test(clean.slice(Math.max(0, numStart - 32), numStart))) continue
     // 百分比换算容忍：工具常以小数给出比例（如 metabolite_formula_coverage 0.6835），
     // agent 以百分数表达（68.35%）。只比原值会把合法的换算引用判成无溯源
-    //（E2E 实测：agent 引用 68.35% 被拦两次，最终靠把 68.35 打印成工具输出才通过，
+    //（实测：agent 引用 68.35% 被拦两次，最终靠把 68.35 打印成工具输出才通过，
     // 白烧 3 轮 bio_python）。
     const isPercent = after === '%'
     if (!isVerified(agent, n) && !(isPercent && isVerified(agent, n / 100))) {

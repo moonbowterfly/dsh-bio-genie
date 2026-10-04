@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """bio_python bridge 的 result 规范化回归测试（2026-10-04）。
 
-背景：真实 E2E 会话中 agent 用 bio_python 做 cobra 计算后返回 numpy 标量，
+背景：真实会话中 agent 用 bio_python 做 cobra 计算后返回 numpy 标量，
 工具层报 `value is not lossless JSON`（dsh snapshot 校验拒绝 -0.0/NaN/Inf），
 agent 被迫显式 float() 转换自愈。修复：bridge._normalize_json_value 对
 numpy 标量/数组做原生转换，-0.0→0.0、NaN/±inf→null，其余递归规范化。

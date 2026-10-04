@@ -40,7 +40,7 @@ import { collectDomainOverview } from './domain-overview.js'
 
 /** 路由前缀（与 @linxin666/dsh-client-ui-web-ui-settings 同风格）。 */
 const ROUTE_PREFIX = '/api/dsh-bio-genie'
-/** 工具调试面板的参数 schema（与 client.js 共用）。 */
+/** 工具试运行面板的参数 schema（与 client.js 共用）。 */
 const TOOL_SCHEMAS = [
   { name: 'seq_analyze', label: '序列分析', engine: 'python', params: [
     { key: 'sequence', type: 'text', required: true, placeholder: 'ATGCGATCGATCG...', desc: '核酸或蛋白质序列' },
@@ -398,7 +398,7 @@ async function handleAddons(req, res, config) {
     : { ok: false, code: 'addon-failed', message: result.error || '操作失败' })
 }
 
-/** 工具 schema 端点：返回所有可调试工具的参数定义。 */
+/** 工具 schema 端点：返回所有可试运行工具的参数定义。 */
 async function handleToolSchemas(req, res) {
   writeJson(res, 200, { ok: true, value: TOOL_SCHEMAS })
 }

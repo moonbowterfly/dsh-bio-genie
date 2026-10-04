@@ -1205,7 +1205,7 @@ function semanticTools(config) {
       },
       op: 'crispr_guide',
       timeoutMs: 60_000,
-      // 语义标签（2026-09-14 GPT 裁决 #4：**保留行为、只改标签**，对既有用户零破坏）：
+      // 语义标签（2026-09-14 设计决定：**保留行为、只改标签**，对既有用户零破坏）：
       // 明确本工具是「轻量启发式」，并据真实包探测告知是否已装深度设计器 dsh-bio-graft。
       decorate: (value) => ({
         ...value,

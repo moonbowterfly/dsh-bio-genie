@@ -9,7 +9,7 @@
  *   - 幂等：已存在不覆盖（保护用户就地编辑的 persona / skill 文件）
  *   - 非致命：失败仅 warn，不 throw——不挡其他 npm 脚本/postinstall
  *   - Windows 友好：路径用 path.join；DSH_HOME 优先取环境变量，否则 $USERPROFILE/.dsh
- *   - 支持 --force：CI / 调试时强制覆盖
+ *   - 支持 --force：CI / 重复安装时强制覆盖
  *   - 支持 --dry-run：只看会做什么，不实际操作
  *
  * 调用方式：

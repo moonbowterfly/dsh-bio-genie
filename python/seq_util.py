@@ -4,7 +4,7 @@
 - `read_text_input`：文本参数 = 内容本身 或 文件路径（读取文件原文）。
 - `read_seq_input`：序列参数 = 内容本身 或 文件路径（FASTA / GenBank / 纯文本 → 去空白序列）。
 
-背景（2026-10-04 E2E 实测）：agent 自然地把「FASTA 文件路径」传给
+背景（2026-10-04 实测）：agent 自然地把「FASTA 文件路径」传给
 bio_seq_analyze / bio_primer3_design 等工具的 sequence 参数，此前被当作字面序列
 解析（报 `Codon 'LAC' is invalid`、`模板太短（21 bp）` 等底层怪错误）；且旧
 analysis_ext._read_text_arg 读 FASTA 时会把 header 里恰好是 a/c/g/t 的字母混入序列。

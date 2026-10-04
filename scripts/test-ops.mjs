@@ -220,21 +220,21 @@ if (SKIP_NET) {
     return r
   }
 
-  const gene = callNet('entrez_search', { db: 'gene', term: 'TP53[Gene Name] AND human[Organism]', retmax: 3, email: 'shuaihao264@gmail.com' })
+  const gene = callNet('entrez_search', { db: 'gene', term: 'TP53[Gene Name] AND human[Organism]', retmax: 3, email: 'bio-genie@example.com' })
   assert(gene.ok && gene.result.summaries.length >= 1 && gene.result.summaries[0].name === 'TP53', 'gene 检索返回 TP53 元数据')
   assert(gene.ok && gene.result.summaries[0].id === '7157' && gene.result.summaries[0].map_location === '17p13.1', 'gene 元数据含 UID 与染色体位置')
 
-  const nuc = callNet('entrez_search', { db: 'nucleotide', term: 'NM_007294', retmax: 1, email: 'shuaihao264@gmail.com' })
+  const nuc = callNet('entrez_search', { db: 'nucleotide', term: 'NM_007294', retmax: 1, email: 'bio-genie@example.com' })
   assert(nuc.ok && nuc.result.summaries[0].accession === 'NM_007294', 'nucleotide 检索回归（accession 正确）')
 
   const enrich = callNet('enrichr', { genes: ['TP53', 'BRCA1', 'EGFR', 'MDM2'], library: 'KEGG_2021_Human', top: 3 })
   assert(enrich.ok && enrich.result.results.length === 3, 'enrichr KEGG 返回 3 条')
   assert(enrich.ok && enrich.result.results[0].adjusted_p_value < 1e-5 && Array.isArray(enrich.result.results[0].overlap_genes), 'enrichr 结果含校正 p 值与重叠基因')
 
-  const pub = callNet('pubmed_search', { term: 'CRISPR gene editing', retmax: 3, email: 'shuaihao264@gmail.com' })
+  const pub = callNet('pubmed_search', { term: 'CRISPR gene editing', retmax: 3, email: 'bio-genie@example.com' })
   assert(pub.ok && pub.result.results.length === 3 && pub.result.results[0].pmid, 'pubmed_search 返回 PMID')
 
-  const abs = callNet('pubmed_abstract', { ids: ['42603971'], email: 'shuaihao264@gmail.com' })
+  const abs = callNet('pubmed_abstract', { ids: ['42603971'], email: 'bio-genie@example.com' })
   assert(abs.ok && abs.result.results[0].doi === '10.1016/j.omta.2026.201816', 'pubmed_abstract DOI 提取正确')
   assert(abs.ok && abs.result.results[0].abstract.length > 500, 'pubmed_abstract 摘要全文')
 

@@ -10,8 +10,8 @@ language: python
 # 差异分析出版配方：volcano / MA（bio-proto-differential）
 
 > 协议库配方（随 bio-figure skill 使用）。库：`figurelib.differential_recipes`
-> （本插件自研，MIT——视觉规则源自 Nature figure guide 精神 + GPT 评审意见，
-> 经本地实现与实拍验证）。
+> （本插件自研，MIT——视觉规则参考 Nature figure guide，
+> 经实现与实测验证）。
 > 配方登记：src/skills.js PROTOCOL rugs 决策树已含 bio-proto-pub-figure；
 > 本协议补差异分析专用层。
 

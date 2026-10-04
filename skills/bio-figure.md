@@ -45,7 +45,7 @@ caption contains what is necessary to reproduce and statistically interpret the 
 
 配色的语义层级：Tier A 焦点证据（accent 色、zorder 高）> Tier B 辅助（次级色）> Tier C 上下文（浅灰、细、低透明度）。**约 80% 数据用中性灰，只有 20% 关键数据才有颜色——这是「编辑级质感」的第一杠杆。**
 
-## 视觉层级与配色语义（2026-09-12 升级，源自 GPT 评审 + 本地复核）
+## 视觉层级与配色语义（2026-09-12 升级，经设计评审与本地复核）
 
 - **语义色 token（全篇一致）**：neutral=#BDBDBD、up=#D55E00（vermillion）、down=#0072B2（blue）、
   highlight=#000000。同一语义全图全篇同色——Control 在 Fig.1 是蓝色，Fig.2-6 不许变橙。

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """differential_recipes 回归测试 — label_col 缺省回退（2026-10-05）。
 
-背景（round2 E2E 实测）：differential_plot 的 label_col=None 路径把 'name'
+背景（实测）：differential_plot 的 label_col=None 路径把 'name'
 当默认列（`label_col or 'name'`），df 没有该列时直接 KeyError——agent 被迫
 给 df 硬加一列 'name' 才能出图。修复后：'name' 仅在真实存在时才使用，
 否则回退索引，且 _pick_labels / labels_arr 双侧一致。

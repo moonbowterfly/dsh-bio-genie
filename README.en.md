@@ -30,7 +30,7 @@
 | 📜 **Transparency Log** | Every code execution / tool call appends an async JSONL log (hash/preview/duration); `bio_log` traces back any analysis; logs are auto-rotated after 30 days |
 | 🧬 **Scientific Rigor Guardrails** | Persona enforces "biological conclusions must trace to tool output"; pure inference is marked [inferred — unverified] |
 | 🧠 **Session Memory** | Successful code patterns + error→fix lessons accumulate automatically (local JSON); query via `bio_memory`, gets smarter over time |
-| ⚙️ **Settings Panel** | "BioGenie" menu in dsh Settings sidebar (⚙️) — tabs: Overview (package info/config defaults), Skill Modules (50 entries grouped by main/domain/research/protocol/guide), Python Environment (venv packages), Tool Debug; with dsh-bio-gem / dsh-bio-graft / dsh-bio-galatea sharing the instance, additional read-only five-state panels "Metabolic Modeling" / "Gene-Editing Design" / "Protein Design" (**the Protein Design page includes a "Model directory" manager to install galatea weights on another drive**) |
+| ⚙️ **Settings Panel** | "BioGenie" menu in dsh Settings sidebar (⚙️) — tabs: Overview (package info/config defaults), Skill Modules (50 entries grouped by main/domain/research/protocol/guide), Python Environment (venv packages), Tool Playground; with dsh-bio-gem / dsh-bio-graft / dsh-bio-galatea sharing the instance, additional read-only five-state panels "Metabolic Modeling" / "Gene-Editing Design" / "Protein Design" (**the Protein Design page includes a "Model directory" manager to install galatea weights on another drive**) |
 | 📚 **Protocol Knowledge Base** | 17 high-frequency task protocols (QC/alignment/BLAST/cloning/trees/structure/enrichment/publication figures/coordinate systems/statistics/differential expression/GSEA…), each with runnable code templates + pitfalls, bundled with the plugin |
 
 ---
@@ -48,7 +48,7 @@ npx -y @deepseek-ai/dsh plugin --profile web add @dsh-bio/dsh-bio-genie
 # Option 2: Install from GitHub (fetches source; this plugin is pure ESM with no build step, loads directly)
 npx -y @deepseek-ai/dsh plugin --profile web add github:moonbowterfly/dsh-bio-genie
 
-# Option 3: Install from a local directory (development)
+# Option 3: Install from a local directory (local source)
 npx -y @deepseek-ai/dsh plugin --profile web add ./dsh-bio-genie
 ```
 
@@ -298,7 +298,7 @@ On first tool call (or background warm-up at dsh startup) the plugin automatical
 Pure ESM JavaScript, **no build step**, edit-and-run:
 
 ```bash
-git clone https://github.com/dsh-bio/dsh-bio-genie
+git clone https://github.com/moonbowterfly/dsh-bio-genie
 # Invoke the bootstrapper directly (first run downloads the environment, ~1-2 min):
 node --input-type=module -e "import('./src/runtime.js').then(m => m.ensureEnvironment({}))"
 ```

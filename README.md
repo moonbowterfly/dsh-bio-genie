@@ -30,7 +30,7 @@
 | 📜 **透明性日志** | 每次代码执行/工具调用异步记 JSONL 日志（哈希/预览/耗时），`bio_log` 可回溯任何一次分析；日志自动 30 天轮转清理 |
 | 🧬 **科学严谨性约束** | persona 强制「生物学结论必须可溯源到工具输出」，纯推断标注 [推断-未验证] |
 | 🧠 **会话记忆** | 成功代码模式 + 错误→修复经验自动沉淀（本地 JSON），`bio_memory` 查询，越用越聪明 |
-| ⚙️ **设置面板** | dsh 设置面板（⚙️ 齿轮）侧栏「BioGenie」菜单——标签页：总览（包元信息/配置默认值）、Skill 模块（50 个条目按主 skill/领域/研究/协议/指南分组）、Python 环境（venv 包列表）、工具调试；同实例安装 dsh-bio-gem / dsh-bio-graft / dsh-bio-galatea 时还分别显示「代谢建模」「基因编辑设计」「蛋白设计」只读五态面板（**蛋白设计页含「模型目录」管理：可把 galatea 大模型安装到其他磁盘**） |
+| ⚙️ **设置面板** | dsh 设置面板（⚙️ 齿轮）侧栏「BioGenie」菜单——标签页：总览（包元信息/配置默认值）、Skill 模块（50 个条目按主 skill/领域/研究/协议/指南分组）、Python 环境（venv 包列表）、工具试运行；同实例安装 dsh-bio-gem / dsh-bio-graft / dsh-bio-galatea 时还分别显示「代谢建模」「基因编辑设计」「蛋白设计」只读五态面板（**蛋白设计页含「模型目录」管理：可把 galatea 大模型安装到其他磁盘**） |
 | 📚 **协议知识库** | 19 个高频任务协议（质控/比对/BLAST/克隆/建树/结构/富集/出版级绘图/坐标系统/统计检验/差异表达/GSEA/NGS 流程…），每个含可执行代码模板 + 常见坑，随插件打包 |
 
 ---
@@ -48,17 +48,17 @@ npx -y @deepseek-ai/dsh plugin --profile web add @dsh-bio/dsh-bio-genie
 # 方式二：从 GitHub 安装（拉取源码；本插件为纯 ESM 无构建步骤，可直接加载）
 npx -y @deepseek-ai/dsh plugin --profile web add github:moonbowterfly/dsh-bio-genie
 
-# 方式三：从本地目录安装（开发调试）
+# 方式三：从本地目录安装（本地源码）
 npx -y @deepseek-ai/dsh plugin --profile web add ./dsh-bio-genie
 
-# 方式四：从本地 tarball 安装（npm pack 产物＝发布形态；适合发布前冷启动验证）
+# 方式四：从本地 tarball 安装（npm pack 产物）
 cd /path/to/dsh-bio-genie && npm pack
-npx -y @deepseek-ai/dsh plugin --profile web add ./dsh-bio-dsh-bio-genie-0.6.38.tgz
+npx -y @deepseek-ai/dsh plugin --profile web add ./dsh-bio-dsh-bio-genie-<版本>.tgz
 ```
 
 `--profile <name>` 是**必填选项**（不传报 `required option '--profile <name>' not specified`），Web 端固定用 `web`。
 
-**引擎兼容**：0.1.x 侧经 dsh **0.1.5-rc.2** 走廊逐卡走查（v0.1.3-alpha.2 → 0.1.5-rc.2 的 4 个边共 55 张变更卡全部核对：零适配命中）与实机验证（全新安装 + 工具注册 + Python 引导 + 设置面板 7 tab + 会话 E2E）。**0.2.0+ 侧（含官方桌面端）已适配**：peer 声明放宽为 `^0.1.0-rc.6 || ^0.2.0-rc.1`（0.2.0-rc.2 上零豁免直装）；agent preset 改由插件自带声明提供（见「精灵专家人设」一节）；双端实机验证通过（0.2.0-rc.2：preset 自动出现 + 工具全量注册 + skill 动态定位；0.1.5-rc.2：启动正常、preset 行自动跳过）。
+**引擎兼容**：0.1.x 侧经 dsh **0.1.5-rc.2** 完整兼容核验（v0.1.3-alpha.2 → 0.1.5-rc.2 全量变更核对：零适配命中）与实机验证（全新安装 + 工具注册 + Python 引导 + 设置面板 + 真实会话）。**0.2.0+ 侧（含官方桌面端）已适配**：peer 声明放宽为 `^0.1.0-rc.6 || ^0.2.0-rc.1`（0.2.0-rc.2 上直接安装）；agent preset 改由插件自带声明提供（见「精灵专家人设」一节）；双端实机验证通过（0.2.0-rc.2：preset 自动出现 + 工具全量注册 + skill 动态定位；0.1.5-rc.2：启动正常、preset 行自动跳过）。
 
 安装后重启 dsh web 服务，插件即被加载。首次启动时插件会在后台自动引导 Python
 环境（下载 uv → Python 3.12 → venv → biopython，约 1-2 分钟），之后秒级就绪。
@@ -339,7 +339,7 @@ agent 自动（实测行为）：
 纯 ESM JavaScript，**无构建步骤**，改完即用：
 
 ```bash
-git clone https://github.com/dsh-bio/dsh-bio-genie
+git clone https://github.com/moonbowterfly/dsh-bio-genie
 # 直接调用引导器（首次会下载环境，约 1-2 分钟）：
 node --input-type=module -e "import('./src/runtime.js').then(m => m.ensureEnvironment({}))"
 ```

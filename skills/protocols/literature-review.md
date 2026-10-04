@@ -48,7 +48,7 @@ def openalex_search(query, n=10, sort='cited_by_count:desc'):
     """OpenAlex 作品检索。返回 id/title/year/cited_by/doi/type。"""
     base = 'https://api.openalex.org/works'
     params = urllib.parse.urlencode({'search': query, 'per-page': n, 'sort': sort})
-    url = f'{base}?{params}&mailto=shuaihao264@gmail.com'   # 礼貌参数，建议换成用户邮箱
+    url = f'{base}?{params}&mailto=your.email@example.com'   # 礼貌参数，建议换成用户邮箱
     with urllib.request.urlopen(url, timeout=20) as r:
         data = json.loads(r.read().decode())
     out = []

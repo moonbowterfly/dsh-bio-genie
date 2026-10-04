@@ -23,7 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Primer3 explain 短语 → 中文可操作建议。
 # n=0 时只回传英文统计（如 "considered 548, overlap target 548, ok 0"）时，
-# agent 只能靠猜测逐个放宽参数试错（v0.6.26 E2E：连续 3 次无效调用后才放弃）。
+# agent 只能靠猜测逐个放宽参数试错（v0.6.26 实测：连续 3 次无效调用后才放弃）。
 _PRIMER3_EXPLAIN_HINTS = (
     ('overlap target',
      '候选引物与 SEQUENCE_TARGET 重叠被排除——该参数（本工具的 must_include）要求引物落在'
@@ -85,7 +85,7 @@ def op_primer3_design(args):
     # target_region 语义 = 「要扩增的区间」（引物落在区间内）→ 映射到 Primer3 的
     # SEQUENCE_INCLUDED_REGION。绝不能映射到 SEQUENCE_TARGET：后者要求引物位于
     # 目标区之外，扩增全长（如 [0, 720]）时引物无处可放 → 恒返回 ok 0，且与
-    # 放宽 tm/gc/二级结构约束完全无关（v0.6.26 E2E 实测：eGFP 720bp 全长扩增
+    # 放宽 tm/gc/二级结构约束完全无关（v0.6.26 实测：eGFP 720bp 全长扩增
     # 连续 3 次失败，agent 无法靠调参自救）。
     target_region = args.get('target_region')
     if target_region:

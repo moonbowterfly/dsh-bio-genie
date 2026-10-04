@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """sequence 参数「内容或文件路径」统一解析的回归测试（2026-10-04）。
 
-背景：真实 E2E 会话（dsh 桌面端 lacZ 任务）中，agent 自然地把 FASTA 文件路径
+背景：真实会话（dsh 桌面端 lacZ 任务）中，agent 自然地把 FASTA 文件路径
 传给 bio_seq_analyze / bio_primer3_design 的 sequence 参数，被当作字面序列解析
 （报 Codon 错误 / 模板太短的底层怪错误），agent 被迫全文打印序列再复制粘贴。
 修复：seq_util.read_seq_input 统一解析（存在路径 → FASTA/GenBank/纯文本；

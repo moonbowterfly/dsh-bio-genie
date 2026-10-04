@@ -158,7 +158,7 @@ const CHECK_STATUSES = new Set(['ok', 'warn', 'missing', 'error'])
 function hasValidDomainStatus(domain, status) {
   if (!status || !['ready', 'degraded'].includes(status.state) || !Array.isArray(status.checks)) return false
   if (!status.checks.every((check) => typeof check?.id === 'string' && CHECK_STATUSES.has(check.status))) return false
-  // ⚠️ check id 必须唯一（2026-10-02 修 Codex 二阶审查 P2）：重复 id 会让
+  // ⚠️ check id 必须唯一（2026-10-02 修复）：重复 id 会让
   // 「取最后一条」的消费方把 missing 记成 ok，凭空造出可用能力。宁可判不可用。
   const ids = status.checks.map((check) => check.id)
   if (new Set(ids).size !== ids.length) return false
