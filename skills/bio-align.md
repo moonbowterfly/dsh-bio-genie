@@ -74,6 +74,14 @@ print(summary.pos_specific_score_matrix())  # 位置特异性打分矩阵
 
 ## 要点
 
-- `PairwiseAligner` 支持多序列比对：直接 `aligner.align(seq1, seq2, seq3, ...)`。
+- `PairwiseAligner` **只支持双序列**（签名 `align(seqA, seqB, strand='+')`；Biopython 1.88 实测：传入第 3 条序列会被当作 `strand` 参数，报 `ValueError: strand must be '+' or '-'`）。多序列需求三条路：① 有 clustalw/muscle → 用 `bio_msa`（缺二进制时返回 `program_missing` + 安装提示，不是静默失败）；② 只是要建树 → **跳过 MSA**：逐对全局比对得距离矩阵直接建树（距离法只需要两两距离）；③ 要真 MSA 文件 → 自写渐进式合并（以最完整序列为锚逐条比对、按坐标合并），并标注为近似比对。
 - 大文件比对结果很占内存，必要时逐条处理。
 - SAM/BAM 请用 `Bio.Align.read("file.sam", "sam")`（新版 API），不是 `AlignIO`。
+
+## 验收标准
+
+- [ ] 路线选择正确：双序列用 `PairwiseAligner`；多序列先试 `bio_msa`（clustalw/muscle），二进制缺失时按 `program_missing` 提示走降级路线并**明示降级**——绝不静默伪称做过 MSA
+- [ ] 手工/近似比对（逐对合并、星形锚定等）**显著标注为近似**，并报告列数、gap 列数与可变位点数
+- [ ] 参数（mode / match / mismatch / gap 罚分，或矩阵名）随结果报告，结果可复现
+- [ ] 比对产物落盘为**等同长**的对齐文件（FASTA/Clustal），完整路径写进报告，供下游建树/共识直接消费
+- [ ] 序列长度差 >20% 时先做质量处理（剪裁/剔除）并说明理由，不用未处理数据直接出结论

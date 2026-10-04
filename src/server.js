@@ -195,8 +195,9 @@ const TOOL_SCHEMAS = [
   ]},
   { name: 'deseq2', label: '差异表达(Python)', engine: 'python', params: [
     { key: 'counts_file', type: 'text', required: true, placeholder: '/path/to/counts.csv', desc: 'counts 矩阵 CSV' },
-    { key: 'meta_file', type: 'text', required: true, placeholder: '/path/to/meta.csv', desc: '样本信息 CSV' },
+    { key: 'meta_file', type: 'text', required: true, placeholder: '/path/to/meta.csv', desc: '样本信息 CSV（sample,condition）' },
     { key: 'contrast', type: 'text', default: 'trt_vs_ctrl', desc: '对比组' },
+    { key: 'out_csv', type: 'text', placeholder: 'D:/path/de_full.csv', desc: '全量结果表落盘路径(可选)' },
   ]},
   { name: 'gsea', label: 'GSEA 富集(Python)', engine: 'python', params: [
     { key: 'de_results_file', type: 'text', required: true, placeholder: '/path/to/de_results.csv', desc: '差异表达结果 CSV' },

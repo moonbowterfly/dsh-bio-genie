@@ -59,9 +59,10 @@ def _pick_labels(df: pd.DataFrame, effect_col: str, padj_col: str | None,
                  label_col: str | None = None) -> set:
     """标注预算：top effect + top significance + 用户点名。绝不全标。"""
     chosen = set()
+    _col = label_col if (label_col and label_col in df.columns) else None
     if user_labels:
         for name in user_labels:
-            chosen.update(df.index[df[label_col] == name] if label_col else
+            chosen.update(df.index[df[_col] == name] if _col else
                           df.index[df.index.astype(str) == str(name)])
     if padj_col and padj_col in df:
         sig = df[df[padj_col] < alpha]
@@ -167,14 +168,18 @@ def differential_plot(dz_frame: pd.DataFrame | str, *, effect_col: str = 'log2FC
             ax.axvline(v, color='#444444', lw=.5, ls='--', zorder=1)
 
     # 标注预算（Tier A highlight）；有 adjustText 时自动避碰，无则静态 offset 回退
+    # label_col 缺省：仅当 df 真的带 'name' 列才用它，否则回退索引（2026-10-05 修：
+    # 原 `label_col or 'name'` 会让没有任何列命名的 DataFrame 直接 KeyError）
+    _label_eff = label_col if label_col else ('name' if 'name' in df.columns else None)
     label_idx = _pick_labels(df, effect_col, padj_col if use_padj else None,
                              alpha, top_k=top_k, user_labels=user_labels,
-                             label_col=label_col or 'name')
+                             label_col=_label_eff)
     labeled = []
     annotations = []
     try:
-        labels_arr = df[label_col].astype(str).to_numpy() if label_col else \
-            df.index.astype(str).to_numpy()
+        labels_arr = (df[label_col].astype(str).to_numpy()
+                      if (label_col and label_col in df.columns) else
+                      df.index.astype(str).to_numpy())
         pos_map = {idx: i for i, idx in enumerate(df.index)}
         for idx in label_idx:
             i = pos_map.get(idx)

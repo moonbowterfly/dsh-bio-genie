@@ -4,7 +4,6 @@
   "missing_acceptance_criteria": [
     "bio-io",
     "bio-seq",
-    "bio-align",
     "bio-blast",
     "bio-searchio",
     "bio-entrez",

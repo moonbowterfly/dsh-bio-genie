@@ -1346,11 +1346,16 @@ function semanticTools(config) {
     // ---- Python 差异表达/GSEA 工具（替代 R 引擎）----
     bioTool(config, {
       name: 'bio_deseq2',
-      description: '差异表达分析（Python）：counts 矩阵 + 样本信息 → 差异基因表。触发词：差异表达。',
+      description:
+        '差异表达分析（归一化 Welch 近似实现）：counts 矩阵 + 样本信息 → 差异基因表（top10 + ' +
+        '可选 out_csv 全量落盘）。方法：median-of-ratios 文库归一化 + log2 空间 Welch t 检验 + ' +
+        'BH-FDR；**非完整 DESeq2**（无负二项 GLM/离散度/收缩），小样本（每组<4）下用于筛选排序而非定量结论。' +
+        '注意：返回体自带 method 元数据与 size_factors，引用结论时按 method 字段如实转述。触发词：差异表达、DEG。',
       parameters: {
-        counts_file: { type: 'string', required: true, description: 'counts 矩阵 CSV' },
-        meta_file: { type: 'string', required: true, description: '样本信息 CSV' },
-        contrast: { type: 'string', default: 'trt_vs_ctrl', description: '对比组' },
+        counts_file: { type: 'string', required: true, description: 'counts 矩阵 CSV（行=基因，列=样本）' },
+        meta_file: { type: 'string', required: true, description: '样本信息 CSV（sample, condition 两列）' },
+        contrast: { type: 'string', default: 'trt_vs_ctrl', description: '对比组（如 heat_vs_ctrl；格式 group1_vs_group2）' },
+        out_csv: { type: 'string', description: '可选：全量结果表落盘路径（gene/baseMean/log2FoldChange/pvalue/padj）。需要完整结果表时用它，不要为了全表重复实现同一算法' },
       },
       op: 'deseq2',
       timeoutMs: 120_000,

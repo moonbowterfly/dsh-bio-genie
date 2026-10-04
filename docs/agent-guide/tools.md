@@ -150,7 +150,7 @@ language: none
 
 ### 组学分析
 
-**bio_deseq2** — 差异表达分析（Python 实现）：`counts_file ★`（counts 矩阵 CSV，行=基因列=样本）、`meta_file ★`（样本信息 CSV，**必须含 `sample` 与 `condition` 两列**——condition 为分组列，取值如 ctrl/trt；用其他列名会报 KeyError）、`contrast`（对比组，格式 `trt_vs_ctrl`）。返回差异基因表。触发词：差异表达。
+**bio_deseq2** — 差异表达分析（归一化 Welch 近似实现）：`counts_file ★`（counts 矩阵 CSV，行=基因列=样本）、`meta_file ★`（样本信息 CSV，**必须含 `sample` 与 `condition` 两列**——condition 为分组列，取值如 ctrl/trt；缺列时返回可操作提示而非裸 KeyError）、`contrast`（对比组，格式 `trt_vs_ctrl`）、`out_csv`（可选，全量结果表落盘）。方法：median-of-ratios 文库归一化 + log2 空间 Welch t 检验 + BH-FDR（**非完整 DESeq2**，无 NB GLM/收缩；返回体含 `method` 元数据与 `size_factors`，结论引用时按 method 字段如实转述；小样本用于筛选排序而非定量结论）。返回差异基因表（top10；全表走 `out_csv`）。触发词：差异表达。
 
 **bio_gsea** — GSEA 富集分析（Python 实现）：`de_results_file ★`（差异表达结果 CSV）、`gene_sets`（基因集，默认 `hallmark`）。返回富集通路。触发词：GSEA、富集。
 
