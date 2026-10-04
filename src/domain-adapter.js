@@ -181,6 +181,9 @@ export function classifyDomainState(domain, { probe, health, status } = {}) {
       minimumVersion: domain.minIntegrationVersion,
     }
   }
+  if (health && health.pluginId !== domain.siblingDirName) {
+    return { state: 'installed-unavailable', installed: true, version: probe.version }
+  }
   if (health?.protocolMajor !== undefined && health.protocolMajor !== domain.protocolMajor) {
     return {
       state: 'incompatible',
@@ -281,8 +284,10 @@ function writeJson(res, status, body) {
  * classify 会判 installed-unavailable —— **不能**在拿到 health 后提前返回，
  * 否则 status 永远不会被请求，degraded/ready 状态不可达。
  */
-export async function handleDomainRequest(domain, req, res, { shapeLegacy, shapeLive, log = console } = {}) {
-  const probe = detectDomain(domain)
+export async function handleDomainRequest(domain, req, res, {
+  shapeLegacy, shapeLive, log = console, detect = detectDomain,
+} = {}) {
+  const probe = detect(domain)
   if (isDomainInstallProbe(req)) {
     const value = probe.installed
       ? { installed: true, version: probe.version, pluginDir: probe.pluginDir, detectedBy: probe.detectedBy }
@@ -303,6 +308,9 @@ export async function handleDomainRequest(domain, req, res, { shapeLegacy, shape
   try {
     health = await fetchDomainIntegration(req, `${domain.integrationPrefix}/health`, 3_000)
     classification = classifyDomainState(domain, { probe, health })
+    if (health.pluginId !== domain.siblingDirName) {
+      return writeJson(res, 200, { ok: true, value: shapeLive(probe, classification) })
+    }
     if (classification.state === 'incompatible') {
       return writeJson(res, 200, { ok: true, value: shapeLive(probe, classification, health) })
     }

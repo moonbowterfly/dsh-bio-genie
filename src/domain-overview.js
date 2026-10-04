@@ -138,6 +138,14 @@ export async function collectDomainCard(domain, req, {
     }
   }
   classification = classifyDomainState(domain, { probe, health })
+  if (health.pluginId !== domain.siblingDirName) {
+    return {
+      ...base, state: 'installed-unavailable',
+      health: { state: 'identity-mismatch', pluginId: health.pluginId ?? null,
+        expectedPluginId: domain.siblingDirName },
+      availability: insufficient('integration 身份不匹配，能力计数不可得。'),
+    }
+  }
   if (classification.state === 'incompatible') {
     return {
       ...base, state: classification.state,

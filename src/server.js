@@ -776,7 +776,7 @@ function inspectGalateaModels(modelsDir) {
 
 /** 判断是否为绝对路径（盘符 / 正斜杠根 / UNC）——防手滑输入相对路径。 */
 function isAbsoluteTargetPath(target) {
-  return /^[A-Za-z]:/.test(target) || target.startsWith('/') || target.startsWith(String.fromCharCode(92, 92))
+  return /^[A-Za-z]:[\\/]/.test(target) || target.startsWith('/') || target.startsWith(String.fromCharCode(92, 92))
 }
 
 /**

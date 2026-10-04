@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import http from 'node:http'
-import { GEM_TOOLS, GRAFT_TOOLS, detectDomain, domainById } from '../src/domain-adapter.js'
-import { liveMetabolicValue, handleEditing } from '../src/server.js'
+import { GEM_TOOLS, GRAFT_TOOLS, domainById, handleDomainRequest } from '../src/domain-adapter.js'
+import { liveMetabolicValue, graftLiveValue } from '../src/server.js'
 import { capabilitiesPayload, gemFixtureNames, graftFixtureNames } from './fixtures/hosted-capabilities.mjs'
 
 let failures = 0
@@ -16,10 +16,8 @@ async function test(name, run) {
   }
 }
 
-// detectDomain reads each plugin's package.json; fixture versions follow the checked-out packages.
-const gem = detectDomain(domainById('gem'))
-const graft = detectDomain(domainById('graft'))
-assert.ok(gem.installed && graft.installed, 'sibling domain package.json files are required')
+const gem = { installed: true, version: '0.1.15', detectedBy: 'test' }
+const graft = { installed: true, version: '0.1.5', detectedBy: 'test' }
 const ready = { state: 'ready', checks: [] }
 const health = { protocolMajor: 1, protocolMinors: [0] }
 
@@ -73,7 +71,7 @@ async function withMockGraft(capabilities, run, { advertise = true } = {}) {
     requests.push(req.url)
     res.setHeader('content-type', 'application/json')
     if (req.url === '/api/dsh-bio-graft/integration/health') {
-      return res.end(integrationOk({ pluginVersion: graft.version, protocolMajor: 1, protocolMinors: [0] }))
+      return res.end(integrationOk({ pluginId: 'dsh-bio-graft', pluginVersion: graft.version, protocolMajor: 1, protocolMinors: [0] }))
     }
     if (req.url === '/api/dsh-bio-graft/integration/v1/status') {
       return res.end(integrationOk({
@@ -92,7 +90,14 @@ async function withMockGraft(capabilities, run, { advertise = true } = {}) {
   try {
     const response = { code: null, body: null,
       writeHead(code) { this.code = code }, end(body) { this.body = body } }
-    await handleEditing({ method: 'GET', url: '/', headers: { host: `127.0.0.1:${server.address().port}` } }, response)
+    await handleDomainRequest(domainById('graft'),
+      { method: 'GET', url: '/', headers: { host: `127.0.0.1:${server.address().port}` } },
+      response,
+      {
+        detect: () => graft,
+        shapeLegacy: () => ({ installed: true, state: 'legacy' }),
+        shapeLive: graftLiveValue,
+      })
     assert.equal(response.code, 200)
     await run(JSON.parse(response.body).value, requests)
   } finally {

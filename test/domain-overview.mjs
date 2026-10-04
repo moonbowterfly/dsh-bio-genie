@@ -38,7 +38,7 @@ function integrations({ onFetch } = {}) {
     const domain = DOMAINS.find((candidate) => endpoint.startsWith(candidate.integrationPrefix + '/'))
     assert.ok(domain, `unexpected integration endpoint: ${endpoint}`)
     if (endpoint.endsWith('/health')) {
-      return { protocolMajor: domain.protocolMajor, pluginVersion: '0.1.99' }
+      return { pluginId: domain.siblingDirName, protocolMajor: domain.protocolMajor, pluginVersion: '0.1.99' }
     }
     assert.ok(endpoint.endsWith('/v1/status'), `unexpected extra endpoint: ${endpoint}`)
     return statusFor(domain)
@@ -129,6 +129,22 @@ test('uninstalled gem remains visible with no integration requests', async () =>
   assert.deepEqual(broker.requests, [])
 })
 
+test('foreign integration identity stops the domain before status', async () => {
+  const gem = domainById('gem')
+  const requests = []
+  const result = await collectDomainOverview(req, {
+    domains: [gem],
+    detect: () => ({ installed: true, version: '0.1.99' }),
+    fetchIntegration: async (_req, endpoint) => {
+      requests.push(endpoint)
+      return { pluginId: 'dsh-bio-graft', protocolMajor: 1 }
+    },
+  })
+  assert.equal(result.domains[1].state, 'installed-unavailable')
+  assert.equal(result.domains[1].health.state, 'identity-mismatch')
+  assert.deepEqual(requests, [`${gem.integrationPrefix}/health`])
+})
+
 test('health and status failures are isolated without losing installation evidence', async () => {
   const requests = []
   const result = await collectDomainOverview(req, {
@@ -143,7 +159,7 @@ test('health and status failures are isolated without losing installation eviden
       }
       const domain = DOMAINS.find((candidate) => endpoint.startsWith(candidate.integrationPrefix + '/'))
       return endpoint.endsWith('/health')
-        ? { protocolMajor: domain.protocolMajor }
+        ? { pluginId: domain.siblingDirName, protocolMajor: domain.protocolMajor }
         : statusFor(domain)
     },
   })

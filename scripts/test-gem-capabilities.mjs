@@ -6,7 +6,7 @@
  *   ② capabilities 拉取失败 → 静默降级（capabilities=undefined，不影响主展示）；
  *   ③ 旧版 gem（features 无 capabilities）→ 不发起 capabilities 请求（向后兼容）。
  *
- * 用本地 mock integration server + 真实 sibling 探测（D:\Program\Github\dsh-bio-gem 存在）。
+ * 用本地 mock integration server + 固定已安装探测值，单仓检出也可运行。
  * Run: node scripts/test-gem-capabilities.mjs
  */
 import assert from 'node:assert/strict'
@@ -33,14 +33,15 @@ function integrationOk(value) {
 }
 
 /** 起一个 mock gem integration server；requestLog 记录收到的路径。 */
-function startMockGem({ withCapabilities = true, capabilitiesBroken = false } = {}) {
+function startMockGem({ withCapabilities = true, capabilitiesBroken = false,
+  pluginId = 'dsh-bio-gem' } = {}) {
   const requestLog = []
   const server = http.createServer((req, res) => {
     requestLog.push(req.url)
     res.setHeader('content-type', 'application/json')
     if (req.url === '/api/dsh-bio-gem/integration/health') {
       return res.end(integrationOk({
-        pluginId: 'dsh-bio-gem',
+        pluginId,
         pluginVersion: '0.1.13',
         protocolMajor: 1,
         protocolMinors: [0],
@@ -122,6 +123,7 @@ async function callDomain(mock, { shapeLive } = {}) {
     res,
     {
       log: silentLog,
+      detect: () => ({ installed: true, version: '0.1.13', detectedBy: 'test' }),
       shapeLegacy: (probe) => ({ legacy: true, version: probe.version }),
       shapeLive: (...args) => { captured = args; return shapeLive ? shapeLive(...args) : { args } },
     },
@@ -132,6 +134,7 @@ async function callDomain(mock, { shapeLive } = {}) {
 const withCaps = await startMockGem({ withCapabilities: true })
 const brokerCaps = await startMockGem({ withCapabilities: true, capabilitiesBroken: true })
 const oldGem = await startMockGem({ withCapabilities: false })
+const foreignGem = await startMockGem({ pluginId: 'dsh-bio-graft' })
 
 try {
   await test('passes capabilities through to shapeLive when gem advertises the feature', async () => {
@@ -166,10 +169,18 @@ try {
   await test('static tool manifest remains the documented fallback size', async () => {
     assert.equal(adapter.GEM_TOOLS.length, GEM_TOOLS_COUNT)
   })
+
+  await test('foreign health identity stops before status and capabilities', async () => {
+    const { captured } = await callDomain(foreignGem)
+    assert.equal(captured[1].state, 'installed-unavailable')
+    assert.equal(captured[2], undefined, 'foreign health must not affect displayed version')
+    assert.deepEqual(foreignGem.requestLog, ['/api/dsh-bio-gem/integration/health'])
+  })
 } finally {
   withCaps.server.close()
   brokerCaps.server.close()
   oldGem.server.close()
+  foreignGem.server.close()
 }
 
 if (failed > 0) {

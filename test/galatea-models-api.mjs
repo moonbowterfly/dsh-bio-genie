@@ -1,5 +1,5 @@
 // galatea-models 端点回归测试（无 dsh 依赖：mock ctx/webServer + mock req/res）。
-import { registerApiRoutes } from 'file:///D:/Program/Github/dsh-bio-genie/src/server.js'
+import { registerApiRoutes } from '../src/server.js'
 import { mkdtempSync, writeFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -83,6 +83,8 @@ check('合并写保留 other 字段', JSON.parse(readFileSync(cfgPath, 'utf8')).
 // 5) 相对路径拒绝
 r = await call('POST', { modelsDir: 'relative/path' })
 check('相对路径拒绝（400 invalid-path）', r.status === 400 && r.json.code === 'invalid-path', JSON.stringify(r.json))
+r = await call('POST', { modelsDir: 'C:relative' })
+check('Windows 盘符相对路径拒绝', r.status === 400 && r.json.code === 'invalid-path', JSON.stringify(r.json))
 
 // 6) 恢复默认（空串 → 删字段）
 r = await call('POST', { modelsDir: '' })

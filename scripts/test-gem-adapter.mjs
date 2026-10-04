@@ -52,10 +52,24 @@ test('classifies a modern installed package with a failed health request as inst
   })
 })
 
+test('rejects a health envelope with a foreign or missing plugin identity', () => {
+  for (const pluginId of ['dsh-bio-graft', undefined]) {
+    assert.deepEqual(adapter.classifyGemState({
+      probe: { installed: true, version: '0.1.15' },
+      health: { pluginId, protocolMajor: 1 },
+      status: { state: 'ready', checks: [
+        { id: 'python.cobra', status: 'ok' },
+        { id: 'runtime.carveme', status: 'ok' },
+        { id: 'runtime.gapseq', status: 'ok' },
+      ] },
+    }), { state: 'installed-unavailable', installed: true, version: '0.1.15' })
+  }
+})
+
 test('classifies a reachable but incompatible protocol major explicitly', () => {
   assert.deepEqual(adapter.classifyGemState({
     probe: { installed: true, version: '0.1.11' },
-    health: { protocolMajor: 2, protocolMinors: [0] },
+    health: { pluginId: 'dsh-bio-gem', protocolMajor: 2, protocolMinors: [0] },
   }), {
     state: 'incompatible',
     installed: true,
@@ -73,7 +87,7 @@ test('classifies a compatible protocol with a non-ok check as degraded', () => {
   ]
   assert.deepEqual(adapter.classifyGemState({
     probe: { installed: true, version: '0.1.11' },
-    health: { protocolMajor: 1 },
+    health: { pluginId: 'dsh-bio-gem', protocolMajor: 1 },
     status: { state: 'degraded', checks },
   }), {
     state: 'degraded',
@@ -91,7 +105,7 @@ test('classifies a compatible protocol with all checks ok as ready', () => {
   ]
   assert.deepEqual(adapter.classifyGemState({
     probe: { installed: true, version: '0.1.11' },
-    health: { protocolMajor: 1 },
+    health: { pluginId: 'dsh-bio-gem', protocolMajor: 1 },
     status: { state: 'ready', checks },
   }), {
     state: 'ready',
@@ -104,7 +118,7 @@ test('classifies a compatible protocol with all checks ok as ready', () => {
 test('treats a malformed status snapshot as installed-unavailable instead of ready', () => {
   assert.deepEqual(adapter.classifyGemState({
     probe: { installed: true, version: '0.1.11' },
-    health: { protocolMajor: 1 },
+    health: { pluginId: 'dsh-bio-gem', protocolMajor: 1 },
     status: { state: 'ready', checks: [] },
   }), {
     state: 'installed-unavailable',
@@ -116,7 +130,7 @@ test('treats a malformed status snapshot as installed-unavailable instead of rea
 test('treats a status/checks contradiction as installed-unavailable', () => {
   assert.deepEqual(adapter.classifyGemState({
     probe: { installed: true, version: '0.1.11' },
-    health: { protocolMajor: 1 },
+    health: { pluginId: 'dsh-bio-gem', protocolMajor: 1 },
     status: {
       state: 'ready',
       checks: [

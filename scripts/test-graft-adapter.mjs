@@ -72,7 +72,7 @@ test('classifies a modern installed package with a failed health request as inst
 test('classifies a reachable but incompatible protocol major explicitly', () => {
   assert.deepEqual(adapter.classifyDomainState(graft, {
     probe: { installed: true, version: '0.1.1' },
-    health: { protocolMajor: 2, protocolMinors: [0] },
+    health: { pluginId: 'dsh-bio-graft', protocolMajor: 2, protocolMinors: [0] },
   }), {
     state: 'incompatible',
     installed: true,
@@ -90,7 +90,7 @@ test('classifies a compatible protocol with all checks ok as ready', () => {
   ]
   assert.deepEqual(adapter.classifyDomainState(graft, {
     probe: { installed: true, version: '0.1.1' },
-    health: { protocolMajor: 1 },
+    health: { pluginId: 'dsh-bio-graft', protocolMajor: 1 },
     status: { state: 'ready', checks },
   }), {
     state: 'ready',
@@ -108,7 +108,7 @@ test('classifies a missing off-target backend as degraded (not ready)', () => {
   ]
   assert.deepEqual(adapter.classifyDomainState(graft, {
     probe: { installed: true, version: '0.1.1' },
-    health: { protocolMajor: 1 },
+    health: { pluginId: 'dsh-bio-graft', protocolMajor: 1 },
     status: { state: 'degraded', checks },
   }), {
     state: 'degraded',
@@ -125,7 +125,7 @@ test('a status missing a required check id is not accepted as ready', () => {
   ]
   assert.deepEqual(adapter.classifyDomainState(graft, {
     probe: { installed: true, version: '0.1.1' },
-    health: { protocolMajor: 1 },
+    health: { pluginId: 'dsh-bio-graft', protocolMajor: 1 },
     status: { state: 'ready', checks },
   }), {
     state: 'installed-unavailable',
@@ -142,7 +142,7 @@ test('treats a status/checks contradiction as installed-unavailable', () => {
   ]
   assert.deepEqual(adapter.classifyDomainState(graft, {
     probe: { installed: true, version: '0.1.1' },
-    health: { protocolMajor: 1 },
+    health: { pluginId: 'dsh-bio-graft', protocolMajor: 1 },
     status: { state: 'ready', checks },
   }), {
     state: 'installed-unavailable',
@@ -154,7 +154,7 @@ test('treats a status/checks contradiction as installed-unavailable', () => {
 test('rejects an unknown status value', () => {
   assert.deepEqual(adapter.classifyDomainState(graft, {
     probe: { installed: true, version: '0.1.1' },
-    health: { protocolMajor: 1 },
+    health: { pluginId: 'dsh-bio-graft', protocolMajor: 1 },
     status: { state: 'weird', checks: [] },
   }), {
     state: 'installed-unavailable',
