@@ -58,7 +58,16 @@ print(len(r), r.seq, r.id)
 - 现代 Biopython 的 `Seq` 不再带 alphabet；直接用 `.translate()` / `.transcribe()`。
 - NCBI/在线服务需要网络与邮箱（见 `bio-entrez`、`bio-blast`）。
 - 遇到 `ImportError` 先跑 `bio_env` 看环境状态，必要时 `reinstall`。
+- **序列参数两种输入方式**：序列类工具（`bio_seq_analyze`、`bio_seq_translate`、`bio_primer3_design`、`bio_crispr_guide`、`bio_blast_search` 等）的 `sequence` 参数既接受序列内容、也接受**文件路径**（FASTA / GenBank / 纯文本；相对路径基于会话工作区）。已有序列文件时**直接传路径**，不要先打印大序列再复制粘贴（易错且浪费上下文）。多记录文件会明确报错——改用 `bio_seq_io_read` 读取目标记录后再传内容。
 - ⚠️ **不要用 dsh 的 bash/pwsh 直接调 venv python**：宿主进程的 `PYTHONPATH` 会污染导入路径（可能加载到错误平台的 numpy 等）。所有代码都走 `bio_python` 工具（它已用 `-I` 隔离环境）；确需安装 Python 包时，用 `bio_env` 的状态/安装能力，或在 `bio_python` 内 `import subprocess` 且显式清空 `PYTHONPATH`。
 - ⚠️ **绘图库已随环境预装**（matplotlib/reportlab，见 `python/requirements.txt`）；若旧环境缺失，`bio_env` reinstall 即可，不要手工 ensurepip 装 pip（uv 环境默认无 pip，2026-08-17 实测踩坑）。
 
 先按需加载领域技能（`bio-io`、`bio-seq`、`bio-align` …）再写非平凡代码。
+
+## 验收标准
+
+- [ ] **数据质量门控执行过**：输入文件/序列的长度、类型、N 比例与预期对照过（不可跳过）
+- [ ] 每个结论标注来源（`[数据]` / `[注释]` / `[文献]` / `[推测]` / `[假设]`）
+- [ ] 失败处理遵守三层边界：L2 先查 `bio_memory` 经验、L3 最多 2 次修复后如实报告，绝不编造结果
+- [ ] 大序列走**文件路径**传给序列类工具，未在对话里复制粘贴长序列全文
+- [ ] 最终产物写入会话工作区并报告**完整文件路径**

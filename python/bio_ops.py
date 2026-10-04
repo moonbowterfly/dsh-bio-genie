@@ -43,6 +43,7 @@ from analysis_ext import (op_seq_introns, op_seq_dotplot, op_uniprot,
                           op_phylo_compare, op_rna_fold)
 # 单细胞 RNA-seq 质控（scanpy，第二层按需依赖，2026-09-16）
 from sc_tools import op_sc_qc
+from seq_util import read_seq_input
 socket.setdefaulttimeout(20)
 from retry_utils import retry_on_network_error
 
@@ -71,7 +72,7 @@ def op_seq_analyze(args):
     from Bio.Seq import Seq
     from Bio.SeqUtils import gc_fraction, molecular_weight
 
-    sequence = args['sequence']
+    sequence = read_seq_input(args['sequence'])
     seq_type = args.get('seq_type', 'auto')  # auto | dna | rna | protein
     s = Seq(sequence)
     result = {
@@ -201,7 +202,7 @@ def _codon_usage_stats(sequence, host='ecoli'):
 def op_seq_translate(args):
     """翻译 DNA/RNA 为蛋白质。"""
     from Bio.Seq import Seq
-    s = Seq(args['sequence'])
+    s = Seq(read_seq_input(args['sequence']))
     table = args.get('table', 1)
     to_stop = args.get('to_stop', False)
     result = {
@@ -215,7 +216,7 @@ def op_seq_translate(args):
 def op_seq_gc_skew(args):
     """计算 GC skew (G-C)/(G+C)，可窗口化。"""
     from Bio.SeqUtils import GC_skew
-    sequence = args['sequence']
+    sequence = read_seq_input(args['sequence'])
     window = args.get('window', 100)
     skews = GC_skew(sequence, window=window)
     return {'window': window, 'gc_skew': [round(float(v), 4) for v in skews]}
@@ -224,7 +225,7 @@ def op_seq_gc_skew(args):
 def op_seq_find_orf(args):
     """查找最长 ORF（开放阅读框）。"""
     from Bio.Seq import Seq
-    sequence = args['sequence']
+    sequence = read_seq_input(args['sequence'])
     min_len = args.get('min_len', 30)  # 至少 10 个密码子
     table = args.get('table', 1)
     s = Seq(sequence)
@@ -255,7 +256,7 @@ def op_seq_restriction(args):
     from Bio.Restriction import RestrictionBatch, AllEnzymes, CommOnly
     from Bio.Seq import Seq
 
-    sequence = args['sequence']
+    sequence = read_seq_input(args['sequence'])
     enzymes = args.get('enzymes', None)  # 如 ["EcoRI", "BamHI"]，None = 全部
     enzyme_set = args.get('enzyme_set', 'commonly')  # commonly(商业常用) | all(含虚构)
     linear = args.get('linear', True)  # 线性/环状影响位点计数
@@ -366,7 +367,7 @@ def op_seq_io_write(args):
 def op_seq_kmer(args):
     """k-mer 频率统计。"""
     from collections import Counter
-    sequence = args['sequence'].upper()
+    sequence = read_seq_input(args['sequence']).upper()
     k = args.get('k', 3)
     if k < 1:
         raise ValueError('k must be >= 1')
@@ -1766,7 +1767,7 @@ def op_blast_search(args):
     import io
     from Bio.Blast import NCBIWWW, NCBIXML
 
-    sequence = args['sequence'].strip()
+    sequence = read_seq_input(args['sequence'])
     program = args.get('program', 'blastn')  # blastn / blastp / blastx
     database = args.get('database') or ('nt' if program in ('blastn', 'blastx') else 'nr')
     hitlist_size = int(args.get('hitlist_size', 10))

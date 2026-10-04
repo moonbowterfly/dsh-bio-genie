@@ -14,7 +14,7 @@ error 字典，不影响 bio_ops.py 其余 op 的加载。
 """
 import os
 import sys
-from seq_util import clean_seq
+from seq_util import clean_seq, read_seq_input
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -68,9 +68,7 @@ def op_primer3_design(args):
     except ImportError:
         return {'error': 'primer3-py 未安装，请运行 bio_env reinstall=true 或 uv pip install primer3-py'}
 
-    sequence = clean_seq(args.get('sequence', ''))
-    if not sequence:
-        raise ValueError('sequence 必填（模板 DNA 序列）')
+    sequence = clean_seq(read_seq_input(args.get('sequence') or '', 'sequence'))
     if len(sequence) < 40:
         raise ValueError(f'模板太短（{len(sequence)} bp），Primer3 至少需要 ~40 bp')
 

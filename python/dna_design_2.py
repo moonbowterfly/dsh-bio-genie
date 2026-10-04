@@ -3,6 +3,8 @@ import sys
 import json
 import os
 
+from seq_util import read_seq_input
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 
@@ -141,7 +143,8 @@ def _plasmid_graphic(args, features):
             record = BiopythonTranslator().translate_record(
                 genbank_file, record_class=CircularGraphicRecord)
         else:
-            seq = ''.join(str(args.get('sequence', '')).upper().split())
+            seq_raw = str(args.get('sequence', ''))
+            seq = read_seq_input(seq_raw, 'sequence').upper() if seq_raw.strip() else ''
             gfeatures = [
                 GraphicFeature(start=int(f.get('start', 0)), end=int(f.get('end', 0)),
                                strand=1 if f.get('direction', '+') == '+' else -1,

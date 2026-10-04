@@ -2,7 +2,6 @@
   "_comment": "skill 质量标准棘轮基线。规则：① 不在本表内的 skill 必须满足全部静态门（含「验收标准」节且含 checklist 条目）；② 自 baseline_commit 起被 git 改动过的 skill 即使在本表内也必须达标（脚本会用 git diff 核对）——所以不能靠往表里加条目来让测试变绿。补全后请从本表删除；改完一批后可把 baseline_commit 前移以减少检查面。",
   "baseline_commit": "6fa7fb2",
   "missing_acceptance_criteria": [
-    "bio-core",
     "bio-io",
     "bio-seq",
     "bio-align",

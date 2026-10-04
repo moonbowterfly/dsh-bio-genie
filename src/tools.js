@@ -423,7 +423,7 @@ function semanticTools(config) {
         'codon_host 可选 ecoli/human/yeast（默认 ecoli）——用于宿主适配快速评估。' +
         '触发词：GC含量、反向互补、序列特征、翻译、分析序列、密码子适应、CAI。',
       parameters: {
-        sequence: { type: 'string', required: true, description: '核酸或蛋白质序列' },
+        sequence: { type: 'string', required: true, description: '核酸或蛋白质序列（内容或文件路径）' },
         seq_type: { type: 'string', enum: ['auto', 'dna', 'rna', 'protein'], description: '序列类型，默认 auto' },
         codon_stats: { type: 'boolean', description: '是否返回密码子使用统计（最优密码子占比），默认 false' },
         codon_host: { type: 'string', enum: ['ecoli', 'human', 'yeast'], description: '密码子统计宿主，默认 ecoli' },
@@ -436,7 +436,7 @@ function semanticTools(config) {
         '把 DNA/RNA 序列翻译成蛋白质。可用遗传密码表编号（默认 1=标准表）。' +
         'to_stop=true 时在第一个终止密码子处停止。触发词：翻译、蛋白序列、遗传密码。',
       parameters: {
-        sequence: { type: 'string', required: true, description: 'DNA 或 RNA 序列' },
+        sequence: { type: 'string', required: true, description: 'DNA 或 RNA 序列（内容或文件路径）' },
         table: { type: 'number', description: '遗传密码表编号，默认 1（标准）' },
         to_stop: { type: 'boolean', description: '是否在第一个终止密码子停止，默认 false' },
       },
@@ -446,7 +446,7 @@ function semanticTools(config) {
       name: 'bio_seq_gc_skew',
       description: '计算序列的 GC skew (G-C)/(G+C)，可指定窗口大小。触发词：GC skew、偏斜、复制起点。',
       parameters: {
-        sequence: { type: 'string', required: true, description: 'DNA 序列' },
+        sequence: { type: 'string', required: true, description: 'DNA 序列（内容或文件路径）' },
         window: { type: 'number', description: '窗口大小，默认 100' },
       },
       op: 'seq_gc_skew',
@@ -455,7 +455,7 @@ function semanticTools(config) {
       name: 'bio_seq_find_orf',
       description: '查找序列中最长的开放阅读框（ATG 起始到终止密码子）。触发词：ORF、开放阅读框、编码区。',
       parameters: {
-        sequence: { type: 'string', required: true, description: 'DNA 序列' },
+        sequence: { type: 'string', required: true, description: 'DNA 序列（内容或文件路径）' },
         min_len: { type: 'number', description: '最小 ORF 长度（nt），默认 30' },
         table: { type: 'number', description: '遗传密码表编号，默认 1' },
       },
@@ -465,7 +465,7 @@ function semanticTools(config) {
       name: 'bio_seq_kmer',
       description: '统计序列的 k-mer 频率（默认 3-mer），返回出现最多的前 N 个。触发词：k-mer、kmer、寡核苷酸频率。',
       parameters: {
-        sequence: { type: 'string', required: true, description: '核酸序列' },
+        sequence: { type: 'string', required: true, description: '核酸序列（内容或文件路径）' },
         k: { type: 'number', description: 'k 值，默认 3' },
         top: { type: 'number', description: '返回前 N 个高频 k-mer，默认 10' },
       },
@@ -520,7 +520,7 @@ function semanticTools(config) {
         'detail=true 返回全部坐标。不指定酶时建议先看摘要再按需指定。' +
         '触发词：限制酶、酶切位点、restriction。',
       parameters: {
-        sequence: { type: 'string', required: true, description: 'DNA 序列' },
+        sequence: { type: 'string', required: true, description: 'DNA 序列（内容或文件路径）' },
         enzymes: { type: 'array', description: '酶名列表，如 ["EcoRI"]，默认全部', items: { type: 'string' } },
         enzyme_set: { type: 'string', enum: ['commonly', 'all'], description: '酶库范围，默认 commonly（商业常用）' },
         linear: { type: 'boolean', description: '是否线性分子，默认 true' },
@@ -538,7 +538,7 @@ function semanticTools(config) {
         '注意：qblast 在 NCBI 服务端排队，通常耗时 1-10 分钟，属正常现象，不要重复调用。' +
         '触发词：BLAST、blastn、序列同源性搜索、远程比对。',
       parameters: {
-        sequence: { type: 'string', required: true, description: '查询序列（DNA 或蛋白质，视 program 而定）' },
+        sequence: { type: 'string', required: true, description: '查询序列（DNA 或蛋白质，视 program 而定；内容或文件路径）' },
         program: { type: 'string', enum: ['blastn', 'blastp', 'blastx'], description: 'BLAST 程序，默认 blastn' },
         database: { type: 'string', description: '数据库，默认 nt（核酸）或 nr（蛋白）' },
         hitlist_size: { type: 'number', description: '最大命中数，默认 10' },
@@ -1059,7 +1059,7 @@ function semanticTools(config) {
         '无满意候选时返回 advice 字段调整建议。支持自定义产物大小、引物长度范围、目标 Tm、top_n、tm_diff_max。' +
         '触发词：引物、PCR、Tm、引物设计。',
       parameters: {
-        sequence: { type: 'string', required: true, description: '模板 DNA 序列' },
+        sequence: { type: 'string', required: true, description: '模板 DNA 序列（内容或文件路径）' },
         product_size: { type: 'number', description: '期望产物大小（bp），默认 500' },
         tm_target: { type: 'number', description: '目标 Tm（°C），默认 60' },
         top_n: { type: 'number', description: '返回候选引物对数，默认 5' },
@@ -1074,7 +1074,7 @@ function semanticTools(config) {
         '密码子优化：按目标宿主的密码子使用频率优化编码序列。返回优化序列、GC%、变更率。' +
         '支持 ecoli/human/yeast。触发词：密码子优化、表达优化、密码子偏好。',
       parameters: {
-        sequence: { type: 'string', required: true, description: '编码序列（CDS）' },
+        sequence: { type: 'string', required: true, description: '编码序列（CDS；内容或文件路径）' },
         organism: { type: 'string', enum: ['ecoli', 'human', 'yeast'], description: '宿主生物，默认 ecoli' },
       },
       op: 'seq_optimize',
@@ -1106,7 +1106,7 @@ function semanticTools(config) {
         name: { type: 'string', description: '质粒名称，默认 plasmid' },
         size: { type: 'number', description: '总大小（bp），默认从特征推断' },
         features: { type: 'array', description: '特征列表 [{name,start,end,type,direction}]', items: { type: 'object', additionalProperties: true } },
-        sequence: { type: 'string', description: '质粒序列（图形模式，配合 features 使用）' },
+        sequence: { type: 'string', description: '质粒序列（内容或文件路径；图形模式配合 features）' },
         genbank_file: { type: 'string', description: 'GenBank 文件路径（图形模式，可不带 features）' },
         output_format: { type: 'string', enum: ['png', 'svg'], description: '图形输出格式，默认 png' },
         out_file: { type: 'string', description: '图形输出路径（可选，默认工作区 <name>_map.<format>）' },
@@ -1131,7 +1131,7 @@ function semanticTools(config) {
         '与 bio_primer_design（Biopython 简单版）区分：本工具走 Primer3 全套二级结构约束，' +
         '适合需要可投稿级引物质量的场景。触发词：Primer3、工业级引物、qPCR 引物、引物对筛选。',
       parameters: {
-        sequence: { type: 'string', required: true, description: '模板 DNA 序列' },
+        sequence: { type: 'string', required: true, description: '模板 DNA 序列（内容或文件路径）' },
         target_region: { type: 'array', description: '要扩增的区间 [start, length]（0-based）：引物落在区间内，产物长度约等于区间长度', items: { type: 'number' } },
         must_include: { type: 'array', description: '产物必须包含的内部区域 [start, length]（0-based）：引物不得进入该区，不能触及序列端点', items: { type: 'number' } },
         primer_size: { type: 'array', description: '引物长度范围 [min, max]，默认 [18, 25]', items: { type: 'number' } },
@@ -1192,7 +1192,7 @@ function semanticTools(config) {
         '效率分为基于 GC 含量+末端 poly-run+PAM 的简化预测（0-100，非实验验证）；off-target 仅扫描输入模板，全基因组扫描需用 Cas-OFFinder。' +
         '触发词：sgRNA 设计、Cas9 引导 RNA、CRISPR 设计、sgRNA 筛选、PAM 扫描。',
       parameters: {
-        sequence: { type: 'string', required: true, description: '模板 DNA 序列' },
+        sequence: { type: 'string', required: true, description: '模板 DNA 序列（内容或文件路径）' },
         cas: { type: 'string', enum: ['spcas9', 'cas9_hifi', 'espcas9', 'cas12a', 'cas12e'], description: 'Cas 蛋白类型，默认 spcas9' },
         gc_min: { type: 'number', description: 'GC% 下限，默认 30' },
         gc_max: { type: 'number', description: 'GC% 上限，默认 80' },
@@ -1235,7 +1235,7 @@ function semanticTools(config) {
         '输出可合成性评分（0-100）+ critical/warning/info 分级问题列表。' +
         '触发词：DNA 合成检查、可合成性评估、序列能不能合成、合成约束、Twist 兼容性。',
       parameters: {
-        sequence: { type: 'string', required: true, description: 'DNA 序列' },
+        sequence: { type: 'string', required: true, description: 'DNA 序列（内容或文件路径）' },
         min_gc_window: { type: 'number', description: '窗口 GC 下限%，默认 25' },
         max_gc_window: { type: 'number', description: '窗口 GC 上限%，默认 65' },
         homopolymer_threshold: { type: 'number', description: '同聚物报警阈值 bp，默认 8' },
