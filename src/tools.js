@@ -1126,6 +1126,8 @@ function semanticTools(config) {
         '两者区别：target_region = 要扩增的区间（引物落在区间内，产物长度自动约束为≈区间长度）；' +
         'must_include = 产物必须包含的内部区域（引物不得进入该区，故不能触及序列端点）。' +
         '扩增全长用 target_region=[0, 序列长度] 或直接省略（默认按产物长度约束）。' +
+        '产物长度直接控制：product_size_range=[min, max]（bp）——显式给出产物大小区间，' +
+        '优先于 target_region 推导；指定苛刻产物长度导致无解时优先用它而非逐项放宽。' +
         'n_returned=0 时返回结构化诊断（explain 原因 + 实际生效的约束），按诊断指引调整一次即可，' +
         '不要盲目逐项放宽参数。' +
         '与 bio_primer_design（Biopython 简单版）区分：本工具走 Primer3 全套二级结构约束，' +
@@ -1133,6 +1135,7 @@ function semanticTools(config) {
       parameters: {
         sequence: { type: 'string', required: true, description: '模板 DNA 序列（内容或文件路径）' },
         target_region: { type: 'array', description: '要扩增的区间 [start, length]（0-based）：引物落在区间内，产物长度约等于区间长度', items: { type: 'number' } },
+        product_size_range: { type: 'array', description: '产物长度区间 [min, max]（bp）：直接控制产物大小，优先于 target_region 推导', items: { type: 'number' } },
         must_include: { type: 'array', description: '产物必须包含的内部区域 [start, length]（0-based）：引物不得进入该区，不能触及序列端点', items: { type: 'number' } },
         primer_size: { type: 'array', description: '引物长度范围 [min, max]，默认 [18, 25]', items: { type: 'number' } },
         tm_range: { type: 'array', description: 'Tm 范围 [min, max]，默认 [58, 65]', items: { type: 'number' } },

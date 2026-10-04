@@ -136,6 +136,15 @@ except ImportError:
 if has_primer3:
     p3 = bio_ops.op_primer3_design({'sequence': f_tmpl, 'num_return': 2})
     check(len(p3.get('pairs', [])) > 0, 'primer3_design 文件输入出对')
+    # product_size_range 直接控制产物大小（2026-10-04 增补）
+    p3b = bio_ops.op_primer3_design({'sequence': f_tmpl, 'product_size_range': [90, 130],
+                                     'gc_range': [40, 60], 'tm_range': [57, 63]})
+    sizes = [p['product_size'] for p in p3b.get('pairs', [])]
+    check(len(sizes) > 0 and all(90 <= s <= 130 for s in sizes),
+          f'product_size_range 直接控制产物大小（{sizes}）')
+    err = expect_error(lambda: bio_ops.op_primer3_design(
+        {'sequence': f_tmpl, 'product_size_range': [130, 100]}))
+    check(err is not None and '无效' in str(err), 'product_size_range 倒置区间拒绝')
 else:
     print('  SKIP primer3 未安装（第二层按需依赖，不在核心测试范围）')
 
