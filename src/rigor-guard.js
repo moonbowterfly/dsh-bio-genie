@@ -140,12 +140,19 @@ export function registerRigorGuard(ctx) {
       // ⚠️ 必须传完整 message 记录：dsh 0.1.5-rc.1 的会话持久化校验
       // （dsh-session assertMessageEventShape）要求 user/message 的 data 自带
       // 非空 `id` 与 `role: 'user'`，否则存盘后 resume 直接失败。
+      // ⚠️⚠️ 0.2.0 硬规则（2026-10-05 实测事故修复）：source.kind 必须是
+      // **producer-owned 的非空字符串，绝不能是 'plugin'** —— v4 存储准入
+      //（session-format-v3-to-v4 message-sources）拒绝一切 kind:'plugin' 消息
+      //（"refuses retired plugin wrappers"）。旧值 {kind:'plugin', plugin:…} 会让
+      // 本 spliced 事件的写入被拒 → **同批的最终回复+收尾事件全部无法落盘**、
+      // 回合以 "format v4 message requires a producer-owned source kind" 报错、
+      // 会话尾部冻结（E2E 实测 5 个会话中招）。自报身份直接以插件名作 kind。
       // 这是**本轮之后的提醒**（回复已放行）：要求下一轮给数字带上出处，
       // 不要求撤回、不要求停止本轮工作。
       agent.steer({
         id: `plugin-msg-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
         role: 'user',
-        source: { kind: 'plugin', plugin: 'dsh-bio-genie' },
+        source: { kind: 'dsh-bio-genie' },
         content: [{
           type: 'text',
           text:

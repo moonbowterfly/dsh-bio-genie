@@ -95,6 +95,14 @@ const check = (ok, msg) => { if (ok) console.log(`  PASS ${msg}`); else { failur
   const msg = a.nudges[0]
   check(Boolean(msg && msg.id && msg.role === 'user' && Array.isArray(msg.content) && msg.source),
     '③ 提醒消息带 id/role/source/content（引擎存盘契约）')
+  // 2026-10-05 事故回归：dsh 0.2.0 的 v4 存储准入拒绝 kind:'plugin' 的消息
+  //（退役 wrapper）——旧值导致提醒注入的整批事件（含最终回复）无法落盘、
+  // 回合报 "format v4 message requires a producer-owned source kind"。此断言
+  // 把真实引擎的准入规则钉进 mock（旧代码在此处必红）。
+  check(typeof msg?.source?.kind === 'string' && msg.source.kind.length > 0 && msg.source.kind !== 'plugin',
+    '③ source.kind 为 producer-owned 非空字符串、且非退役的 "plugin"（v4 存储准入硬规则）')
+  check(msg?.source?.kind === 'dsh-bio-genie',
+    '③ source.kind 以插件名自报身份（dsh-bio-genie）')
   check(/溯源提醒/.test(msg?.content?.[0]?.text || ''), '③ 文案是「溯源提醒」语气（非拦截令）')
   check(!/请调用相应 bio_\* 工具.*后再回复/.test(msg?.content?.[0]?.text || ''),
     '③ 不再要求「先算完再回复」（旧拦截话术已移除）')
