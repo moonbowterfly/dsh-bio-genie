@@ -7,6 +7,11 @@
  *  2) 真 bridge 正常代码 → 期望 ok:true、exitCode 0（回归）
  *  3) 真 bridge 抛异常代码 → 期望 ok:true + stderr 含 Traceback（bridge 契约回归；
  *     needs_repair 判定在 tools.js 层）
+ *  4) hang 脚本 + 短超时 → 期望 ok:false / timedOut:true / exitCode 为整数哨兵 -1
+ *     （2026-10-05 事故回归：被 kill 时 close code=null 直传会被引擎值校验拒绝
+ *     "value.exitCode must be an integer"，真实原因被吞。所有出口 exitCode 必须
+ *     是整数）。
+ *  5) python 路径不存在（spawn 失败）→ 期望 ok:false / exitCode 为整数（-1）。
  *
  * 注意：直接调 spawnPython（本测试为此将其导出）；真 bridge 用例用系统 python。
  */
@@ -71,6 +76,32 @@ const check = (name, cond, detail) => {
   check('case3 exitCode still 0 (handled shape)', out.exitCode === 0, `exitCode=${out.exitCode}`)
 }
 
+// 用例 4：超时 kill（信号终止，close code=null）→ exitCode 仍须为整数（哨兵 -1）
+{
+  const hangBridge = join(tmp, 'hang_bridge.py')
+  writeFileSync(hangBridge, [
+    'import sys, time',
+    'sys.stdin.read()  # 消费 payload',
+    'time.sleep(600)   # 模拟不收敛代码/无响应调用',
+  ].join('\n'))
+  const out = await spawnPython(PYTHON, hangBridge, { code: 'x' }, { timeoutMs: 1500 })
+  check('case4 timeout → ok:false', out.ok === false, `ok=${out.ok}`)
+  check('case4 timeout → timedOut:true', out.timedOut === true, `timedOut=${out.timedOut}`)
+  // 本机与 POSIX 信号 kill 时 close code 均为 null → -1 哨兵；
+  // 若某平台给出整数退出码则此断言需随之调整（首先保证下面 schema 断言）。
+  check('case4 killed process → integer exitCode sentinel (-1)', out.exitCode === -1, `exitCode=${out.exitCode}`)
+  check('case4 engine-schema: exitCode integer', Number.isInteger(out.exitCode), `typeof=${typeof out.exitCode}`)
+  check('case4 error message mentions timeout', /timed out/i.test(out.error || ''), `error=${(out.error || '').slice(0, 80)}`)
+}
+
+// 用例 5：spawn 失败（python 可执行文件不存在）→ exitCode 也须是整数
+{
+  const out = await spawnPython(join(tmp, 'no_such_python.exe'), join(tmp, 'whatever.py'), { code: 'x' }, { timeoutMs: 5000 })
+  check('case5 spawn error → ok:false', out.ok === false, `ok=${out.ok}`)
+  check('case5 spawn error → integer exitCode sentinel (-1)', out.exitCode === -1, `exitCode=${out.exitCode}`)
+  check('case5 engine-schema: exitCode integer', Number.isInteger(out.exitCode), `typeof=${typeof out.exitCode}`)
+}
+
 rmSync(tmp, { recursive: true, force: true })
-console.log(failures === 0 ? '\n结果: 3 用例全过' : `\n结果: ${failures} 项失败`)
+console.log(failures === 0 ? '\n结果: 全部用例通过' : `\n结果: ${failures} 项失败`)
 process.exit(failures === 0 ? 0 : 1)

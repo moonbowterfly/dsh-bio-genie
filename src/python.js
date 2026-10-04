@@ -34,6 +34,12 @@ export function spawnPython(exe, script, payload, { cwd, timeoutMs, signal } = {
       settled = true
       clearTimeout(timer)
       if (signal) signal.removeEventListener('abort', onAbort)
+      // 引擎值校验要求工具输出的 exitCode 必须是整数（bio_python 输出 schema:
+      // integer）。超时/信号 kill/spawn 失败时 close code 为 null，直接透传会被
+      // 引擎以 "returned invalid output: value.exitCode must be an integer" 拒绝
+      // ——把真实的超时/失败信息整个吞掉（2026-10-05 实测事故：agent 收到无效
+      // 输出报错而非超时指引）。无退出码一律用 -1 哨兵，绝不让非整数流出。
+      if (!Number.isInteger(obj.exitCode)) obj.exitCode = -1
       resolvePromise(obj)
     }
     const onAbort = () => child.kill()
@@ -69,11 +75,11 @@ export function spawnPython(exe, script, payload, { cwd, timeoutMs, signal } = {
       } else {
         const reason = didTimeout
           ? `python execution timed out after ${timeoutMs} ms (exit ${code})。` +
-            '提示：该操作在限定时间内未返回结果、已被终止——常见于远程服务调用' +
-            '（如 NCBI BLAST qblast）遇到的排队或限流（短时间连续请求易触发）。' +
-            '建议：① 稍后重试，并避免连续高频调用同一远程服务；' +
-            '② 考虑替代路径（如 Entrez 直接下载数据做本地比对）；' +
-            '③ 用 bio_log 查看本次调用记录。'
+            '提示：该操作在限定时间内未返回结果、已被终止——常见于 ① 远程服务调用' +
+            '（如 NCBI BLAST qblast）排队或限流（短时间连续请求易触发）；② 代码未收敛' +
+            '（如循环变量未推进、等待输入导致死循环）。建议：① 检查循环能否正常退出；' +
+            '② 稍后重试，并避免连续高频调用同一远程服务；③ 考虑替代路径（如 Entrez' +
+            ' 直接下载数据做本地比对）；④ 用 bio_log 查看本次调用记录。'
           : `python returned no valid JSON (exit ${code})`
         settle({ ok: false, stdout, stderr, error: reason, exitCode: code, timedOut: didTimeout })
       }
