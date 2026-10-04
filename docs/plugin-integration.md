@@ -302,15 +302,15 @@ GET  /api/dsh-bio-gem/integration/v1/jobs/:id     # 任务状态（批次 2 预�
 - 质量铁律沿用：脱靶**永不说安全**（只能「在当前搜索参数下未检出」）；不打综合分
   （只给评分向量 + 声明式 objective）。
 
-### 15.5 验证矩阵（已执行）
+### 15.5 集成检查方法（预期行为）
 
-| 级别 | 动作 | 结果 |
+| 级别 | 动作 | 预期 |
 |---|---|---|
-| ① 端点直调 | `curl /api/dsh-bio-genie/editing?probe=install` 与完整请求 | `installed:true` / `state=ready` / checks 三项 ok / 5 计划 / 6 编辑器 / 7 工具 / remediations 空 |
-| ② bundle 内容 | boot manifest → 拉 `@dsh-bio/dsh-bio-genie/client.js` | 新分页文案与组件全部命中 |
-| ③ 真实浏览器 | 设置 → BioGenie → 分页列表 | 「代谢建模」与「基因编辑设计」两个域分页渲染完整（含证据分级列） |
-| ④ 路由验证 | 真实会话（同一工作区、同一任务） | `skill(graft-expert)` → `graft_profiles` → `graft_design` → `graft_score` → `graft_plan_save` 全链走通 |
-| ⑤ 回归 | `npm run bench` | exit 0（含 gem 适配器、graft 适配器与 bio_crispr_guide 语义标签门） |
+| ① 端点直调 | `curl /api/dsh-bio-genie/editing?probe=install` 与完整请求 | `installed:true` / `state=ready` / checks 全 ok / `remediations` 空；计划数、编辑器数、工具数以实际返回为准（工具数与插件注册一致，当前 11） |
+| ② bundle 内容 | boot manifest → 拉 `@dsh-bio/dsh-bio-genie/client.js` | 分页文案与组件存在 |
+| ③ 浏览器 | 设置 → BioGenie → 分页列表 | 「代谢建模」与「基因编辑设计」域分页渲染完整（含证据分级列） |
+| ④ 路由 | 真实会话（同一工作区、同一任务） | `skill(graft-expert)` → `graft_profiles` → `graft_design` → `graft_score` → `graft_plan_save` 全链可用 |
+| ⑤ 回归 | `npm run bench` | 预期全绿（含 gem 适配器、graft 适配器与 bio_crispr_guide 语义标签门） |
 
 ### 15.6 本域特有纪律（接入方与宿主都适用）
 

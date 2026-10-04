@@ -1709,12 +1709,11 @@ def _blast_diagnostics(sequence, program, params_used, warnings, hit_count,
     return {'query_length': length, 'params_used': dict(params_used), 'notes': notes}
 
 
-# ── qblast 排队 deadline（2026-09-19 审计修复）──────────────────────────────
-# 真实事故（实测）：23nt + expect=0.001 的 qblast 在 NCBI 服务端排队
-# >600s，被 TS 执行层硬杀（python execution timed out after 600000 ms），agent
-# 只拿到裸超时文案、无任何指引。qblast 的排队时长由 NCBI 控制、进程内无法中断
-# 其轮询，因此在本层施加**总 deadline** 主动放弃（默认 540s，后于执行层 600s
-# 硬杀线留 60s 余量），换取结构化、可行动的返回文案。
+# ── qblast 排队 deadline ────────────────────────────────────────────
+# 短查询 + 严 expect（如 23nt + expect=0.001）易在 NCBI 服务端长时间排队，
+# 超过执行层 600s 上限会被硬杀且无结构化指引。qblast 的排队时长由 NCBI 控制、
+# 进程内无法中断其轮询，因此在本层施加**总 deadline** 主动放弃（默认 540s，
+# 于执行层 600s 硬杀线留 60s 余量），换取结构化、可行动的返回文案。
 _QBLAST_DEADLINE_S = 540
 
 

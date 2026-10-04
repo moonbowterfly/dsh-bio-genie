@@ -152,11 +152,11 @@ bio_plasmid_map name="pET28a" features=[...]               # 质粒图谱
 1. **命名空间共存**：`bio_*` 与 `gem_*` 直接调用，不做封装。
 2. **模型权威源 = gem 模型卡**（`<模型名>.card.json`，lineage 版本化）：汇报模型规模/验证/必需基因时
    provenance 指向模型卡字段或当次工具输出，**禁止凭印象重述**。
-3. **预测权威源 = gem 预测账本**（`~/.dsh/dsh-bio-gem/ledger/predictions.jsonl`）：引用必需/表型/分泌/合成致死
+3. **预测权威源 = gem 预测账本**（每模型一个账本：`~/.dsh/dsh-bio-gem/ledger/<模型名>.jsonl`；旧全局 predictions.jsonl 已弃用）：引用必需/表型/分泌/合成致死
    预测必须带 `prediction_id` + `evidence_tier` + `status`；**未入账的预测不得谎称已有**。
 4. **下游接口 = gem_targets 规范导出**（11 字段 CSV/JSON）：靶点清单一律用 `gem_targets`，不自行编格式。
 5. **质量铁律**：数字来自工具输出（_provenance）；跨条件通量对比只认 `gem_fluxscan` 区间分离判定
-   （overlap=伪影禁止引用）；退化场景如实报告（wt≤EPS）；生长值单位 mmol/gDW/h。
+   （overlap=伪影禁止引用）；退化场景如实报告（wt≤EPS）；生长值单位以返回 `units` 字段为准（归一化 biomass 为 1/h；一般通量为 mmol/gDW/h）。
 
 ### 7.3《代谢模型分析报告》模板
 

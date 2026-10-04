@@ -170,8 +170,7 @@ for (const s of SKILL_MANIFEST) {
 // ─────────────────────────────────────────────────────────────
 // 计量口径（实测可复现）：agent 侧 skill 目录 = 一行一条 `- \`name\`: description`，
 // 单条字符数 = name + description + 6（减号、空格、反引号、冒号、空格、换行）。
-// 整块 = 条目行 + 外壳文字（FRAME_CHARS，实测取自真实会话的
-// <system-reminder> 块：6454 整块 − 5717 条目行 = 737）。
+// 整块 = 条目行 + 外壳文字（FRAME_CHARS = 737，按 skill 目录注入块实测差值取值）。
 const DESC_MAX_LEN = 120
 const CATALOG_BUDGET = 9000
 const FRAME_CHARS = 737

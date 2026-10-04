@@ -31,7 +31,7 @@
 | 🧬 **Scientific Rigor Guardrails** | Persona enforces "biological conclusions must trace to tool output"; pure inference is marked [inferred — unverified] |
 | 🧠 **Session Memory** | Successful code patterns + error→fix lessons accumulate automatically (local JSON); query via `bio_memory`, gets smarter over time |
 | ⚙️ **Settings Panel** | "BioGenie" menu in dsh Settings sidebar (⚙️) — tabs: Overview (package info/config defaults), Skill Modules (50 entries grouped by main/domain/research/protocol/guide), Python Environment (venv packages), Tool Playground; with dsh-bio-gem / dsh-bio-graft / dsh-bio-galatea sharing the instance, additional read-only five-state panels "Metabolic Modeling" / "Gene-Editing Design" / "Protein Design" (**the Protein Design page includes a "Model directory" manager to install galatea weights on another drive**) |
-| 📚 **Protocol Knowledge Base** | 17 high-frequency task protocols (QC/alignment/BLAST/cloning/trees/structure/enrichment/publication figures/coordinate systems/statistics/differential expression/GSEA…), each with runnable code templates + pitfalls, bundled with the plugin |
+| 📚 **Protocol Knowledge Base** | 19 high-frequency task protocols (QC/alignment/BLAST/cloning/trees/structure/enrichment/publication figures/coordinate systems/statistics/differential expression/GSEA…), each with runnable code templates + pitfalls, bundled with the plugin |
 
 ---
 
@@ -288,7 +288,7 @@ On first tool call (or background warm-up at dsh startup) the plugin automatical
 | Dimension | Requirement |
 |-----------|-------------|
 | **Node** | `^22.19 \|\| >=24` (same as dsh) |
-| **dsh** | Peer deps `@deepseek-ai/dsh-tools` etc. at `^0.1.0-rc.6 || ^0.2.0-rc.1` (both 0.1.x and 0.2.0+ incl. the official desktop app; see the Installation section above) |
+| **dsh** | Peer deps `@deepseek-ai/dsh-tools` etc. at `^0.1.0-rc.6 \|\| ^0.2.0-rc.1` (both 0.1.x and 0.2.0+ incl. the official desktop app; see the Installation section above) |
 | **Platform** | Windows / macOS / Linux (x86_64 / arm64); platform-appropriate uv/Python is downloaded automatically |
 
 ---
