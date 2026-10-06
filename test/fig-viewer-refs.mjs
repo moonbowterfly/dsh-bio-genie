@@ -72,7 +72,11 @@ function tamperManifestText(from, to) {
 let count = 0
 async function check(name, body) { await body(); count++; console.log(`PASS ${name}`) }
 
+const testHooks = { stateCalls: [], effects: [] }
+
 function load(href) {
+  testHooks.stateCalls.length = 0
+  testHooks.effects.length = 0
   let plugin
   vm.runInNewContext(source, {
     URL, atob, btoa, TextDecoder, TextEncoder, console, crypto: webcrypto,
@@ -82,8 +86,11 @@ function load(href) {
         assert.equal(name, 'react')
         return {
           createElement: (type, props, ...children) => ({ type, props, children }),
-          useState: v => [typeof v === 'function' ? v() : v, () => {}],
-          useEffect: () => {},
+          useState: v => {
+            const init = typeof v === 'function' ? v() : v
+            return [init, x => { testHooks.stateCalls.push(x) }]
+          },
+          useEffect: (fn, deps) => { testHooks.effects.push({ fn, deps }) },
           useRef: () => ({ current: null }),
           useMemo: f => f(),
           useCallback: f => f,
@@ -829,6 +836,58 @@ await check('R232 hit: malformed clip never throws (element skipped)', () => {
   assert.equal(M.hitTestElements(bad, 10, 10, 8, 1).length, 0)
   const okOne = [{ element_id: 'ok', geometry: { center: [10, 10], radius: 3 }, clip: [0, 0, 100, 100] }]
   assert.equal(M.hitTestElements(okOne, 10, 10, 8, 1).length, 1)
+})
+
+// ── R2-3.3：renderer 必填（onLoad 注入）/ 清理 effect 依赖就绪 ────────
+await check('R233 dims: renderer size required — missing/string rejected at load', async () => {
+  const body = world.entries.find(({ entry }) => entry.name === 'sidebar.right.pane.tab')
+  const frames = await framesOf(world.providers[0], ADDRESS)
+  const base = frames[0].value
+  const mw = base.manifest.image.width
+  const mh = base.manifest.image.height
+  function runOnLoad(hitsVar) {
+    const vv = { manifest: base.manifest, rows: base.rows, hits: hitsVar, image: base.image }
+    const tree = body.component({ useTabInfo: () => ({ tab: { contentId: 'x' } }),
+      useResource: () => ({ status: 'live', value: vv }) })
+    let img = null
+    ;(function walk(n) {
+      if (!n || typeof n !== 'object') return
+      if (Array.isArray(n)) { n.forEach(walk); return }
+      if (n.props && n.props['data-figview'] === 'figure-img') { img = n; return }
+      ;(n.children || []).forEach(walk)
+    })(tree)
+    assert.ok(img, 'img rendered')
+    const b4 = testHooks.stateCalls.length
+    img.props.onLoad({ target: { naturalWidth: mw, naturalHeight: mh, parentElement: null } })
+    return testHooks.stateCalls.slice(b4)
+  }
+  const h1 = JSON.parse(JSON.stringify(base.hits)); h1.renderer_height = '5000'
+  assert.ok(runOnLoad(h1).indexOf('error') !== -1, 'string renderer_height 拒绝')
+  const h2 = JSON.parse(JSON.stringify(base.hits)); delete h2.renderer_height
+  assert.ok(runOnLoad(h2).indexOf('error') !== -1, 'missing renderer_height 拒绝')
+  const h3 = JSON.parse(JSON.stringify(base.hits)); delete h3.renderer_width; delete h3.renderer_height
+  assert.ok(runOnLoad(h3).indexOf('error') !== -1, '双轴缺失拒绝')
+  const good = runOnLoad(base.hits)
+  assert.ok(good.indexOf('error') === -1 && good.indexOf('loaded') !== -1, '正常路径 loaded')
+})
+
+await check('R233 lifecycle: cleanup effect deps ready at render (boolean + status)', async () => {
+  const body = world.entries.find(({ entry }) => entry.name === 'sidebar.right.pane.tab')
+  const frames = await framesOf(world.providers[0], ADDRESS)
+  const v = frames[0].value
+  const b1 = testHooks.effects.length
+  body.component({ useTabInfo: () => ({ tab: { contentId: 'x' } }),
+    useResource: () => ({ status: 'live', value: v }) })
+  const ready = testHooks.effects.slice(b1).some(e => Array.isArray(e.deps) && e.deps.length === 2
+    && e.deps[0] === true && typeof e.deps[1] === 'string')
+  assert.ok(ready, '有图场景：deps=[true, imgStatus]')
+  const von = { manifest: v.manifest, rows: v.rows, hits: v.hits, image: { omitted: true, reason: 'x' } }
+  const b2 = testHooks.effects.length
+  body.component({ useTabInfo: () => ({ tab: { contentId: 'x' } }),
+    useResource: () => ({ status: 'live', value: von }) })
+  const ready2 = testHooks.effects.slice(b2).some(e => Array.isArray(e.deps) && e.deps.length === 2
+    && e.deps[0] === false && typeof e.deps[1] === 'string')
+  assert.ok(ready2, 'omitted 场景：deps=[false, imgStatus]')
 })
 
 // ── tab / 卡片 / 查看器 ─────────────────────────────────────────────────
