@@ -1,0 +1,173 @@
+{
+  "note": "真实 tool/result 样本（round3-plasmid 桌面会话，dsh 0.2.0-rc.2），用于 fig-viewer parser 测试；超长 text 已截断",
+  "source_session": "--D-Program-dsh-g-series-e2e-20261004-round3-plasmid--\\session-fcd475e7-7799-4ae6-b4b9-aaedbce298f9\\session.v4.jsonl.zstd",
+  "samples": {
+    "error_result": {
+      "type": "tool/result",
+      "seq": 31,
+      "time": 1791142374099,
+      "data": {
+        "turn": 1,
+        "step": 3,
+        "message": {
+          "role": "tool",
+          "source": {
+            "kind": "tool",
+            "callId": "call_00_K5cZ8yRSFn5IwLv870KX8676"
+          },
+          "toolCallId": "call_00_K5cZ8yRSFn5IwLv870KX8676",
+          "content": [
+            {
+              "type": "text",
+              "text": "Error: tool \"bio_python\" returned invalid output: \"value.exitCode\" must be an integer"
+            }
+          ],
+          "isError": true,
+          "id": "bfc453f8-e1fa-4992-afce-91e1b609dae7"
+        },
+        "error": {
+          "name": "ToolOutputError",
+          "code": "INVALID_TOOL_OUTPUT"
+        }
+      },
+      "sourceEventSeqs": [
+        30
+      ],
+      "surfaceOp": "append"
+    },
+    "plain_text": {
+      "type": "tool/result",
+      "seq": 36,
+      "time": 1791142376566,
+      "data": {
+        "turn": 1,
+        "step": 4,
+        "message": {
+          "role": "tool",
+          "source": {
+            "kind": "tool",
+            "callId": "call_00_vx0cQnyWbVTeV2W7stpA7199"
+          },
+          "toolCallId": "call_00_vx0cQnyWbVTeV2W7stpA7199",
+          "content": [
+            {
+              "type": "text",
+              "text": "strand start0 end0 aa_len head\n+ 884 1745 286 MSIQHFRVALIPFFAAFCLPVFAHP\n- 142 499 118 MRCEIPHRCVRRKYRIRRHSPFRLR\n+ 215 539 107 MTMITPSLHACRSTLEDPRVPSSNS\n- 1348 1615 88 MIPRDPRSPAPDLSAINQPAGRAER\n- 302 476 57 MRKEKIPHQAPFAIQAAQLLGRAIG\n- 1171 1342 56 MLCKKAVSSFGPPIVVRSKLAAVLS\n- 510 669 52 MTVKTSDTCSSRRRSQLVCKRMPGA\n\n[stderr]\nC:\\Users\\shuai\\.dsh\\dsh-bio-genie\\python-env\\Lib\\site-packages\\Bio\\Seq.py:2874: BiopythonWarning: Partial codon, len(sequence) not a multiple of three. Explicitly trim the sequence or add trailing N before translation. This may become an error in future.\n  warnings.warn(\n\n[result]\n{\"n_orfs\":7,\"top\":[[\"+\",884,1745,286,\"MSIQHFRVALIPFFAAFCLPVFAHP\"],[\"-\",142,499,118,\"MRCEIPHRCVRRKYRIRRHSPFRLR\"],[\"+\",215,539,107,\"MTMITPSLHACRSTLEDPRVPSSNS\"],[\"-\",1348,1615,88,\"MIPRDPRSPAPDLSAINQPAGRAER\"],[\"-\",302,476,57,\"MRKEKIPHQAPFAIQAAQLLGRAIG\"],[\"-\",1171,1342,56,\"MLCKKAVSSFGPPIVVRSKLAAVLS\"],[\"-\",510,669,52,\"MTVKTSDTCSSRRRSQLVCKRMPGA\"]]}"
+            }
+          ],
+          "isError": false,
+          "id": "d95aa694-a9b6-4dd5-b93e-46050c0d2e19"
+        }
+      },
+      "sourceEventSeqs": [
+        35
+      ],
+      "surfaceOp": "append"
+    },
+    "sidecar_tool": {
+      "type": "tool/result",
+      "seq": 76,
+      "time": 1791142489802,
+      "data": {
+        "turn": 1,
+        "step": 12,
+        "message": {
+          "role": "tool",
+          "source": {
+            "kind": "tool",
+            "callId": "call_00_NVGFoCDgT2pcoHGP0G5Y3267"
+          },
+          "toolCallId": "call_00_NVGFoCDgT2pcoHGP0G5Y3267",
+          "content": [
+            {
+              "type": "text",
+              "text": "{\n  \"name\": \"pUC19\",\n  \"graphic\": true,\n  \"out_file\": \"D:\\\\Program\\\\dsh\\\\g-series-e2e-20261004\\\\round3-plasmid\\\\pUC19_map.png\",\n  \"output_format\": \"png\",\n  \"figure_width\": 11,\n  \"_provenance\": {\n    \"tool\": \"bio_plasmid_map\",\n    \"at\": \"2026-10-04T19:34:49.801Z\"\n  }\n}"
+            }
+          ],
+          "isError": false,
+          "id": "2f99d3e6-beef-43ef-aa08-6482874a86c7"
+        }
+      },
+      "sourceEventSeqs": [
+        75
+      ],
+      "surfaceOp": "append"
+    },
+    "image_block": {
+      "type": "tool/result",
+      "seq": 83,
+      "time": 1791142495230,
+      "data": {
+        "turn": 1,
+        "step": 13,
+        "message": {
+          "role": "tool",
+          "source": {
+            "kind": "tool",
+            "callId": "call_00_SAKcBH37xvixiWwVr0cO4857"
+          },
+          "toolCallId": "call_00_SAKcBH37xvixiWwVr0cO4857",
+          "content": [
+            {
+              "type": "text",
+              "text": "<path>D:\\Program\\dsh\\g-series-e2e-20261004\\round3-plasmid\\pUC19_map.png</path>\n<type>image</type>\n<content>\nimage/webp image, 1613x2598 px, 158532 bytes (downscaled from 2601x4189 px; multiply coordinates by 1.61 to locate features in the original file)\n</content>"
+            },
+            {
+              "type": "image",
+              "attachment": {
+                "attachmentId": "sha256:72024939173c93cc44b97139a1a2785b78a1c8c11f65c993722f739aa702ad6d",
+                "mediaType": "image/webp",
+                "bytes": 158532,
+                "width": 1613,
+                "height": 2598,
+                "name": "pUC19_map.png",
+                "originalDimensions": {
+                  "width": 2601,
+                  "height": 4189
+                }
+              }
+            }
+          ],
+          "isError": false,
+          "id": "483e79e0-42c3-4f57-83cc-22d963ce5f45"
+        },
+        "meta": {
+          "path": "D:\\Program\\dsh\\g-series-e2e-20261004\\round3-plasmid\\pUC19_map.png"
+        }
+      },
+      "sourceEventSeqs": [
+        82
+      ],
+      "surfaceOp": "append"
+    },
+    "sidecar_tool_constructed": {
+      "type": "tool/result",
+      "seq": 9001,
+      "time": 1791142489802,
+      "data": {
+        "turn": 1,
+        "step": 12,
+        "message": {
+          "role": "tool",
+          "source": {
+            "kind": "tool",
+            "callId": "call_00_NVGFoCDgT2pcoHGP0G5Y3267"
+          },
+          "toolCallId": "call_00_NVGFoCDgT2pcoHGP0G5Y3267",
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"ok\": true, \"result\": {\"name\": \"pUC19\", \"graphic\": true, \"out_file\": \"D:/Program/dsh/g-series-e2e-20261004/round3-plasmid/pUC19_map.png\", \"viewer_manifest\": \"D:/Program/dsh/g-series-e2e-20261004/round3-plasmid/pUC19.figview/pUC19/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/pUC19.figview.json\", \"figure_id\": \"pUC19\"}}"
+            }
+          ],
+          "isError": false,
+          "id": "2f99d3e6-beef-43ef-aa08-6482874a86c7"
+        }
+      },
+      "sourceEventSeqs": [
+        75
+      ],
+      "surfaceOp": "append"
+    }
+  }
+}

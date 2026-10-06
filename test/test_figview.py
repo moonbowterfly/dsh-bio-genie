@@ -331,6 +331,43 @@ class FigviewTests(unittest.TestCase):
         REPORT['file_source'] = {'manifest': str(entry), 'validator': validate_bundle(entry)}
         self.assertEqual(REPORT['file_source']['validator']['points'], 5)
 
+    def test_09_export_sidecar_discovery(self):
+        """fig_export 的 sidecar 发现：阳性（真实 bundle 同 stem）/ 阴性 / 结构不合格。"""
+        import bio_ops
+        d = EVIDENCE / 'sidecar-discovery'
+        d.mkdir(parents=True, exist_ok=True)
+        fig, _ax, _meta = differential_plot(table(), label_col='gene', top_k=0, viewer=True)
+        entry = Path(export_bundle(fig.figview_binding, d / 'bundle', figure_id='sidecar-demo'))
+        m = json.loads(entry.read_text())
+        png = entry.parent / m['image']['path']
+        self.assertTrue(png.is_file())
+        self.assertEqual(os.path.splitext(png.name)[0], 'sidecar-demo')
+
+        path, viewer = bio_ops._discover_figview_sidecar(str(png))
+        self.assertEqual(path, str(entry))
+        self.assertTrue(viewer['available'])
+        self.assertEqual(viewer['figure_id'], 'sidecar-demo')
+        self.assertEqual(viewer['schema_version'], 1)
+        self.assertEqual(viewer['inspect'], 'points')
+
+        out = bio_ops.op_fig_export({'paths': [str(png)]})
+        self.assertTrue(out['results'][0]['viewer']['available'])
+        self.assertEqual(out['results'][0]['viewer']['figure_id'], 'sidecar-demo')
+
+        lonely = d / 'lonely.png'
+        Image.new('RGB', (64, 64), 'white').save(lonely)
+        self.assertEqual(bio_ops._discover_figview_sidecar(str(lonely)), (None, None))
+        out2 = bio_ops.op_fig_export({'paths': [str(lonely)]})
+        self.assertFalse(out2['results'][0]['viewer']['available'])
+
+        bad = d / 'bad.png'
+        Image.new('RGB', (64, 64), 'white').save(bad)
+        (d / 'bad.figview.json').write_text('{"schema_version": 1}', encoding='utf-8')
+        _p, viewer3 = bio_ops._discover_figview_sidecar(str(bad))
+        self.assertFalse(viewer3['available'])
+        self.assertIn('结构校验未通过', viewer3['reason'])
+        REPORT['sidecar_discovery'] = {'ok': str(png), 'manifest': path, 'lonely': None}
+
 
 if __name__ == '__main__':
     result = unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.loadTestsFromTestCase(FigviewTests))

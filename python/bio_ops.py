@@ -844,6 +844,40 @@ def op_fig_profile(args):
     return _to_jsonable(info)
 
 
+def _discover_figview_sidecar(path):
+    """查找图文件的 fig-viewer sidecar manifest（保守发现，不猜非同名文件）。
+
+    约定：与图同目录、同 stem 的 `<stem>.figview.json`（R2-1 bundle 布局中图与
+    manifest 同目录）。返回 (manifest_path, viewer_dict) 或 (None, None)。
+    权威关联通道是工具结果里的 viewer_manifest 字段；此处仅为审计兜底。
+    """
+    import json as _json
+    import os as _os
+    stem = _os.path.splitext(_os.path.abspath(path))[0]
+    candidate = stem + '.figview.json'
+    if not _os.path.isfile(candidate):
+        return None, None
+    try:
+        with open(candidate, 'r', encoding='utf-8') as fh:
+            m = _json.load(fh)
+        ok = (isinstance(m, dict) and m.get('schema_version') == 1
+              and isinstance(m.get('figure_id'), str) and m.get('figure_id')
+              and isinstance(m.get('revision'), str) and m.get('revision'))
+        if not ok:
+            return candidate, {'available': False, 'reason': 'manifest 存在但结构校验未通过'}
+        inspect = (m.get('capabilities') or {}).get('inspect')
+        return candidate, {
+            'available': True,
+            'manifest': candidate,
+            'schema_version': 1,
+            'figure_id': m.get('figure_id'),
+            'revision': m.get('revision'),
+            'inspect': inspect,
+        }
+    except Exception as e:
+        return candidate, {'available': False, 'reason': f'{type(e).__name__}: {e}'}
+
+
 def op_fig_export(args):
     """图文件合规审计 + 可选 PNG 预览：格式/DPI/尺寸/字体嵌入检查。
 
@@ -878,6 +912,9 @@ def op_fig_export(args):
             'issues': [{'severity': s, 'message': m} for s, m in issues],
             'info': _to_jsonable(info),
         }
+        _manifest_path, viewer = _discover_figview_sidecar(p)
+        entry['viewer'] = viewer if viewer is not None else {
+            'available': False, 'reason': '未发现同 stem 的 sidecar manifest（交互查看不可用）'}
         if preview:
             try:
                 out = os.path.splitext(os.path.abspath(p))[0] + '_preview.png'
