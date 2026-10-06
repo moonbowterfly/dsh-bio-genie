@@ -25,7 +25,7 @@ language: python
 3. 查期刊规格（bio-figure 内的期刊表：Nature 单栏 3.5in/7-8pt/300dpi…）
 4. bio_fig_qa → 中文图确认 cjk_ready，false 就改英文标签
 5. bio_python 绘制（配方见 bio-proto-pub-figure）
-6. audit_layout(fig) 程序自检（缺字/裁切/刻度重叠）
+6. audit_layout(fig) 程序自检（缺字/裁切/刻度重叠/文本互叠/图例遮数据）
 7. export_figure(...) 按最终尺寸导出 PDF/SVG/PNG + 灰度预览
 8. bio_fig_export 审计 → FAIL 回改 → 直到 PASS
 ```
@@ -38,8 +38,32 @@ from figurelib.profile_data import profile_data     # profile_data('data.csv', g
 from figurelib.export_figure import export_figure   # export_figure(fig, 'figs/fig1', formats=['pdf','svg','png'], size_inches=(3.5,2.625), dpi=300, grayscale_preview=True)
 from figurelib.check_figure import check_figure     # check_figure('fig1.pdf', min_dpi=300, target_inches=(3.5,2.625))
 from figurelib.layout_tools import finalize_figure, add_panel_labels  # finalize_figure(fig); add_panel_labels(fig, style='nature'|'ieee')
-from figurelib.visual_qa import audit_layout, render_preview         # audit_layout(fig) → [(severity, msg), ...]
+from figurelib.visual_qa import audit_layout, print_report, render_preview  # audit_layout(fig) → [(severity, msg), ...]
 ```
+
+### 出图后布局自检
+
+agent 自绘图时，在最终尺寸和布局确定后、导出前，对同一个 Figure 调用自检：
+
+```python
+from figurelib.visual_qa import audit_layout, print_report
+
+issues = audit_layout(fig, clip_tol_px=2, overlap_tol_px=1, legend_min_points=3)
+verdict = print_report(issues)  # PASS / WARN / FAIL；WARN 不自动阻断导出
+# 按报告移动重叠标注、调整字体/间距或移走图例，再自检并导出。
+```
+
+`differential_plot`（含 volcano/MA 别名）已在导出前自动审计；无 `out_file` 时也会审计。
+结果在 `meta['layout_audit']`，简洁修正建议在 `meta['layout_suggestions']`，
+可直接 `print_report(meta['layout_audit'])`。默认 `legend_loc='outside'` 将图例横排在
+axes 上方留白区；可以显式覆盖为 `'best'` 或其他 matplotlib 位置。自定义 axes
+若留白不足或带标题，按报告调整图例/标题间距，随后重新审计。
+
+文本互叠排除刻度及科学计数法偏移文字、同一 legend 内的条目/标题配对；
+annotation 只比较文字 bbox，不把箭头穿越当成文本互叠。图例检测默认至少 3 个
+可见且未被裁剪的独立 scatter 中心或 line 顶点落入 bbox 才 WARN，同坐标分层
+绘制不重复计数。阈值可调；稀疏折线的段穿越、marker 边缘、bar/image 等未覆盖，
+仍需渲染预览读图复核。原有缺字 FAIL、裁切/刻度 WARN 语义保持不变。
 
 ## 4. 中文图（方框问题的根治）
 

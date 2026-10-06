@@ -11,6 +11,10 @@
 """
 import os
 import sys
+import subprocess
+
+if not sys.flags.isolated:
+    raise SystemExit(subprocess.run([sys.executable, '-I', '-B', __file__, *sys.argv[1:]]).returncode)
 
 import pandas as pd
 import matplotlib
@@ -59,6 +63,11 @@ try:
     check('meta 记录了标注基因', 'geneA' in meta.get('labeled', []), str(meta.get('labeled')))
     check('meta 记录 n_sig_up/down', meta.get('n_sig_up') == 1 and meta.get('n_sig_down') == 1,
           f"up={meta.get('n_sig_up')} down={meta.get('n_sig_down')}")
+    check('meta 自动返回 layout_audit 和修正建议',
+          isinstance(meta.get('layout_audit'), list) and isinstance(meta.get('layout_suggestions'), list))
+    fig.canvas.draw()
+    check('默认 legend 位于 axes 上方',
+          ax.get_legend().get_window_extent(fig.canvas.get_renderer()).y0 > ax.bbox.y1)
     plt.close(fig)
 except Exception as e:
     check('differential_plot 无 name 列不再 KeyError', False, f'{type(e).__name__}: {e}')
