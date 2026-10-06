@@ -597,6 +597,65 @@ await check('R223 boundary requires host-provided canonical path (no silent skip
   assert.match(frames[0].error.message, /未提供规范路径/)
 })
 
+// ── R2-2.4：rows/hits 严格路径 / 类型严格 / UNC / eof 严格 ──────────────
+await check('R224 rows/hits strict JSON: duplicate keys and invalid UTF-8 rejected even with matching sha', async () => {
+  const rowsText = bundle['recipe.rows.json'].toString('utf8')
+  const dup = Buffer.from(rowsText.replace('"schema_version":1', '"schema_version":1,"schema_version":1'))
+  const ovDup = withBundle({ 'recipe.rows.json': dup })
+  const w1 = makeContext({ override: ovDup })
+  plugin.apply(w1.ctx)
+  const f1 = await framesOf(w1.providers[0], addrWithRev(revOfBytes(ovDup['recipe.figview.json'])))
+  assert.equal(f1[0].ok, false)
+  assert.match(f1[0].error.message, /rows 结构非法：重复键/)
+
+  const bad = Buffer.from(rowsText)
+  const pos = bad.indexOf('schema_version')
+  assert.ok(pos >= 0)
+  bad[pos] = 0xFF
+  const ovU = withBundle({ 'recipe.rows.json': bad })
+  const w2 = makeContext({ override: ovU })
+  plugin.apply(w2.ctx)
+  const f2 = await framesOf(w2.providers[0], addrWithRev(revOfBytes(ovU['recipe.figview.json'])))
+  assert.equal(f2[0].ok, false)
+  assert.match(f2[0].error.message, /rows 非合法 UTF-8/)
+})
+
+await check('R224 type strictness: schema_version true and array parent_revision are rejected', async () => {
+  const w1 = makeContext({ override: { 'recipe.figview.json': tamperManifestText('"schema_version":1', '"schema_version":true') } })
+  plugin.apply(w1.ctx)
+  const f1 = await framesOf(w1.providers[0], ADDRESS)
+  assert.equal(f1[0].ok, false)
+  assert.match(f1[0].error.message, /不支持的 schema_version/)
+
+  const ovP = buildManifestBytes(m => { m.parent_revision = ['a'.repeat(64)] })
+  const w2 = makeContext({ override: { 'recipe.figview.json': ovP } })
+  plugin.apply(w2.ctx)
+  const f2 = await framesOf(w2.providers[0], addrWithRev(revOfBytes(ovP)))
+  assert.equal(w2 && f2[0].ok, false)
+  assert.match(f2[0].error.message, /parent_revision 非法/)
+})
+
+await check('R224 host eof is required; UNC case-insensitive placement accepted', async () => {
+  const raw = Buffer.from(bundle['recipe.figview.json'])
+  const w1 = makeContext({ rawReturn: (path) => {
+    if (!String(path).includes('figview.json')) return undefined
+    return { ok: true, value: { data: new Uint8Array(raw), offset: 0, bytes: raw.length, absolutePath: BYTES_ABS } }
+  } })
+  plugin.apply(w1.ctx)
+  const f1 = await framesOf(w1.providers[0], ADDRESS)
+  assert.equal(f1[0].ok, false)
+  assert.match(f1[0].error.message, /缺少布尔 eof/)
+
+  const w2 = makeContext({ absPaths: {
+    'recipe.figview.json': '//SERVER/SHARE/b/' + REV + '/recipe.figview.json',
+    'recipe.rows.json': '//server/share/b/' + REV + '/recipe.rows.json',
+    'recipe.hits.json': '//server/share/b/' + REV + '/recipe.hits.json',
+  } })
+  plugin.apply(w2.ctx)
+  const f2 = await framesOf(w2.providers[0], ADDRESS)
+  assert.ok(f2[0].ok, f2[0].error && f2[0].error.message)
+})
+
 // ── tab / 卡片 / 查看器 ─────────────────────────────────────────────────
 await check('tab claims only well-formed bio-figure session addresses; title derives from stem', () => {
   const tab = world.tabs[0]
