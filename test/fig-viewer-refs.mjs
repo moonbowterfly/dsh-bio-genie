@@ -1232,6 +1232,17 @@ await check('R241 form: proto keys do not leak inherited values into preview', a
   assert.ok(!text.includes('function Object'), '不泄漏继承值')
 })
 
+await check('R241b: explicit null from stays literal; missing from shows placeholder', () => {
+  const M = plugin.__figureViewerMath
+  const m = { figure_id: 'f', revision: 'r', redraw: { recipe_id: 'x', allowed_parameters: ['a', 'b'], parameters: {} },
+    source: { snapshot_sha256: 'd'.repeat(64) } }
+  const t1 = M.buildRedrawRequest(m, { a: { from: null, to: 'Y' } })
+  assert.ok(t1.includes('a: null -> ' + JSON.stringify('Y')), '真实 null 原值字面显示')
+  const t2 = M.buildRedrawRequest(m, { b: { from: undefined, to: 'Z' } })
+  assert.ok(t2.includes('b: (当前值) -> ' + JSON.stringify('Z')), '未提供显示当前值占位')
+  assert.ok(!t2.includes('b: null'), '不把未提供写成 null')
+})
+
 // ── tab / 卡片 / 查看器 ─────────────────────────────────────────────────
 await check('tab claims only well-formed bio-figure session addresses; title derives from stem', () => {
   const tab = world.tabs[0]
