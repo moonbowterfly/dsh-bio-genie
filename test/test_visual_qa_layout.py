@@ -72,6 +72,14 @@ def volcano_fixture(variant=0):
                          'baseMean': np.exp(np.linspace(2, 8, len(effects)))})
 
 
+def dense_volcano_fixture():
+    """Hermes R2 independent acceptance scene: default_rng(7), 8,000 points."""
+    rng = np.random.default_rng(7)
+    effect = np.clip(rng.normal(0, .55, 8000), -6, 6)
+    p = np.clip(rng.uniform(0, 1, 8000) * np.exp(-1.5 * np.abs(effect)), 1e-300, 1)
+    return pd.DataFrame({'log2FC': effect, 'pvalue': p})
+
+
 def text_overlap_example():
     fig, ax = plt.subplots(figsize=(4, 3))
     ax.annotate('annotation A', (.5, .5), xycoords='axes fraction')
@@ -222,6 +230,74 @@ class LayoutTests(unittest.TestCase):
                 for old, new in zip(old_ax.lines, ax.lines):
                     np.testing.assert_array_equal(old.get_xydata(), new.get_xydata())
 
+    def assert_visible_labels_fit(self, fig, ax, meta):
+        self.assertEqual(new_issues(meta['layout_audit']), [], meta['layout_audit'])
+        self.assertEqual(new_issues(audit_layout(fig)), [])
+        fig.canvas.draw()
+        renderer = fig.canvas.get_renderer()
+        visible = [t for t in ax.texts if t.get_text() and t._check_xy(renderer)]
+        self.assertGreater(len(visible), 0)  # never pass by dropping all labels
+        for text in visible:
+            box = text.get_window_extent(renderer)
+            self.assertGreaterEqual(box.x0, ax.bbox.x0 - 1e-6)
+            self.assertGreaterEqual(box.y0, ax.bbox.y0 - 1e-6)
+            self.assertLessEqual(box.x1, ax.bbox.x1 + 1e-6)
+            self.assertLessEqual(box.y1, ax.bbox.y1 + 1e-6)
+
+    def test_dense_seed7_final_limits_and_three_default_label_variants(self):
+        # Default top_k=5 is essential: the earlier top_k=0 examples could not
+        # catch annotation × legend collisions. Exercise global jitter seeds too.
+        scenes = [(f'dense-jitter-{seed}', dense_volcano_fixture(), seed) for seed in (0, 7, 19)]
+        scenes += [(f'variant-{i}', volcano_fixture(i), 7) for i in range(3)]
+        for name, frame, seed in scenes:
+            with self.subTest(scene=name):
+                np.random.seed(seed)
+                fig, ax, meta = differential_plot(frame, effect_col='log2FC',
+                                                   p_col='pvalue', mode='volcano')
+                self.assert_visible_labels_fit(fig, ax, meta)
+                self.assertGreater(len(meta['labeled']), 0)
+                if name.startswith('dense'):
+                    self.assertEqual((meta['n_sig_up'], meta['n_sig_down']), (91, 91))
+                plt.close(fig)
+
+    def test_static_fallback_keeps_annotations_out_of_legend_strip(self):
+        with patch.dict(sys.modules, {'adjustText': None}):
+            fig, ax, meta = differential_plot(dense_volcano_fixture())
+        self.assert_visible_labels_fit(fig, ax, meta)
+
+    def test_clipped_annotations_are_not_user_text_collisions(self):
+        fig, ax = plt.subplots()
+        ax.set(xlim=(0, 1), ylim=(0, 1))
+        a = ax.annotate('hidden A', (.5, .5))
+        b = ax.annotate('hidden B', (.5, .5))
+        fig.canvas.draw()  # populate extents before these targets become clipped
+        a.xy = (2, .5)
+        b.xy = (2, .5)
+        self.assertEqual(new_issues(audit_layout(fig)), [])
+        a.set_annotation_clip(False)
+        b.set_annotation_clip(False)
+        # Put the text on the canvas while retaining an out-of-range target.
+        a.set_anncoords('axes fraction')
+        b.set_anncoords('axes fraction')
+        a.set_position((.5, .5))
+        b.set_position((.5, .5))
+        self.assertEqual(len(new_issues(audit_layout(fig))), 1)
+
+    def test_boundary_geometry_guard_updates_leaders(self):
+        from figurelib.differential_recipes import _fit_annotations
+        from matplotlib.patches import FancyArrowPatch
+        fig, ax = plt.subplots()
+        ax.set(xlim=(0, 1), ylim=(0, 1))
+        a = ax.annotate('first', (.98, .98), ha='center')
+        b = ax.annotate('second', (.98, .98), ha='center')
+        arrow = FancyArrowPatch(b.get_position(), b.xy, patchA=b, transform=ax.transData)
+        ax.add_patch(arrow)
+        _fit_annotations(ax, [a, b], [arrow])
+        self.assertNotEqual(tuple(b.get_position()), b.xy)
+        self.assertEqual(tuple(arrow._posA_posB[0]), tuple(b.get_position()))
+        self.assertEqual(tuple(arrow._posA_posB[1]), b.xy)
+        self.assert_visible_labels_fit(fig, ax, {'layout_audit': audit_layout(fig)})
+
     def test_ma_and_no_significant_points_also_audited(self):
         frame = volcano_fixture()
         fig, ax, meta = differential_plot(frame, mode='ma', base_mean_col='baseMean', top_k=0)
@@ -272,6 +348,67 @@ def evidence(out_dir=None):
                 (out_dir / f'variant{variant}_{loc}.json').write_text(
                     json.dumps(meta, ensure_ascii=False, indent=2), encoding='utf-8')
             plt.close(fig)
+
+
+def r2_evidence(out_dir):
+    """Real PNG exports with the default annotation budget, plus saved R1 comparison.
+
+    Run --r2-evidence DIR after saving e1fde66's differential_recipes.py and
+    visual_qa.py as DIR/baseline_differential_recipes.py and baseline_visual_qa.py.
+    """
+    import figurelib.visual_qa as qa
+    def load(name):
+        spec = importlib.util.spec_from_file_location(name, out_dir / f'{name}.py')
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+    old_recipe = load('baseline_differential_recipes')
+    old_qa = load('baseline_visual_qa')
+    scenes = [('dense', dense_volcano_fixture())]
+    scenes += [(f'variant{i}', volcano_fixture(i)) for i in range(3)]
+    results = []
+    for name, frame in scenes:
+        np.random.seed(7)
+        with patch('figurelib.visual_qa.audit_layout', side_effect=old_qa.audit_layout):
+            old_fig, old_ax, old_meta = old_recipe.differential_plot(
+                frame, effect_col='log2FC', p_col='pvalue', mode='volcano')
+        print(f'=== {name} before e1fde66 ===')
+        print_report(old_meta['layout_audit'])
+        old_fig.canvas.draw()
+        old_renderer = old_fig.canvas.get_renderer()
+        old_visible_count = sum(bool(t.get_text()) and t._check_xy(old_renderer) for t in old_ax.texts)
+        old_fig.savefig(out_dir / f'{name}_before.png', dpi=150, bbox_inches='tight')
+        np.random.seed(7)
+        fig, ax, meta = differential_plot(frame, effect_col='log2FC', p_col='pvalue', mode='volcano',
+                                           out_file=str(out_dir / f'{name}_after.png'))
+        print(f'=== {name} after ===')
+        print_report(meta['layout_audit'])
+        assert new_issues(meta['layout_audit']) == []
+        assert new_issues(qa.audit_layout(fig)) == []
+        old_fields = {k: v for k, v in old_meta.items() if not k.startswith('layout_')}
+        assert all(meta[k] == value for k, value in old_fields.items())
+        assert ax.get_ylim() == old_ax.get_ylim()
+        assert ax.get_position().bounds == old_ax.get_position().bounds
+        assert len(ax.collections) == len(old_ax.collections)
+        for old, new in zip(old_ax.collections, ax.collections):
+            np.testing.assert_array_equal(old.get_offsets(), new.get_offsets())
+            np.testing.assert_array_equal(old.get_facecolors(), new.get_facecolors())
+        renderer = fig.canvas.get_renderer()
+        visible_count = sum(bool(t.get_text()) and t._check_xy(renderer) for t in ax.texts)
+        assert visible_count > 0 and visible_count == old_visible_count
+        result = {'scene': name, 'before': old_meta['layout_audit'], 'after': meta['layout_audit'],
+                  'text_overlaps_after': 0, 'legend_data_overlaps_after': 0,
+                  'visible_annotations_before': old_visible_count,
+                  'visible_annotations_after': visible_count, 'metadata_unchanged': True,
+                  'scatter_and_axes_rectangle_unchanged': True,
+                  'xlim_before': old_ax.get_xlim(), 'xlim_after': ax.get_xlim(),
+                  'png': meta['out_file']}
+        results.append(result)
+        (out_dir / f'{name}_after.json').write_text(json.dumps(meta, ensure_ascii=False, indent=2),
+                                                   encoding='utf-8')
+        plt.close('all')
+    (out_dir / 'r2_acceptance.json').write_text(json.dumps(results, ensure_ascii=False, indent=2),
+                                               encoding='utf-8')
 
 
 def baseline_regression(baseline_dir):
@@ -358,7 +495,9 @@ def baseline_regression(baseline_dir):
 
 
 if __name__ == '__main__':
-    if '--evidence' in sys.argv:
+    if '--r2-evidence' in sys.argv:
+        r2_evidence(Path(sys.argv[sys.argv.index('--r2-evidence') + 1]))
+    elif '--evidence' in sys.argv:
         baseline_dir = (Path(sys.argv[sys.argv.index('--baseline-dir') + 1])
                         if '--baseline-dir' in sys.argv else None)
         evidence(baseline_dir)

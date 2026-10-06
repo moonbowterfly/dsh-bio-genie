@@ -33,6 +33,8 @@ if sys.platform == "win32":
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+import matplotlib.text as mtext
+from matplotlib.transforms import Bbox
 import numpy as np
 import pandas as pd
 
@@ -80,6 +82,58 @@ def _pick_labels(df: pd.DataFrame, effect_col: str, padj_col: str | None,
         if pcol:
             chosen.update(sig.nsmallest(k, pcol).index)
     return {c for c in chosen if not pd.isna(c)}
+
+
+def _fit_annotations(ax, texts, arrows=()):
+    """Final pixel geometry guard: keep visible labels inside the data axes.
+
+    adjustText is heuristic and may leave overlaps at an axes boundary. Preserve
+    its positions when possible, otherwise try nearby rows/columns in a stable
+    order with a 4 px gap so neighbouring numeric labels remain distinct.
+    Do not move or render annotations whose target was
+    clipped by the volcano cap. Reconnect any moved label's existing leader.
+    """
+    ax.figure.canvas.draw()
+    renderer = ax.figure.canvas.get_renderer()
+    bounds = ax.bbox
+    legend = ax.get_legend()
+    occupied = [legend.get_window_extent(renderer)] if legend is not None else []
+    gap = 4.0
+    for text in texts:
+        if not text._check_xy(renderer):
+            continue
+        text.get_window_extent(renderer)  # update annotation's text transform
+        box = mtext.Text.get_window_extent(text, renderer)
+        if box.width + 2 * gap > bounds.width or box.height + 2 * gap > bounds.height:
+            continue  # preserve the text and let audit_layout report the limit
+        dx = max(bounds.x0 + gap - box.x0, min(0, bounds.x1 - gap - box.x1))
+        dy = max(bounds.y0 + gap - box.y0, min(0, bounds.y1 - gap - box.y1))
+        step = box.height + gap
+        limit = int(np.ceil(max(bounds.width, bounds.height) / step))
+        offsets = [(0, 0)]
+        for radius in range(1, limit + 1):
+            offsets.extend((u * step, v * step) for u, v in
+                           ((0, -radius), (0, radius), (-radius, 0), (radius, 0),
+                            (-radius, -radius), (radius, -radius),
+                            (-radius, radius), (radius, radius)))
+        for u, v in offsets:
+            candidate = Bbox.from_bounds(box.x0 + dx + u, box.y0 + dy + v,
+                                         box.width, box.height)
+            if not (bounds.x0 + gap <= candidate.x0 and candidate.x1 <= bounds.x1 - gap
+                    and bounds.y0 + gap <= candidate.y0 and candidate.y1 <= bounds.y1 - gap):
+                continue
+            if any(candidate.padded(gap).overlaps(other) for other in occupied):
+                continue
+            transform = text.get_transform()
+            position = transform.transform(text.get_position())
+            text.set_position(transform.inverted().transform(position + (dx + u, dy + v)))
+            occupied.append(candidate)
+            for arrow in arrows:
+                if getattr(arrow, 'patchA', None) is text:
+                    arrow.set_positions(text.get_position(), text.xy)
+            break
+        else:
+            occupied.append(box)  # no silent dropping; audit will report it
 
 
 def differential_plot(dz_frame: pd.DataFrame | str, *, effect_col: str = 'log2FC',
@@ -195,23 +249,6 @@ def differential_plot(dz_frame: pd.DataFrame | str, *, effect_col: str = 'log2FC
             labeled.append(nm)
     except Exception as e:  # 标注失败不拖垮出图
         print(f"[warn] label pass failed: {type(e).__name__}: {e}", file=sys.stderr)
-    if annotations:
-        try:
-            from adjustText import adjust_text
-            texts = [ax.annotate(nm, (xi, yi), fontsize=6, color=SEM_HIGHLIGHT)
-                     for nm, xi, yi in annotations]
-            adjust_text(texts, ax=ax, expand=(1.15, 1.25),
-                        arrowprops=dict(arrowstyle='-', color='#333333', lw=.4))
-        except ImportError:
-            # 第二层未装（adjustText）：静态 offset 兜底
-            for nm, xi, yi in annotations:
-                ax.annotate(nm, (xi, yi), textcoords='offset points',
-                            xytext=(3, 3), fontsize=6, color=SEM_HIGHLIGHT,
-                            ha='left', va='bottom')
-        except Exception as e:
-            print(f"[warn] adjust_text failed, fallback static: {type(e).__name__}: {e}",
-                  file=sys.stderr)
-
     # 轴标签（含语义单位）
     if mode == 'volcano':
         ax.set_xlabel(f'{effect_col}')
@@ -236,6 +273,38 @@ def differential_plot(dz_frame: pd.DataFrame | str, *, effect_col: str = 'log2FC
         ymax = min(np.nanmax(y[np.isfinite(y)]), max(q999, 3.0) * 1.15)
         ax.set_ylim(top=max(ymax, 4))
     ax.margins(x=.04)
+
+    # Resolve limits BEFORE placing labels: adjusting against the earlier
+    # autoscaled ylim and then lowering the volcano cap moved labels above the
+    # final axes, directly into the outside legend's strip (Hermes R2, seed 7).
+    if annotations:
+        # Leader patches also update dataLim. Freeze the resolved data limits so
+        # later draws cannot rescale the axes underneath the pixel layout guard.
+        ax.set_xlim(ax.get_xlim())
+        ax.set_ylim(ax.get_ylim())
+        try:
+            from adjustText import adjust_text
+            texts = [ax.annotate(nm, (xi, yi), fontsize=6, color=SEM_HIGHLIGHT)
+                     for nm, xi, yi in annotations]
+            fig.canvas.draw()
+            # Capped targets render no text. Matplotlib reports a unit bbox for
+            # clipped annotations, so bbox width alone cannot identify them.
+            visible_texts = [text for text in texts
+                             if ax.patch.contains_point(ax.transData.transform(text.xy))]
+            if visible_texts:
+                _, arrows = adjust_text(visible_texts, ax=ax, expand=(1.15, 1.25),
+                                        ensure_inside_axes=True, expand_axes=False,
+                                        arrowprops=dict(arrowstyle='-', color='#333333', lw=.4))
+                _fit_annotations(ax, visible_texts, arrows)
+        except ImportError:
+            # 第二层未装（adjustText）：静态 offset 兜底，仍保留图例条带。
+            texts = [ax.annotate(nm, (xi, yi), textcoords='offset points',
+                                 xytext=(3, 3), fontsize=6, color=SEM_HIGHLIGHT,
+                                 ha='left', va='bottom')
+                     for nm, xi, yi in annotations]
+            _fit_annotations(ax, texts)
+        except Exception as e:
+            print(f"[warn] adjust_text failed: {type(e).__name__}: {e}", file=sys.stderr)
 
     meta = {
         'mode': mode,

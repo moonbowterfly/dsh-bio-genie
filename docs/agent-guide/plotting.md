@@ -59,6 +59,18 @@ verdict = print_report(issues)  # PASS / WARN / FAIL；WARN 不自动阻断导�
 axes 上方留白区；可以显式覆盖为 `'best'` 或其他 matplotlib 位置。自定义 axes
 若留白不足或带标题，按报告调整图例/标题间距，随后重新审计。
 
+配方先确定最终轴范围，再运行标注避碰，并用渲染后的文字 bbox 做几何兜底：
+可见标注保留在 axes 内，避开 outside 图例条带；靠近边界的剩余文本互叠按固定
+顺序尝试邻近位置，并同步更新引导线。被最终数据范围裁掉的 annotation 不参与
+避碰或文本互叠检测，显式 `annotation_clip=False` 的文字仍会检查。
+
+裁切 WARN 的口径是**原始 Figure 画布**。配方的 `out_file` 路径自动采用
+`bbox_inches='tight'`，所以 `log2FC` 等轴标签超出原画布但被 tight 导出完整包含时，
+该 WARN 属已知诊断噪音，不代表导出文件裁掉标签。配方保留该报告，避免改变
+调用方的 axes 尺寸/布局引擎；无 `out_file` 或后续使用普通 `savefig` 时仍需处理。
+若要原始画布也容纳全部标签，可先确定布局，再调用配方；配方返回后再次执行
+`finalize_figure` 等布局修改，需要重新审计。
+
 文本互叠排除刻度及科学计数法偏移文字、同一 legend 内的条目/标题配对；
 annotation 只比较文字 bbox，不把箭头穿越当成文本互叠。图例检测默认至少 3 个
 可见且未被裁剪的独立 scatter 中心或 line 顶点落入 bbox 才 WARN，同坐标分层

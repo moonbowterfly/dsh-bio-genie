@@ -253,7 +253,7 @@ def audit_layout(fig, clip_tol_px: float = 2.0, overlap_tol_px: float = 1.0,
             continue
         try:
             if isinstance(t, mtext.Annotation):
-                if t.get_window_extent(renderer).width <= 0:
+                if not t._check_xy(renderer):
                     continue  # annotation_clip hid this annotation
                 # Annotation's full extent includes its arrow. Only compare text.
                 bb = mtext.Text.get_window_extent(t, renderer)
