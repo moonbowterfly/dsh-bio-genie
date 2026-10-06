@@ -709,6 +709,68 @@ await check('R23 math: hit test radius (css 8px at scale) / ordering / zorder ti
   assert.equal(M.hitTestElements([{ element_id: 'x' }, null], 0, 0, 8, 1).length, 0)
 })
 
+// ── R2-3.1：clip 合同 / 平局顺序 / 数值防护 / fit 下限 / 无图回退 ─────
+await check('R231 hit: off-clip markers cannot be selected; inside-clip works', () => {
+  const M = plugin.__figureViewerMath
+  const clipped = [
+    { element_id: 'in', zorder: 0, geometry: { center: [50, 50], radius: 3 }, clip: [0, 0, 100, 100] },
+    { element_id: 'out', zorder: 9, geometry: { center: [150, 150], radius: 3 }, clip: [0, 0, 100, 100] },
+  ]
+  assert.equal(M.hitTestElements(clipped, 150, 150, 8, 1).length, 0, '完全 off-clip 的点不可选中')
+  assert.equal(M.hitTestElements(clipped, 50, 50, 8, 1)[0].el.element_id, 'in')
+  const partial = [{ element_id: 'p', zorder: 0, geometry: { center: [98, 95], radius: 3 }, clip: [0, 0, 100, 100] }]
+  assert.equal(M.hitTestElements(partial, 98, 95, 8, 1).length, 1, 'clip 内点击命中')
+  assert.equal(M.hitTestElements(partial, 106, 95, 8, 1).length, 0, 'clip 外点击即使进入半径也不命中')
+})
+
+await check('R231 hit: draw_order and element_id break remaining ties (not JSON order)', () => {
+  const M = plugin.__figureViewerMath
+  const dtie = [
+    { element_id: 'bottom', draw_order: 0, zorder: 1, geometry: { center: [10, 10], radius: 0 } },
+    { element_id: 'top', draw_order: 1, zorder: 1, geometry: { center: [10, 10], radius: 0 } },
+  ]
+  assert.equal(M.hitTestElements(dtie, 10, 10, 8, 1)[0].el.element_id, 'top')
+  const rev = [dtie[1], dtie[0]]
+  assert.equal(M.hitTestElements(rev, 10, 10, 8, 1)[0].el.element_id, 'top', '输入顺序不决定结果')
+})
+
+await check('R231 hit: malformed numeric geometry never throws (skipped)', () => {
+  const M = plugin.__figureViewerMath
+  assert.equal(M.hitTestElements([{ element_id: 'bad', geometry: { center: [{ toString: null }, 0], radius: 3 } }], 0, 0, 8, 1).length, 0)
+  assert.equal(M.hitTestElements([{ element_id: 'bd', geometry: { center: [10, 10], radius: 'x' } }], 10, 10, 8, 1).length, 1, 'radius 非数按 0 处理')
+  assert.equal(M.hitTestElements([{ element_id: 'inf', geometry: { center: [Infinity, 0], radius: 3 } }], 0, 0, 8, 1).length, 0)
+})
+
+await check('R231 zoom: shrink never increases scale below fit floor', () => {
+  const M = plugin.__figureViewerMath
+  const fit = M.fitView(10000, 5000, 100, 220)
+  assert.ok(fit.scale < 0.02)
+  const z = M.zoomAt(fit, 1 / 1.2, 0, 0)
+  assert.ok(z.scale <= fit.scale + 1e-12, '缩小操作不得放大')
+  assert.equal(M.zoomAt({ scale: 50, tx: 0, ty: 0 }, 2, 5, 5).scale, 64)
+})
+
+await check('R231 fallback: omitted image renders row browser instead of canvas', async () => {
+  const body = world.entries.find(({ entry }) => entry.name === 'sidebar.right.pane.tab')
+  const frames = await framesOf(world.providers[0], ADDRESS)
+  const noImg = { manifest: frames[0].value.manifest, rows: frames[0].value.rows, hits: frames[0].value.hits,
+    image: { omitted: true, reason: 'missing' } }
+  const rendered = body.component({ useTabInfo: () => ({ tab: { contentId: 'x' } }),
+    useResource: () => ({ status: 'live', value: noImg }) })
+  assert.equal(rendered.props['data-figview'], 'pane-v2')
+  const found = []
+  function walk(node) {
+    if (!node || typeof node !== 'object') return
+    if (Array.isArray(node)) { node.forEach(walk); return }
+    const attrs = node.props || {}
+    if (attrs['data-figview']) found.push(attrs['data-figview'])
+    ;(node.children || []).forEach(walk)
+  }
+  walk(rendered)
+  assert.ok(found.indexOf('no-image') !== -1, '无图回退节点存在')
+  assert.ok(found.indexOf('row-browser') !== -1, '源表浏览器存在')
+})
+
 // ── tab / 卡片 / 查看器 ─────────────────────────────────────────────────
 await check('tab claims only well-formed bio-figure session addresses; title derives from stem', () => {
   const tab = world.tabs[0]
