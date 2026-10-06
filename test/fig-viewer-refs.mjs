@@ -976,6 +976,105 @@ await check('R234b dims: illegal renderer object rejected AND error text stays s
   assert.ok(typeof s2 === 'string')
 })
 
+// ── R2-4：重绘闭环（请求文本 / 回填 adapter / 表单 / 集成） ──────────
+await check('R24 redraw: request text carries ids, patch and the no-source-change requirement', () => {
+  const M = plugin.__figureViewerMath
+  const m = { figure_id: 'figX', revision: 'abc123',
+    redraw: { recipe_id: 'volcano_r1', parameters: { alpha: 0.05 } },
+    source: { snapshot_sha256: 'deadbeef' } }
+  const text = M.buildRedrawRequest(m, { alpha: { from: 0.05, to: '0.1' } }, '标题改为Y')
+  assert.ok(text.includes('figure_id: figX'))
+  assert.ok(text.includes('base_revision: abc123'))
+  assert.ok(text.includes('recipe_id: volcano_r1'))
+  assert.ok(text.includes('deadbeef'))
+  assert.ok(text.includes('alpha: 0.05 -> 0.1'))
+  assert.ok(text.includes('备注: 标题改为Y'))
+  assert.ok(text.includes('新 revision'), '要求以新 revision 导出')
+  assert.ok(text.includes('源表/原始行不动'), '声明不改源数据')
+})
+
+await check('R24 redraw: fill prefers insert, preserves existing draft on fallback, reports no-channel/errors', () => {
+  const M = plugin.__figureViewerMath
+  const calls = []
+  const a1 = { captureInsertion: () => ({ start: 1, end: 1, draftRev: 7 }),
+    insertText: (tx, span) => { calls.push(['ins', tx, span.draftRev]); return true },
+    setDraft: (tx) => calls.push(['set', tx]) }
+  const r1 = M.applyRedrawFill(a1, null, 'TXT')
+  assert.equal(r1.ok, true)
+  assert.equal(r1.mode, 'insert')
+  assert.equal(calls.length, 1)
+  assert.equal(calls[0][0], 'ins')
+  const calls2 = []
+  const a2 = { captureInsertion: () => ({ start: 0, end: 0, draftRev: 1 }),
+    insertText: () => false,
+    setDraft: (tx) => calls2.push(tx) }
+  const r2 = M.applyRedrawFill(a2, { draft: '已有草稿' }, 'TXT')
+  assert.equal(r2.ok, true)
+  assert.equal(r2.mode, 'setDraft')
+  assert.ok(calls2[0].includes('已有草稿') && calls2[0].includes('TXT'), '保留旧草稿并追加')
+  const r3 = M.applyRedrawFill(null, null, 'T')
+  assert.equal(r3.ok, false)
+  assert.equal(r3.reason, 'no-channel')
+  const a4 = { captureInsertion: () => { throw new Error('boom') }, insertText: () => true }
+  const r4 = M.applyRedrawFill(a4, null, 'T')
+  assert.equal(r4.ok, false)
+  assert.equal(r4.reason, 'error')
+  const r5 = M.applyRedrawFill({}, null, 'T')
+  assert.equal(r5.ok, false)
+  assert.equal(r5.reason, 'no-method')
+  const r6 = M.applyRedrawFill({ setDraft: () => {} }, null, 'T')
+  assert.equal(r6.ok, false)
+  assert.equal(r6.reason, 'no-draft-info', '无草稿信息时不盲写（不覆盖风险）')
+})
+
+await check('R24 redraw: form renders whitelist params, buttons, preview; fill button calls insertText', async () => {
+  const M = plugin.__figureViewerMath
+  const frames = await framesOf(world.providers[0], ADDRESS)
+  const value = frames[0].value
+  const calls = []
+  const mockActions = { captureInsertion: () => ({ start: 0, end: 0, draftRev: 3 }),
+    insertText: (tx) => { calls.push(tx); return true },
+    setDraft: () => {} }
+  const form = M.RedrawForm({ value, inputActions: mockActions, useInput: () => ({ draft: '' }) })
+  assert.equal(form.props['data-figview'], 'redraw-form')
+  const found = { params: [], buttons: [], preview: null }
+  ;(function walk(n) {
+    if (!n || typeof n !== 'object') return
+    if (Array.isArray(n)) { n.forEach(walk); return }
+    const a = n.props || {}
+    if (a['data-redraw-param']) found.params.push(a['data-redraw-param'])
+    if (a['data-figview'] === 'redraw-fill') found.buttons.push(n)
+    if (a['data-figview'] === 'redraw-preview') found.preview = n
+    ;(n.children || []).forEach(walk)
+  })(form)
+  const allowed = value.manifest.redraw.allowed_parameters
+  assert.equal(found.params.length, allowed.length, '每个白名单参数一行输入')
+  assert.equal(found.buttons.length, 1, '回填按钮存在')
+  assert.ok(found.preview, '预览存在')
+  const previewText = JSON.stringify(found.preview.children || [])
+  assert.ok(previewText.includes(value.manifest.figure_id), '预览含 figure_id')
+  found.buttons[0].props.onClick()
+  assert.equal(calls.length, 1, 'fill 调用了 insertText')
+  assert.ok(calls[0].includes('【图重绘请求】'))
+})
+
+await check('R24 redraw: viewer tab exposes the redraw toggle', async () => {
+  const body = world.entries.find(({ entry }) => entry.name === 'sidebar.right.pane.tab')
+  const frames = await framesOf(world.providers[0], ADDRESS)
+  const tree = body.component({ useTabInfo: () => ({ tab: { contentId: 'x' } }),
+    useResource: () => ({ status: 'live', value: frames[0].value }) })
+  let toggle = null
+  ;(function walk(n) {
+    if (!n || typeof n !== 'object') return
+    if (Array.isArray(n)) { n.forEach(walk); return }
+    const a = n.props || {}
+    if (a['data-figview'] === 'redraw-toggle') toggle = n
+    ;(n.children || []).forEach(walk)
+  })(tree)
+  assert.ok(toggle, '重绘按钮在查看器工具栏')
+  assert.ok(String((toggle.children || [])[0]).includes('重绘'))
+})
+
 // ── tab / 卡片 / 查看器 ─────────────────────────────────────────────────
 await check('tab claims only well-formed bio-figure session addresses; title derives from stem', () => {
   const tab = world.tabs[0]
