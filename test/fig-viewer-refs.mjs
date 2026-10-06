@@ -771,6 +771,66 @@ await check('R231 fallback: omitted image renders row browser instead of canvas'
   assert.ok(found.indexOf('row-browser') !== -1, '源表浏览器存在')
 })
 
+// ── R2-3.2：分页 / 平局 point_order / 稳定地板 / clip 数值防护 ────────
+await check('R232 pager: 60-row fallback shows page 1 of 2 with prev/next controls', async () => {
+  const body = world.entries.find(({ entry }) => entry.name === 'sidebar.right.pane.tab')
+  const rows60 = { schema_version: 1, columns: [{ name: 'gene', type: 'string', unit: null, precision: 'p', dtype: 'object' }], rows: [] }
+  for (let i = 0; i < 60; i++) rows60.rows.push({ row_id: 'r' + i, values: { gene: 'g' + i } })
+  const value = { manifest: manifestObj, rows: rows60, hits: null, image: { omitted: true, reason: 'test' } }
+  const tree = body.component({ useTabInfo: () => ({ tab: { contentId: 'x' } }),
+    useResource: () => ({ status: 'live', value }) })
+  let pager = null
+  let tbody = null
+  ;(function walk(n) {
+    if (!n || typeof n !== 'object') return
+    if (Array.isArray(n)) { n.forEach(walk); return }
+    const a = n.props || {}
+    if (a['data-figview'] === 'row-pager') pager = n
+    if (n.type === 'tbody' && !tbody) tbody = n
+    ;(n.children || []).forEach(walk)
+  })(tree)
+  assert.ok(pager, '分页控件存在')
+  const flat = Array.isArray(tbody.children[0]) ? tbody.children[0] : tbody.children
+  const trs = flat.filter(c => c && c.type === 'tr')
+  assert.equal(trs.length, 50, '首屏 50 行')
+  const btns = (pager.children || []).filter(c => c && c.type === 'button')
+  assert.equal(btns.length, 2, '上一页/下一页按钮')
+  assert.equal(btns[0].props.disabled, true, '首页禁上一页')
+})
+
+await check('R232 hit: point_order breaks draw_order ties (later point wins)', () => {
+  const M = plugin.__figureViewerMath
+  const tie = [
+    { element_id: 'a', zorder: 1, draw_order: 0, point_order: 0, geometry: { center: [10, 10], radius: 0 } },
+    { element_id: 'b', zorder: 1, draw_order: 0, point_order: 1, geometry: { center: [10, 10], radius: 0 } },
+  ]
+  assert.equal(M.hitTestElements(tie, 10, 10, 8, 1)[0].el.element_id, 'b')
+  assert.equal(M.hitTestElements([tie[1], tie[0]], 10, 10, 8, 1)[0].el.element_id, 'b', '输入顺序不决定结果')
+})
+
+await check('R232 zoom: floor is stable across steps (zoom-in then out returns)', () => {
+  const M = plugin.__figureViewerMath
+  const fit = { scale: 0.0098, tx: 0, ty: 0 }
+  const zIn = M.zoomAt(fit, 1.2, 0, 0, 0.0098)
+  const zOut = M.zoomAt(zIn, 1 / 1.2, 0, 0, 0.0098)
+  assert.ok(Math.abs(zOut.scale - 0.0098) < 1e-12, '放大后缩回应回到地板')
+  const fit2 = M.fitView(10000, 5000, 100, 220)
+  const back2 = M.zoomAt(M.zoomAt(fit2, 1.2, 0, 0, fit2.scale), 1 / 1.2, 0, 0, fit2.scale)
+  assert.ok(Math.abs(back2.scale - fit2.scale) < 1e-12)
+})
+
+await check('R232 hit: malformed clip never throws (element skipped)', () => {
+  const M = plugin.__figureViewerMath
+  const bad = [
+    { element_id: 'b1', geometry: { center: [10, 10], radius: 3 }, clip: [0, 0, { toString: null }, 1000] },
+    { element_id: 'b2', geometry: { center: [10, 10], radius: 3 }, clip: [0, 0, 100] },
+    { element_id: 'b3', geometry: { center: [10, 10], radius: 3 }, clip: [100, 0, 0, 100] },
+  ]
+  assert.equal(M.hitTestElements(bad, 10, 10, 8, 1).length, 0)
+  const okOne = [{ element_id: 'ok', geometry: { center: [10, 10], radius: 3 }, clip: [0, 0, 100, 100] }]
+  assert.equal(M.hitTestElements(okOne, 10, 10, 8, 1).length, 1)
+})
+
 // ── tab / 卡片 / 查看器 ─────────────────────────────────────────────────
 await check('tab claims only well-formed bio-figure session addresses; title derives from stem', () => {
   const tab = world.tabs[0]
