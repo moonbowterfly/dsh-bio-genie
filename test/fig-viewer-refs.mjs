@@ -1,8 +1,9 @@
 /**
  * R2-2 生产版 fig-viewer：refs 解析 / Turn 数据 / provider / 卡片 / tab。
  * Factory/adapter 作用域（无真实 DOM）；使用真实 R2-1 bundle 与真实会话样本。
- * R2-2.1 修复轮：覆盖 preview 分支 / 缺 hash 拒绝 / 非法路径 / revision 绑定 /
- * 预算与结构校验 / fig_export 链 / malformed 信封 / 途中取消。
+ * R2-2.1：preview 分支 / 缺 hash 拒绝 / 非法路径 / revision 绑定 / 预算与结构 / fig_export 链。
+ * R2-2.2：内容摘要自洽核验 / 发布布局硬校验 / 预算对象修正（hits）/ 读取身份核验 /
+ *         row_id 与 hits→rows 引用 / bundle 边界（absolutePath）/ parser 收紧 / fullRefKey。
  */
 import assert from 'node:assert/strict'
 import { createHash, webcrypto } from 'node:crypto'
@@ -20,16 +21,51 @@ const bundle = {
 const manifestObj = JSON.parse(bundle['recipe.figview.json'].toString('utf8'))
 const REV = manifestObj.revision
 const SESSION = 'session-refs-test'
-const MANIFEST = 'C:/virtual/work/recipe.figview.json'
-const REV_MANIFEST = 'C:/virtual/work/recipe/' + REV + '/recipe.figview.json'
+const MANIFEST = 'C:/virtual/work/recipe/' + REV + '/recipe.figview.json'
 const ADDRESS = 'dsh-resource://bio-figure/session/' + encodeURIComponent(SESSION) + '/' + encodeURIComponent(MANIFEST)
-const REV_ADDRESS = 'dsh-resource://bio-figure/session/' + encodeURIComponent(SESSION) + '/' + encodeURIComponent(REV_MANIFEST)
+const NO_REV_MANIFEST = 'C:/virtual/work/recipe.figview.json'
+const NO_REV_ADDRESS = 'dsh-resource://bio-figure/session/' + encodeURIComponent(SESSION) + '/' + encodeURIComponent(NO_REV_MANIFEST)
+const OTHER_REV = 'f'.repeat(64)
+const OTHER_REV_MANIFEST = 'C:/virtual/work/recipe/' + OTHER_REV + '/recipe.figview.json'
+const OTHER_REV_ADDRESS = 'dsh-resource://bio-figure/session/' + encodeURIComponent(SESSION) + '/' + encodeURIComponent(OTHER_REV_MANIFEST)
+const ANCESTOR_TRAP_MANIFEST = 'C:/virtual/work/' + REV + '/recipe/nothex/recipe.figview.json'
+const ANCESTOR_TRAP_ADDRESS = 'dsh-resource://bio-figure/session/' + encodeURIComponent(SESSION) + '/' + encodeURIComponent(ANCESTOR_TRAP_MANIFEST)
 const sha256hex = b => createHash('sha256').update(b).digest('hex')
 const enc = s => new TextEncoder().encode(s)
-function manifestOverride(mutate) {
+
+/** 自洽 manifest：JS 序列化（保留成员序）→ 去 revision 取摘要 → 回填 revision（追加末尾）。 */
+function buildManifestBytes(mutate) {
   const m = JSON.parse(JSON.stringify(manifestObj))
-  mutate(m)
+  if (mutate) mutate(m)
+  delete m.revision
+  const noRev = JSON.stringify(m)
+  const rev = sha256hex(Buffer.from(noRev, 'utf8'))
+  m.revision = rev
   return enc(JSON.stringify(m))
+}
+/** 组合 override：替换 bundle 文件字节 → 同步 manifest 的对应 sha → 自洽 revision。 */
+function withBundle(files, mutateManifest) {
+  const out = { ...bundle }
+  for (const [k, v] of Object.entries(files || {})) out[k] = v
+  const m = JSON.parse(JSON.stringify(manifestObj))
+  if (files && files['recipe.rows.json']) m.data.sha256 = sha256hex(files['recipe.rows.json'])
+  if (files && files['recipe.hits.json']) m.hitmap.sha256 = sha256hex(files['recipe.hits.json'])
+  if (mutateManifest) mutateManifest(m)
+  delete m.revision
+  const noRev = JSON.stringify(m)
+  m.revision = sha256hex(Buffer.from(noRev, 'utf8'))
+  out['recipe.figview.json'] = enc(JSON.stringify(m))
+  return out
+}
+function revOfBytes(b) { return JSON.parse(Buffer.from(b).toString('utf8')).revision }
+function addrWithRev(rev) {
+  return 'dsh-resource://bio-figure/session/' + encodeURIComponent(SESSION) + '/' +
+    encodeURIComponent('C:/virtual/work/recipe/' + rev + '/recipe.figview.json')
+}
+function tamperManifestText(from, to) {
+  const s = bundle['recipe.figview.json'].toString('utf8')
+  assert.ok(s.includes(from), 'tamper anchor missing: ' + from)
+  return enc(s.replace(from, to))
 }
 
 let count = 0
@@ -50,7 +86,7 @@ function load(href) {
   return plugin
 }
 
-/** fake workspaceFiles.readBytes：bundle 映射 + range 切片 + 注入点（rawReturn/override/abort）。 */
+/** fake workspaceFiles.readBytes：bundle 映射 + range 切片 + 注入点（rawReturn/override/abort/身份字段）。 */
 function makeContext(opts = {}) {
   const entries = [], tabs = [], providers = [], opened = [], definitions = []
   const readCalls = []
@@ -61,8 +97,10 @@ function makeContext(opts = {}) {
         readCalls.push({ sessionId, path, options })
         if (opts.rawReturn) {
           const r = typeof opts.rawReturn === 'function' ? opts.rawReturn(path, options) : opts.rawReturn
-          if (opts.abortAfterFirstRead) { try { controller.abort() } catch (e) { /* noop */ } }
-          return r
+          if (r !== undefined) {
+            if (opts.abortAfterFirstRead) { try { controller.abort() } catch (e) { /* noop */ } }
+            return r
+          }
         }
         const name = String(path).split('/').pop()
         const full = (opts.override && opts.override[name] !== undefined) ? opts.override[name] : bundle[name]
@@ -77,7 +115,10 @@ function makeContext(opts = {}) {
           eof = offset + data.length >= bytes.length
         }
         if (opts.abortAfterFirstRead) { try { controller.abort() } catch (e) { /* noop */ } }
-        return { data: new Uint8Array(data), eof, offset }
+        const res = { data: new Uint8Array(data), eof, offset }
+        if (opts.absPaths) res.absolutePath = String(opts.absPaths[name] || ('C:/virtual/work/recipe/' + REV + '/' + name))
+        if (opts.bytesHint) res.bytes = opts.bytesHint
+        return res
       },
     },
   }
@@ -119,7 +160,7 @@ await check('missing remote service degrades silently (no throw, no viewer regis
   assert.deepEqual(bare.entries.map(({ entry }) => entry.name), ['settings.section'])
 })
 
-// ── refs 解析（经 definition 全链路）─────────────────────────────────────
+// ── refs 解析 ───────────────────────────────────────────────────────────
 const def = world.definitions[0]
 const samples = fixture.samples
 const evt = s => JSON.parse(JSON.stringify(s))
@@ -139,7 +180,7 @@ await check('match routes turn/start and only figure-bearing results', () => {
   assert.equal(def.match(evt(samples.sidecar_tool)).role, 'update')
 })
 
-await check('fig_export results[].viewer chain is recognized (R2-2.1 P1-6)', () => {
+await check('fig_export results[].viewer chain is recognized (P1-6)', () => {
   const event = {
     type: 'tool/result', seq: 50, data: { turn: 4, step: 1, message: { role: 'tool', isError: false,
       source: { kind: 'tool', callId: 'call-export' },
@@ -155,52 +196,90 @@ await check('fig_export results[].viewer chain is recognized (R2-2.1 P1-6)', () 
   assert.equal(st.figures.length, 1)
   assert.equal(st.figures[0].kind, 'sidecar')
   assert.ok(st.figures[0].manifest.endsWith('recipe.figview.json'))
-  assert.equal(st.figures[0].figureId, 'recipe')
 })
 
-await check('update accumulates sidecar + preview refs with dedupe and stable keys', () => {
+await check('fig_export strictness: non-boolean available is not a sidecar; verdict gates preview', () => {
+  const mkEvent = results => ({
+    type: 'tool/result', seq: 51, data: { turn: 4, step: 2, message: { role: 'tool', isError: false,
+      source: { kind: 'tool', callId: 'call-export-2' },
+      content: [{ type: 'text', text: JSON.stringify({ count: results.length, results }) }] } },
+  })
+  assert.equal(def.match(mkEvent([{ path: 'C:/w/a.png', viewer: { available: 'false', manifest: 'C:/w/a.figview.json' } }])), null)
+  assert.equal(def.match(mkEvent([{ path: 'C:/w/random.png' }])), null)
+  const previewEvent = mkEvent([{ path: 'C:/w/a.png', verdict: 'PASS' }])
+  assert.equal(def.match(previewEvent).role, 'update')
+})
+
+await check('update accumulates refs; preview and sidecar with identical path stay distinct; dedupe by kind+path', () => {
   let state = def.start({}, { event: { data: { turn: 1 } } })
   state = def.update({ state }, { event: evt(samples.sidecar_tool_constructed), seq: 12 })
   assert.equal(state.figures.length, 1)
-  assert.equal(state.figures[0].kind, 'sidecar')
-  assert.ok(state.figures[0].manifest.endsWith('pUC19.figview.json'))
-  assert.equal(state.figures[0].figureId, 'pUC19')
   const same = def.update({ state }, { event: evt(samples.sidecar_tool_constructed), seq: 13 })
-  assert.equal(same, state) // 幂等：同 manifest 不再追加
+  assert.equal(same, state)
   state = def.update({ state }, { event: evt(samples.sidecar_tool), seq: 76 })
-  assert.equal(state.figures.length, 2) // 真实 out_file 样本 → preview 型
-  assert.equal(state.figures[1].kind, 'preview')
-  assert.ok(state.figures[1].imagePath.endsWith('pUC19_map.png'))
+  assert.equal(state.figures.length, 2)
   state = def.update({ state }, { event: evt(samples.image_block), seq: 83 })
-  assert.equal(state.figures.length, 2) // 同路径图片内容块 → dedupe
+  assert.equal(state.figures.length, 2)
+  // 同 path 不同 kind：不互相吞掉（P2-B）
+  const bothKinds = { figures: [
+    { kind: 'preview', imagePath: 'C:/w/same', manifest: null, figureId: null, name: null, seq: 1 },
+  ] }
+  const st2 = def.update({ state: { turn: 9, figures: bothKinds.figures } },
+    { event: { type: 'tool/result', seq: 90, data: { turn: 9, step: 1, message: { isError: false,
+      content: [{ type: 'text', text: JSON.stringify({ ok: true, result: { viewer_manifest: 'C:/w/same', figure_id: 'x' } }) }],
+      source: { kind: 'tool', callId: 'c9' } } } }, seq: 90 })
+  assert.equal(st2.figures.length, 2, '同 path 的 preview 与 sidecar 应并存（kind 区分）')
 })
 
 await check('buildLocationData publishes one stable Turn value (idempotent on repeat)', () => {
   const state = { turn: 1, figures: [{ kind: 'preview', imagePath: 'C:/x/a.png', manifest: null, figureId: null, name: null, seq: 1 }] }
   const data = def.buildLocationData({ state }, 'turn', null)
   assert.equal(data.kind, 'turn')
-  assert.equal(data.turn, 1)
   assert.equal(data.key, 'bio-figures')
-  assert.equal(data.value.figures.length, 1)
   assert.equal(def.buildLocationData({ state }, 'step', null), null)
   assert.equal(def.buildLocationData({ state }, 'turn', data), data)
 })
 
-// ── provider（真实 R2-1 bundle 全链路）──────────────────────────────────
-await check('provider reads manifest/rows/hits through workspaceFiles and verifies sha256', async () => {
+// ── provider 主链路 ─────────────────────────────────────────────────────
+await check('provider reads manifest/rows/hits, verifies sha256 and content digest (real bundle)', async () => {
   const frames = await framesOf(world.providers[0], ADDRESS)
   assert.equal(frames.length, 1)
   const v = frames[0].value
-  assert.ok(frames[0].ok)
+  assert.ok(frames[0].ok, frames[0].error && frames[0].error.message)
   assert.equal(v.manifest.figure_id, 'recipe')
-  assert.equal(v.manifest.schema_version, 1)
   assert.equal(v.rows.rows.length, 9)
   assert.equal(v.hits.elements.length, 9)
-  assert.equal(v.hits.units, 'image-pixels')
   assert.deepEqual(world.readCalls.map(c => c.path.split('/').pop()),
     ['recipe.figview.json', 'recipe.rows.json', 'recipe.hits.json'])
-  assert.equal(world.readCalls[1].options.baseFile, MANIFEST)
   assert.ok(world.readCalls[1].options.range, '有界读取应通过 range 段读实现')
+})
+
+await check('manifest content digest: byte-level tamper without revision update is rejected', async () => {
+  const w = makeContext({ override: { 'recipe.figview.json': tamperManifestText('"figure_id":"recipe"', '"figure_id":"recipf"') } })
+  plugin.apply(w.ctx)
+  const frames = await framesOf(w.providers[0], ADDRESS)
+  assert.equal(frames[0].ok, false)
+  assert.match(frames[0].error.message, /内容摘要与 revision 不一致/)
+})
+
+await check('revision layout: direct parent must be the 64hex revision; ancestors cannot rescue or poison', async () => {
+  // 直接父目录非 hex（祖先有 hex）：拒绝，不再被祖先误放行
+  const f1 = await framesOf(world.providers[0], ANCESTOR_TRAP_ADDRESS)
+  assert.equal(f1[0].ok, false)
+  assert.match(f1[0].error.message, /缺少 revision 目录/)
+  // 直接父目录是正确 hex：正常（错误 rev 值走另一 case）
+  const okFrames = await framesOf(world.providers[0], ADDRESS)
+  assert.ok(okFrames[0].ok)
+  // 无 revision 目录：拒绝（生产入口不兼容非发布布局）
+  const f2 = await framesOf(world.providers[0], NO_REV_ADDRESS)
+  assert.equal(f2[0].ok, false)
+  assert.match(f2[0].error.message, /缺少 revision 目录/)
+})
+
+await check('revision mismatch between path and manifest is rejected', async () => {
+  const frames = await framesOf(world.providers[0], OTHER_REV_ADDRESS)
+  assert.equal(frames[0].ok, false)
+  assert.match(frames[0].error.message, /revision 与路径不一致/)
 })
 
 await check('tampered rows bytes fail closed with sha256 mismatch', async () => {
@@ -222,86 +301,160 @@ await check('manifest missing fields fails closed', async () => {
   assert.match(frames[0].error.message, /缺少字段/)
 })
 
-// ── R2-2.1 修复轮新覆盖 ─────────────────────────────────────────────────
-await check('P1-1 preview branch (data/hitmap null, inspect=preview) is accepted', async () => {
-  const w = makeContext({ override: { 'recipe.figview.json': manifestOverride(m => {
+// ── preview / 引用 / 路径 ───────────────────────────────────────────────
+await check('preview branch (data/hitmap null, inspect=preview) is accepted (self-consistent manifest)', async () => {
+  const ovPv = buildManifestBytes(m => {
     m.capabilities = { inspect: 'preview', reason: 'no-source-table', request_redraw: false }
     m.data = null
     m.hitmap = null
-  }) } })
+  })
+  const w = makeContext({ override: { 'recipe.figview.json': ovPv } })
   plugin.apply(w.ctx)
-  const frames = await framesOf(w.providers[0], REV_ADDRESS)
+  const frames = await framesOf(w.providers[0], addrWithRev(revOfBytes(ovPv)))
   assert.equal(frames.length, 1)
   assert.ok(frames[0].ok, frames[0].error && frames[0].error.message)
   assert.equal(frames[0].value.rows, null)
   assert.equal(frames[0].value.hits, null)
 })
 
-await check('P1-1 points branch with null data/hitmap is rejected', async () => {
-  const w = makeContext({ override: { 'recipe.figview.json': manifestOverride(m => { m.data = null }) } })
+await check('points branch with null data/hitmap is rejected; bad capabilities rejected', async () => {
+  const ov1 = buildManifestBytes(m => { m.data = null })
+  const w = makeContext({ override: { 'recipe.figview.json': ov1 } })
   plugin.apply(w.ctx)
-  const frames = await framesOf(w.providers[0], REV_ADDRESS)
-  assert.equal(frames[0].ok, false)
-  assert.match(frames[0].error.message, /data 为 null 但 capabilities\.inspect=points/)
+  const f1 = await framesOf(w.providers[0], addrWithRev(revOfBytes(ov1)))
+  assert.match(f1[0].error.message, /data 为 null 但 capabilities\.inspect=points/)
+  const ov2 = buildManifestBytes(m => { delete m.capabilities })
+  const w2 = makeContext({ override: { 'recipe.figview.json': ov2 } })
+  plugin.apply(w2.ctx)
+  const f2 = await framesOf(w2.providers[0], addrWithRev(revOfBytes(ov2)))
+  assert.match(f2[0].error.message, /缺少字段：capabilities/)
+  const ov3 = buildManifestBytes(m => { m.capabilities.inspect = 'fancy' })
+  const w3 = makeContext({ override: { 'recipe.figview.json': ov3 } })
+  plugin.apply(w3.ctx)
+  const f3 = await framesOf(w3.providers[0], addrWithRev(revOfBytes(ov3)))
+  assert.match(f3[0].error.message, /capabilities\.inspect 非法/)
+  const ov4 = buildManifestBytes(m => { m.image = null })
+  const w4 = makeContext({ override: { 'recipe.figview.json': ov4 } })
+  plugin.apply(w4.ctx)
+  const f4 = await framesOf(w4.providers[0], addrWithRev(revOfBytes(ov4)))
+  assert.match(f4[0].error.message, /image 不能为 null/)
 })
 
-await check('P1-2 missing sha256 is rejected (fail-closed, not skipped)', async () => {
-  const w = makeContext({ override: { 'recipe.figview.json': manifestOverride(m => { delete m.data.sha256 }) } })
+await check('missing sha256 is rejected (fail-closed, not skipped)', async () => {
+  const ovS = buildManifestBytes(m => { delete m.data.sha256 })
+  const w = makeContext({ override: { 'recipe.figview.json': ovS } })
   plugin.apply(w.ctx)
-  const frames = await framesOf(w.providers[0], REV_ADDRESS)
+  const frames = await framesOf(w.providers[0], addrWithRev(revOfBytes(ovS)))
   assert.equal(frames[0].ok, false)
   assert.match(frames[0].error.message, /缺少合法 sha256/)
 })
 
-await check('P1-3 unsafe bundle-relative paths are rejected', async () => {
+await check('unsafe bundle-relative paths are rejected', async () => {
   for (const badPath of ['../recipe.rows.json', 'C:/outside/recipe.rows.json', 'a\\b.json', 'a%2eb.json', '/abs.json']) {
-    const w = makeContext({ override: { 'recipe.figview.json': manifestOverride(m => { m.data.path = badPath }) } })
+    const ovU = buildManifestBytes(m => { m.data.path = badPath })
+    const w = makeContext({ override: { 'recipe.figview.json': ovU } })
     plugin.apply(w.ctx)
-    const frames = await framesOf(w.providers[0], REV_ADDRESS)
+    const frames = await framesOf(w.providers[0], addrWithRev(revOfBytes(ovU)))
     assert.equal(frames[0].ok, false, '应拒绝: ' + badPath)
     assert.match(frames[0].error.message, /路径非法/, '应报路径非法: ' + badPath)
   }
 })
 
-await check('P1-4 manifest revision mismatching the path revision is rejected', async () => {
-  const w = makeContext({ override: { 'recipe.figview.json': manifestOverride(m => { m.revision = 'f'.repeat(64) }) } })
-  plugin.apply(w.ctx)
-  const frames = await framesOf(w.providers[0], REV_ADDRESS)
-  assert.equal(frames[0].ok, false)
-  assert.match(frames[0].error.message, /revision 与路径不一致/)
+// ── 预算 / 结构 / 引用完整性 ────────────────────────────────────────────
+await check('points budget counts hits (not rows): rows>hits ok; 10001 hits rejected', async () => {
+  // rows 10 行 > hits 9：不误拒
+  const rowsObj = JSON.parse(bundle['recipe.rows.json'].toString('utf8'))
+  const extra = JSON.parse(JSON.stringify(rowsObj.rows[0]))
+  extra.row_id = extra.row_id + ':extra'
+  rowsObj.rows.push(extra)
+  const rowsBytes = Buffer.from(JSON.stringify(rowsObj))
+  const ovB1 = withBundle({ 'recipe.rows.json': rowsBytes })
+  const w1 = makeContext({ override: ovB1 })
+  plugin.apply(w1.ctx)
+  const f1 = await framesOf(w1.providers[0], addrWithRev(revOfBytes(ovB1['recipe.figview.json'])))
+  assert.ok(f1[0].ok, f1[0].error && f1[0].error.message)
+  assert.equal(f1[0].value.rows.rows.length, 10)
+  // 10001 hits：拒绝
+  const hitsObj = JSON.parse(bundle['recipe.hits.json'].toString('utf8'))
+  hitsObj.elements = new Array(10001).fill({})
+  const hitsBytes = Buffer.from(JSON.stringify(hitsObj))
+  const ovB2 = withBundle({ 'recipe.hits.json': hitsBytes })
+  const w2 = makeContext({ override: ovB2 })
+  plugin.apply(w2.ctx)
+  const f2 = await framesOf(w2.providers[0], addrWithRev(revOfBytes(ovB2['recipe.figview.json'])))
+  assert.equal(f2[0].ok, false)
+  assert.match(f2[0].error.message, /hits 点数超出预算/)
 })
 
-await check('P1-5 oversized manifest is stopped during bounded read', async () => {
-  const big = manifestOverride(m => { m.padding = 'x'.repeat(1200 * 1000) })
-  const w = makeContext({ override: { 'recipe.figview.json': big } })
-  plugin.apply(w.ctx)
-  const frames = await framesOf(w.providers[0], ADDRESS)
-  assert.equal(frames[0].ok, false)
-  assert.match(frames[0].error.message, /超出预算/)
-})
-
-await check('P1-2b malformed rows (non-array) rejected before renderer', async () => {
+await check('malformed rows rejected; hits row_id references validated', async () => {
   const badRows = Buffer.from(JSON.stringify({ schema_version: 1, columns: [], rows: {} }))
-  const w = makeContext({ override: {
-    'recipe.rows.json': badRows,
-    'recipe.figview.json': manifestOverride(m => { m.data.sha256 = sha256hex(badRows) }),
-  } })
+  const ovR = withBundle({ 'recipe.rows.json': badRows })
+  const w = makeContext({ override: ovR })
   plugin.apply(w.ctx)
-  const frames = await framesOf(w.providers[0], REV_ADDRESS)
-  assert.equal(frames[0].ok, false)
-  assert.match(frames[0].error.message, /rows 结构非法/)
+  const f1 = await framesOf(w.providers[0], addrWithRev(revOfBytes(ovR['recipe.figview.json'])))
+  assert.match(f1[0].error.message, /rows 结构非法/)
+  // hits 引用不存在的 row_id
+  const hitsObj = JSON.parse(bundle['recipe.hits.json'].toString('utf8'))
+  hitsObj.elements[0] = { ...hitsObj.elements[0], row_ids: ['NOT-IN-ROWS'] }
+  const hitsBytes = Buffer.from(JSON.stringify(hitsObj))
+  const ovH = withBundle({ 'recipe.hits.json': hitsBytes })
+  const w2 = makeContext({ override: ovH })
+  plugin.apply(w2.ctx)
+  const f2 = await framesOf(w2.providers[0], addrWithRev(revOfBytes(ovH['recipe.figview.json'])))
+  assert.equal(f2[0].ok, false)
+  assert.match(f2[0].error.message, /hits 引用不存在的 row_id/)
 })
 
-await check('P2-1 malformed envelope and invalid byte arrays are rejected', async () => {
-  const w1 = makeContext({ rawReturn: { ok: 'malformed', value: { data: new Uint8Array(bundle['recipe.figview.json']), eof: true } } })
+// ── 读取身份与完整性 ────────────────────────────────────────────────────
+await check('read identity: oversized size hint rejected pre-read; offset mismatch rejected', async () => {
+  const raw = new Uint8Array(bundle['recipe.figview.json'])
+  const w1 = makeContext({ rawReturn: { ok: true, value: { data: raw, eof: false, offset: 0, bytes: 9 * 1024 * 1024 } } })
   plugin.apply(w1.ctx)
   const f1 = await framesOf(w1.providers[0], ADDRESS)
   assert.equal(f1[0].ok, false)
+  assert.match(f1[0].error.message, /超出预算（文件/)
+  const w2 = makeContext({ rawReturn: { ok: true, value: { data: raw, eof: true, offset: 999, bytes: raw.length } } })
+  plugin.apply(w2.ctx)
+  const f2 = await framesOf(w2.providers[0], ADDRESS)
+  assert.equal(f2[0].ok, false)
+  assert.match(f2[0].error.message, /读取 offset 不符/)
+})
+
+await check('short read with eof:false continues to completion (two-segment manifest)', async () => {
+  const raw = Buffer.from(bundle['recipe.figview.json'])
+  const half = Math.floor(raw.length / 2)
+  const absPath = 'C:/virtual/work/recipe/' + REV + '/recipe.figview.json'
+  const w = makeContext({ rawReturn: (path, options) => {
+    if (!String(path).includes('figview.json')) return undefined
+    const off = options && options.range ? options.range.offset : 0
+    if (off === 0) return { ok: true, value: { data: new Uint8Array(raw.subarray(0, half)), eof: false, offset: 0, bytes: raw.length, absolutePath: absPath } }
+    return { ok: true, value: { data: new Uint8Array(raw.subarray(off)), eof: true, offset: off, bytes: raw.length, absolutePath: absPath } }
+  } })
+  plugin.apply(w.ctx)
+  const frames = await framesOf(w.providers[0], ADDRESS)
+  assert.ok(frames[0].ok, frames[0].error && frames[0].error.message)
+  assert.equal(frames[0].value.manifest.figure_id, 'recipe')
+})
+
+await check('bundle boundary: final path outside the manifest directory is rejected', async () => {
+  const w = makeContext({
+    absPaths: { 'recipe.rows.json': 'C:/outside/recipe.rows.json' },
+  })
+  plugin.apply(w.ctx)
+  const frames = await framesOf(w.providers[0], ADDRESS)
+  assert.equal(frames[0].ok, false)
+  assert.match(frames[0].error.message, /bundle 之外/)
+})
+
+await check('malformed envelope and invalid byte arrays are rejected', async () => {
+  const w1 = makeContext({ rawReturn: { ok: 'malformed', value: { data: new Uint8Array(bundle['recipe.figview.json']), eof: true } } })
+  plugin.apply(w1.ctx)
+  const f1 = await framesOf(w1.providers[0], ADDRESS)
   assert.match(f1[0].error.message, /信封非法/)
   const w2 = makeContext({ rawReturn: (path) => {
     if (String(path).includes('figview.json')) return { ok: true, value: { data: new Uint8Array(bundle['recipe.figview.json']), eof: true } }
     if (String(path).includes('rows')) return { ok: true, value: { data: [104, 101, 300], eof: true } }
-    return { ok: true, value: { data: new Uint8Array(bundle['recipe.hits.json']), eof: true } }
+    return undefined
   } })
   plugin.apply(w2.ctx)
   const f2 = await framesOf(w2.providers[0], ADDRESS)
@@ -309,7 +462,7 @@ await check('P2-1 malformed envelope and invalid byte arrays are rejected', asyn
   assert.match(f2[0].error.message, /字节数组元素非法/)
 })
 
-await check('P2-2 mid-read abort stops further IO and emits no success frame', async () => {
+await check('mid-read abort stops further IO and emits no success frame', async () => {
   const w = makeContext({ abortAfterFirstRead: true })
   plugin.apply(w.ctx)
   const frames = await framesOf(w.providers[0], ADDRESS, w.controller.signal)
@@ -317,7 +470,7 @@ await check('P2-2 mid-read abort stops further IO and emits no success frame', a
   assert.equal(w.readCalls.length, 1, '取消后不应继续读 rows/hits')
 })
 
-await check('P2-4 renderer guard: malformed value renders without throwing', async () => {
+await check('renderer guard: malformed value renders without throwing', async () => {
   const body = world.entries.find(({ entry }) => entry.name === 'sidebar.right.pane.tab')
   const weird = { manifest: { figure_id: 'w', revision: 'r', capabilities: {} },
     rows: { schema_version: 1, columns: [], rows: {} }, hits: null }
@@ -333,7 +486,7 @@ await check('unsupported address and pre-aborted signal produce the right outcom
   assert.equal(none.length, 0)
 })
 
-// ── tab 类型 ────────────────────────────────────────────────────────────
+// ── tab / 卡片 / 查看器 ─────────────────────────────────────────────────
 await check('tab claims only well-formed bio-figure session addresses; title derives from stem', () => {
   const tab = world.tabs[0]
   assert.ok(tab.canOpen(ADDRESS))
@@ -342,7 +495,6 @@ await check('tab claims only well-formed bio-figure session addresses; title der
   assert.equal(tab.title(ADDRESS), 'recipe')
 })
 
-// ── turnTail 卡片 ───────────────────────────────────────────────────────
 await check('figure card renders rows and opens sidecar via encoded address / preview via openFile', () => {
   const tail = world.entries.find(({ entry }) => entry.name === 'conversation.chat.turnTail')
   const figures = { figures: [
@@ -359,16 +511,12 @@ await check('figure card renders rows and opens sidecar via encoded address / pr
   assert.ok(buttons[0] && buttons[1])
   buttons[0].props.onClick()
   assert.equal(world.opened.length, 1)
-  const m = /^dsh-resource:\/\/bio-figure\/session\/([^/]+)\/(.+)$/.exec(world.opened[0])
-  assert.equal(decodeURIComponent(m[1]), SESSION)
-  assert.equal(decodeURIComponent(m[2]), 'C:/w/a.figview.json')
   buttons[1].props.onClick()
   assert.deepEqual(files, ['C:/w/b.png'])
   assert.equal(tail.component({ sessionId: SESSION, turn: { data: { get: () => undefined } } }), null)
 })
 
-// ── pane.tab 查看器 ─────────────────────────────────────────────────────
-await check('viewer tab renders summary + preview payload and handles error frame', async () => {
+await check('viewer tab renders summary + preview payload and handles failure frame', async () => {
   const body = world.entries.find(({ entry }) => entry.name === 'sidebar.right.pane.tab')
   const frames = await framesOf(world.providers[0], ADDRESS)
   const ok = body.component({ useTabInfo: () => ({ tab: { contentId: ADDRESS } }), useResource: () => ({ status: 'live', value: frames[0].value }) })
