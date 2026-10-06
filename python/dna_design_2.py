@@ -117,7 +117,7 @@ def op_assembly_design(args):
 
 
 def _plasmid_graphic(args, features):
-    """dna-features-viewer 图形模式：GenBank 文件或 features+sequence → PNG/SVG。
+    """图形模式：环形用 matplotlib；线性保留 dna-features-viewer。
 
     成功返回 dict（含 out_file 路径）；库缺失或无图形输入返回 None 走文本回退。
     """
@@ -125,6 +125,13 @@ def _plasmid_graphic(args, features):
     output_format = str(args.get('output_format', 'png')).lower()
     if not genbank_file and not args.get('sequence'):
         return None
+    if args.get('circular', True):
+        try:
+            from plasmid_render import render_circular_map
+            return render_circular_map(args, features)
+        except Exception as e:
+            return {'graphic': False,
+                    'graphic_note': f'图形渲染失败，已回退文本模式: {e}'}
     try:
         import matplotlib
         matplotlib.use('Agg')
