@@ -74,7 +74,7 @@ async function check(name, body) { await body(); count++; console.log(`PASS ${na
 function load(href) {
   let plugin
   vm.runInNewContext(source, {
-    URL, atob, TextDecoder, console, crypto: webcrypto,
+    URL, atob, TextDecoder, TextEncoder, console, crypto: webcrypto,
     window: { location: { href }, __ModuleLoader__: { load({ id, factory }) {
       assert.equal(id, '@dsh-bio/dsh-bio-genie')
       plugin = factory(name => {
@@ -115,8 +115,9 @@ function makeContext(opts = {}) {
           eof = offset + data.length >= bytes.length
         }
         if (opts.abortAfterFirstRead) { try { controller.abort() } catch (e) { /* noop */ } }
-        const res = { data: new Uint8Array(data), eof, offset }
-        if (opts.absPaths) res.absolutePath = String(opts.absPaths[name] || ('C:/virtual/work/recipe/' + REV + '/' + name))
+        const res = { data: new Uint8Array(data), eof, offset, bytes: bytes.length }
+        const absBase = 'C:/virtual/work/recipe/' + REV + '/'
+        if (!opts.noAbs) res.absolutePath = (opts.absPaths && opts.absPaths[name]) ? opts.absPaths[name] : (absBase + name)
         if (opts.bytesHint) res.bytes = opts.bytesHint
         return res
       },
@@ -452,8 +453,8 @@ await check('malformed envelope and invalid byte arrays are rejected', async () 
   const f1 = await framesOf(w1.providers[0], ADDRESS)
   assert.match(f1[0].error.message, /信封非法/)
   const w2 = makeContext({ rawReturn: (path) => {
-    if (String(path).includes('figview.json')) return { ok: true, value: { data: new Uint8Array(bundle['recipe.figview.json']), eof: true } }
-    if (String(path).includes('rows')) return { ok: true, value: { data: [104, 101, 300], eof: true } }
+    if (String(path).includes('figview.json')) return { ok: true, value: { data: new Uint8Array(bundle['recipe.figview.json']), eof: true, offset: 0, bytes: bundle['recipe.figview.json'].length, absolutePath: 'C:/virtual/work/recipe/' + REV + '/recipe.figview.json' } }
+    if (String(path).includes('rows')) return { ok: true, value: { data: [104, 101, 300], eof: true, offset: 0 } }
     return undefined
   } })
   plugin.apply(w2.ctx)
@@ -484,6 +485,116 @@ await check('unsupported address and pre-aborted signal produce the right outcom
   assert.equal(bad[0].error.code, 'figview/unsupported-address')
   const none = await framesOf(world.providers[0], ADDRESS, AbortSignal.abort())
   assert.equal(none.length, 0)
+})
+
+// ── R2-2.3：结构病理 / 完成性 / schema 残余 / 路径规范化 ────────────────
+const BYTES_ABS = 'C:/virtual/work/recipe/' + REV + '/recipe.figview.json'
+
+await check('R223 structural: duplicate keys (top / nested / escaped-equivalent) are rejected', async () => {
+  const cases = [
+    tamperManifestText('"figure_id":"recipe"', '"figure_id":"recipe","figure_id":"recipe2"'),
+    tamperManifestText('"kind":"dataframe"', '"kind":"dataframe","kind":"file"'),
+    tamperManifestText('"figure_id":"recipe"', '"figure_id":"recipe","figure_' + String.fromCharCode(92) + 'u0069d":"recipe2"'),
+  ]
+  for (const bytes of cases) {
+    const w = makeContext({ override: { 'recipe.figview.json': bytes } })
+    plugin.apply(w.ctx)
+    const frames = await framesOf(w.providers[0], ADDRESS)
+    assert.equal(frames[0].ok, false, '应拒绝重复键变体')
+    assert.match(frames[0].error.message, /重复键|结构非法/)
+  }
+})
+
+await check('R223 structural: invalid UTF-8 byte is rejected', async () => {
+  const b = Buffer.from(bundle['recipe.figview.json'])
+  const pos = b.indexOf('"figure_id":"recipe"')
+  assert.ok(pos >= 0)
+  b[pos + 13] = 0xFF
+  const w = makeContext({ override: { 'recipe.figview.json': new Uint8Array(b) } })
+  plugin.apply(w.ctx)
+  const frames = await framesOf(w.providers[0], ADDRESS)
+  assert.equal(frames[0].ok, false)
+  assert.match(frames[0].error.message, /非合法 UTF-8/)
+})
+
+await check('R223 structural: non-finite number (1e999) is rejected', async () => {
+  const w = makeContext({ override: { 'recipe.figview.json': tamperManifestText('"width":958', '"width":1e999') } })
+  plugin.apply(w.ctx)
+  const frames = await framesOf(w.providers[0], ADDRESS)
+  assert.equal(frames[0].ok, false)
+  assert.match(frames[0].error.message, /非有限|非法数值/)
+})
+
+await check('R223 read completion: endless eof:false stream is rejected (no silent concat)', async () => {
+  const w = makeContext({ rawReturn: (path, options) => {
+    if (!String(path).includes('figview.json')) return undefined
+    const off = options && options.range ? options.range.offset : 0
+    return { ok: true, value: { data: enc(' '), eof: false, offset: off, bytes: 500000, absolutePath: BYTES_ABS } }
+  } })
+  plugin.apply(w.ctx)
+  const frames = await framesOf(w.providers[0], ADDRESS)
+  assert.equal(frames[0].ok, false)
+  assert.match(frames[0].error.message, /未达到 EOF/)
+})
+
+await check('R223 read completion: declared size mismatch at eof is rejected', async () => {
+  const raw = Buffer.from(bundle['recipe.figview.json'])
+  const w = makeContext({ rawReturn: { ok: true, value: { data: new Uint8Array(raw), eof: true, offset: 0, bytes: raw.length + 100, absolutePath: BYTES_ABS } } })
+  plugin.apply(w.ctx)
+  const frames = await framesOf(w.providers[0], ADDRESS)
+  assert.equal(frames[0].ok, false)
+  assert.match(frames[0].error.message, /累计字节与文件大小不符/)
+})
+
+await check('R223 schema: missing row_ids / wrong doc versions / bad object types are rejected', async () => {
+  const h = JSON.parse(bundle['recipe.hits.json'].toString('utf8'))
+  delete h.elements[0].row_ids
+  const ovH2 = withBundle({ 'recipe.hits.json': Buffer.from(JSON.stringify(h)) })
+  const w1 = makeContext({ override: ovH2 })
+  plugin.apply(w1.ctx)
+  const f1 = await framesOf(w1.providers[0], addrWithRev(revOfBytes(ovH2['recipe.figview.json'])))
+  assert.match(f1[0].error.message, /缺少 row_ids/)
+
+  const r = JSON.parse(bundle['recipe.rows.json'].toString('utf8'))
+  r.schema_version = 2
+  const ovR2 = withBundle({ 'recipe.rows.json': Buffer.from(JSON.stringify(r)) })
+  const w2 = makeContext({ override: ovR2 })
+  plugin.apply(w2.ctx)
+  const f2 = await framesOf(w2.providers[0], addrWithRev(revOfBytes(ovR2['recipe.figview.json'])))
+  assert.match(f2[0].error.message, /rows schema_version 非法/)
+
+  const ovS = buildManifestBytes(m => { m.source = null })
+  const w3 = makeContext({ override: { 'recipe.figview.json': ovS } })
+  plugin.apply(w3.ctx)
+  const f3 = await framesOf(w3.providers[0], addrWithRev(revOfBytes(ovS)))
+  assert.match(f3[0].error.message, /source 类型非法/)
+
+  const ovE = buildManifestBytes(m => { m.capabilities.reason = '' })
+  const w4 = makeContext({ override: { 'recipe.figview.json': ovE } })
+  plugin.apply(w4.ctx)
+  const f4 = await framesOf(w4.providers[0], addrWithRev(revOfBytes(ovE)))
+  assert.match(f4[0].error.message, /reason 非法/)
+})
+
+await check('R223 path normalization: dot-dot traversal rejected; drive-letter case-insensitive', async () => {
+  const w1 = makeContext({ absPaths: { 'recipe.rows.json': 'C:/virtual/work/recipe/' + REV + '/../outside/recipe.rows.json' } })
+  plugin.apply(w1.ctx)
+  const f1 = await framesOf(w1.providers[0], ADDRESS)
+  assert.equal(f1[0].ok, false)
+  assert.match(f1[0].error.message, /bundle 之外/)
+
+  const w2 = makeContext({ absPaths: { 'recipe.rows.json': 'c:/virtual/work/recipe/' + REV + '/recipe.rows.json' } })
+  plugin.apply(w2.ctx)
+  const f2 = await framesOf(w2.providers[0], ADDRESS)
+  assert.ok(f2[0].ok, f2[0].error && f2[0].error.message)
+})
+
+await check('R223 boundary requires host-provided canonical path (no silent skip)', async () => {
+  const w = makeContext({ noAbs: true })
+  plugin.apply(w.ctx)
+  const frames = await framesOf(w.providers[0], ADDRESS)
+  assert.equal(frames[0].ok, false)
+  assert.match(frames[0].error.message, /未提供规范路径/)
 })
 
 // ── tab / 卡片 / 查看器 ─────────────────────────────────────────────────
