@@ -890,6 +890,61 @@ await check('R233 lifecycle: cleanup effect deps ready at render (boolean + stat
   assert.ok(ready2, 'omitted 场景：deps=[false, imgStatus]')
 })
 
+await check('R233b cleanup: effect body clears selection when image absent, keeps it otherwise', async () => {
+  const body = world.entries.find(({ entry }) => entry.name === 'sidebar.right.pane.tab')
+  const frames = await framesOf(world.providers[0], ADDRESS)
+  const v = frames[0].value
+  // omitted 态：清理 effect 提交 → setSel(null)
+  const von = { manifest: v.manifest, rows: v.rows, hits: v.hits, image: { omitted: true, reason: 'x' } }
+  const b1 = testHooks.effects.length
+  body.component({ useTabInfo: () => ({ tab: { contentId: 'x' } }),
+    useResource: () => ({ status: 'live', value: von }) })
+  const clr1 = testHooks.effects.slice(b1).find(e => Array.isArray(e.deps) && e.deps.length === 2
+    && typeof e.deps[0] === 'boolean' && e.fn)
+  assert.ok(clr1, '清理 effect 已注册（omitted）')
+  const c1 = testHooks.stateCalls.length
+  clr1.fn()
+  assert.ok(testHooks.stateCalls.slice(c1).indexOf(null) !== -1, 'omitted 提交 → setSel(null)')
+  // 有图 idle 态：清理 effect 提交 → 不清选择
+  const b2 = testHooks.effects.length
+  body.component({ useTabInfo: () => ({ tab: { contentId: 'x' } }),
+    useResource: () => ({ status: 'live', value: v }) })
+  const clr2 = testHooks.effects.slice(b2).find(e => Array.isArray(e.deps) && e.deps.length === 2
+    && typeof e.deps[0] === 'boolean' && e.fn)
+  assert.ok(clr2, '清理 effect 已注册（有图）')
+  const c2 = testHooks.stateCalls.length
+  clr2.fn()
+  assert.equal(testHooks.stateCalls.slice(c2).indexOf(null), -1, '有图 idle 提交 → 不清选择')
+})
+
+await check('R232b pager: next button invokes page advance with correct argument', async () => {
+  const body = world.entries.find(({ entry }) => entry.name === 'sidebar.right.pane.tab')
+  const rows60 = { schema_version: 1, columns: [{ name: 'gene', type: 'string' }], rows: [] }
+  for (let i = 0; i < 60; i++) rows60.rows.push({ row_id: 'r' + i, values: { gene: 'g' + i } })
+  const value = { manifest: manifestObj, rows: rows60, hits: null, image: { omitted: true, reason: 'test' } }
+  const tree = body.component({ useTabInfo: () => ({ tab: { contentId: 'x' } }),
+    useResource: () => ({ status: 'live', value }) })
+  let pager = null
+  ;(function walk(n) {
+    if (!n || typeof n !== 'object') return
+    if (Array.isArray(n)) { n.forEach(walk); return }
+    const a = n.props || {}
+    if (a['data-figview'] === 'row-pager') pager = n
+    ;(n.children || []).forEach(walk)
+  })(tree)
+  assert.ok(pager, 'pager')
+  const btns = (pager.children || []).filter(c => c && c.type === 'button')
+  assert.equal(btns.length, 2)
+  assert.equal(btns[0].props.disabled, true, '首页禁上一页')
+  assert.equal(btns[1].props.disabled, false, '首页允许下一页')
+  const c1 = testHooks.stateCalls.length
+  btns[1].props.onClick()
+  assert.ok(testHooks.stateCalls.slice(c1).indexOf(1) !== -1, '下一页 → setPage(1)')
+  const c2 = testHooks.stateCalls.length
+  btns[0].props.onClick()
+  assert.equal(testHooks.stateCalls.slice(c2).length, 0, '首页点上一页 → 无状态变更')
+})
+
 // ── tab / 卡片 / 查看器 ─────────────────────────────────────────────────
 await check('tab claims only well-formed bio-figure session addresses; title derives from stem', () => {
   const tab = world.tabs[0]
