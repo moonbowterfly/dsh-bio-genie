@@ -945,6 +945,37 @@ await check('R232b pager: next button invokes page advance with correct argument
   assert.equal(testHooks.stateCalls.slice(c2).length, 0, '首页点上一页 → 无状态变更')
 })
 
+await check('R234b dims: illegal renderer object rejected AND error text stays string-safe', async () => {
+  const body = world.entries.find(({ entry }) => entry.name === 'sidebar.right.pane.tab')
+  const frames = await framesOf(world.providers[0], ADDRESS)
+  const base = frames[0].value
+  const mw = base.manifest.image.width
+  const mh = base.manifest.image.height
+  const h4 = JSON.parse(JSON.stringify(base.hits)); h4.renderer_width = { toString: null }
+  const vv = { manifest: base.manifest, rows: base.rows, hits: h4, image: base.image }
+  const tree = body.component({ useTabInfo: () => ({ tab: { contentId: 'x' } }),
+    useResource: () => ({ status: 'live', value: vv }) })
+  let img = null
+  ;(function walk(n) {
+    if (!n || typeof n !== 'object') return
+    if (Array.isArray(n)) { n.forEach(walk); return }
+    if (n.props && n.props['data-figview'] === 'figure-img') { img = n; return }
+    ;(n.children || []).forEach(walk)
+  })(tree)
+  assert.ok(img, 'img rendered')
+  const b4 = testHooks.stateCalls.length
+  img.props.onLoad({ target: { naturalWidth: mw, naturalHeight: mh, parentElement: null } })
+  const calls = testHooks.stateCalls.slice(b4)
+  assert.ok(calls.indexOf('error') !== -1, '非法 renderer 对象被拒')
+  const mm = calls.filter(x => x && typeof x === 'object' && x.got)
+  assert.ok(mm.length >= 1, 'setMismatch 被调用')
+  const gw = mm[0].got.w
+  const s1 = '实际 ' + gw + ' 期望 ' + mm[0].expect.w   // 模拟渲染拼接：修复前（原始对象）此处抛 TypeError
+  assert.ok(typeof s1 === 'string', '错误文案拼接安全')
+  const s2 = '实际 ' + mm[0].got.h + ' 期望 ' + mm[0].expect.h
+  assert.ok(typeof s2 === 'string')
+})
+
 // ── tab / 卡片 / 查看器 ─────────────────────────────────────────────────
 await check('tab claims only well-formed bio-figure session addresses; title derives from stem', () => {
   const tab = world.tabs[0]
