@@ -1075,6 +1075,92 @@ await check('R24 redraw: viewer tab exposes the redraw toggle', async () => {
   assert.ok(String((toggle.children || [])[0]).includes('重绘'))
 })
 
+// ── R2-6：来源行 / 元素列表 / 数据编辑 ──────────────────────────────
+await check('R26 edit: buildEditRequest carries ids, edits and audit requirement', () => {
+  const M = plugin.__figureViewerMath
+  const m = { figure_id: 'figX', revision: 'abc123',
+    source: { kind: 'file', label: 'data.csv', path: 'C:/w/data.csv', file_sha256: 'f'.repeat(64) } }
+  const text = M.buildEditRequest(m,
+    { deletes: ['r1:0'], sets: [{ row_id: 'r2:0', column: 'pvalue', from: 0.2, to: '0.05' }] },
+    '剔除离群点')
+  assert.ok(text.includes('figure_id: figX'))
+  assert.ok(text.includes('base_revision: abc123'))
+  assert.ok(text.includes('source_path: C:/w/data.csv'))
+  assert.ok(text.includes('删除行 r1:0'))
+  assert.ok(text.includes('修改行 r2:0 的 pvalue: 0.2 -> 0.05'))
+  assert.ok(text.includes('备注: 剔除离群点'))
+  assert.ok(text.includes('审计'), '要求保留审计')
+})
+
+await check('R26 edit: EditPanel renders edits; generate fills via insertText', () => {
+  const M = plugin.__figureViewerMath
+  const m = { figure_id: 'figX', revision: 'r1', source: { kind: 'file', path: 'C:/w/d.csv' } }
+  const calls = []
+  const actions = { captureInsertion: () => ({ start: 0, end: 0, draftRev: 1 }),
+    insertText: tx => { calls.push(tx); return true }, setDraft: () => {} }
+  const panel = M.EditPanel({ manifest: m,
+    editSet: { deletes: ['r1:0'], sets: [{ row_id: 'r2:0', column: 'x', from: 1, to: '2' }] },
+    inputActions: actions, onClear: () => {} })
+  assert.equal(panel.props['data-figview'], 'edit-panel')
+  const items = { del: 0, set: 0, gen: null }
+  ;(function walk(n) {
+    if (!n || typeof n !== 'object') return
+    if (Array.isArray(n)) { n.forEach(walk); return }
+    const a = n.props || {}
+    if (a['data-figview'] === 'edit-delete-item') items.del += 1
+    if (a['data-figview'] === 'edit-set-item') items.set += 1
+    if (a['data-figview'] === 'edit-generate') items.gen = n
+    ;(n.children || []).forEach(walk)
+  })(panel)
+  assert.equal(items.del, 1)
+  assert.equal(items.set, 1)
+  assert.ok(items.gen, '生成按钮存在')
+  items.gen.props.onClick()
+  assert.equal(calls.length, 1, 'generate 调 insertText')
+  assert.ok(calls[0].includes('【图数据编辑请求】'))
+})
+
+await check('R26 list: ElementsPanel renders rows and picks by click', () => {
+  const M = plugin.__figureViewerMath
+  const hits = { elements: [
+    { element_id: 'ns:1', kind: 'point', row_ids: ['a:0'], geometry: { center: [10, 20], radius: 2 } },
+    { element_id: 'up:2', kind: 'point', row_ids: [], geometry: { center: [30, 40], radius: 2 } },
+  ] }
+  const picked = []
+  const panel = M.ElementsPanel({ hits, sel: { elementId: 'ns:1' }, onPick: el => picked.push(el) })
+  assert.equal(panel.props['data-figview'], 'elements-panel')
+  const rows = []
+  ;(function walk(n) {
+    if (!n || typeof n !== 'object') return
+    if (Array.isArray(n)) { n.forEach(walk); return }
+    const a = n.props || {}
+    if (a['data-figview'] === 'element-row') rows.push(n)
+    ;(n.children || []).forEach(walk)
+  })(panel)
+  assert.equal(rows.length, 2, '两个元素两行')
+  rows[1].props.onClick()
+  assert.equal(picked.length, 1)
+  assert.equal(picked[0].element_id, 'up:2')
+})
+
+await check('R26 viewer: list toggle, source line and copy button present', async () => {
+  const body = world.entries.find(({ entry }) => entry.name === 'sidebar.right.pane.tab')
+  const frames = await framesOf(world.providers[0], ADDRESS)
+  const tree = body.component({ useTabInfo: () => ({ tab: { contentId: 'x' } }),
+    useResource: () => ({ status: 'live', value: frames[0].value }) })
+  const found = { list: false, src: false }
+  ;(function walk(n) {
+    if (!n || typeof n !== 'object') return
+    if (Array.isArray(n)) { n.forEach(walk); return }
+    const a = n.props || {}
+    if (a['data-figview'] === 'list-toggle') found.list = true
+    if (a['data-figview'] === 'source-line') found.src = true
+    ;(n.children || []).forEach(walk)
+  })(tree)
+  assert.ok(found.list, '列表按钮在工具栏')
+  assert.ok(found.src, '来源行渲染')
+})
+
 // ── tab / 卡片 / 查看器 ─────────────────────────────────────────────────
 await check('tab claims only well-formed bio-figure session addresses; title derives from stem', () => {
   const tab = world.tabs[0]
@@ -1096,12 +1182,41 @@ await check('figure card renders rows and opens sidecar via encoded address / pr
   assert.equal(card.props['data-figview'], 'turn-card')
   const list = card.children.find(Array.isArray)
   assert.equal(list.length, 2)
-  const buttons = list.map(r => (r.children || []).find(c => c && c.type === 'button'))
-  assert.ok(buttons[0] && buttons[1])
-  buttons[0].props.onClick()
+  const flatButtons = r => {
+    const out = []
+    ;(function walk(n) {
+      if (Array.isArray(n)) { n.forEach(walk); return }
+      if (n && typeof n === 'object') {
+        if (n.type === 'button') out.push(n)
+        ;(n.children || []).forEach(walk)
+      }
+    })(r.children || [])
+    return out
+  }
+  const buttons = list.map(flatButtons)
+  assert.ok(buttons[0].length >= 1 && buttons[1].length >= 1)
+  buttons[0][0].props.onClick()
   assert.equal(world.opened.length, 1)
-  buttons[1].props.onClick()
+  buttons[1][0].props.onClick()
   assert.deepEqual(files, ['C:/w/b.png'])
+  // R2-6：sidecar 行带 sourcePath 时出现「源数据」按钮，点击走 openFile
+  const figures2 = { figures: [
+    { kind: 'sidecar', manifest: 'C:/w/a.figview.json', imagePath: null, figureId: 'a',
+      sourcePath: 'C:/w/data.csv', scriptPath: 'C:/w/a.figview-bundle/recipe.py', seq: 5 },
+  ] }
+  const files2 = []
+  const card2 = tail.component({ sessionId: SESSION, seq: 9,
+    turn: { data: { get: k => (k === 'bio-figures' ? figures2 : undefined) } },
+    openFile: p => files2.push(p) })
+  const list2 = card2.children.find(Array.isArray)
+  const btns2 = flatButtons(list2[0])
+  const srcBtn = btns2.find(b => String((b.children || [])[0]).includes('源数据'))
+  const scrBtn = btns2.find(b => String((b.children || [])[0]).includes('脚本'))
+  assert.ok(srcBtn, '源数据按钮存在')
+  assert.ok(scrBtn, '脚本按钮存在')
+  srcBtn.props.onClick()
+  scrBtn.props.onClick()
+  assert.deepEqual(files2, ['C:/w/data.csv', 'C:/w/a.figview-bundle/recipe.py'])
   assert.equal(tail.component({ sessionId: SESSION, turn: { data: { get: () => undefined } } }), null)
 })
 

@@ -357,7 +357,7 @@ def differential_plot(dz_frame: pd.DataFrame | str, *, effect_col: str = 'log2FC
         parser = {'kind': 'dataframe'}
         if isinstance(dz_frame, str):
             from pathlib import Path
-            source = {'kind': 'file', 'label': Path(dz_frame).name,
+            source = {'kind': 'file', 'label': Path(dz_frame).name, 'path': str(dz_frame),
                       'file_sha256': sha256(source_bytes)}
             parser = {'kind': 'pandas.read_csv', 'delimiter': sep, 'encoding': 'utf-8',
                       'options': {'header': 0, 'index_col': None}}

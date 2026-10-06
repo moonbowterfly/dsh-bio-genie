@@ -866,6 +866,13 @@ def _discover_figview_sidecar(path):
         if not ok:
             return candidate, {'available': False, 'reason': 'manifest 存在但结构校验未通过'}
         inspect = (m.get('capabilities') or {}).get('inspect')
+        src = m.get('source') or {}
+        redraw = m.get('redraw') or {}
+        script = redraw.get('script') or {}
+        source_path = src.get('path') if isinstance(src.get('path'), str) and src.get('path') else None
+        script_path = None
+        if isinstance(script.get('path'), str) and script.get('path'):
+            script_path = _os.path.join(_os.path.dirname(_os.path.abspath(candidate)), script['path'])
         return candidate, {
             'available': True,
             'manifest': candidate,
@@ -873,6 +880,8 @@ def _discover_figview_sidecar(path):
             'figure_id': m.get('figure_id'),
             'revision': m.get('revision'),
             'inspect': inspect,
+            'source_path': source_path,
+            'script_path': script_path,
         }
     except Exception as e:
         return candidate, {'available': False, 'reason': f'{type(e).__name__}: {e}'}
