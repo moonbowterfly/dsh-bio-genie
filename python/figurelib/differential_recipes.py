@@ -143,7 +143,7 @@ def differential_plot(dz_frame: pd.DataFrame | str, *, effect_col: str = 'log2FC
                       effect_threshold: float = 1.0, use_padj: bool = True,
                       user_labels: list[str] | None = None, top_k: int = 5,
                       out_file: str | None = None, journal: str = 'nature',
-                      ax=None, legend_loc: str | int = 'outside') -> tuple:
+                      ax=None, legend_loc: str | int = 'outside', viewer=False) -> tuple:
     """差异分析事实图（Volcano 或 MA）。返回 (fig, ax, meta)。
 
     参数：
@@ -158,13 +158,21 @@ def differential_plot(dz_frame: pd.DataFrame | str, *, effect_col: str = 'log2FC
       journal: 'nature' 预设（其余回退 nature 色板并 WARN）
       legend_loc: 默认 'outside'：axes 上方留白区横排，不改变数据区尺寸；
                   可覆盖为 matplotlib 的位置（如 'best' / 'upper right'）。
+      viewer: 显式 True 或配置 dict 才登记 sidecar 绑定；无 out_file 时通过
+              fig.figview_binding 调用 export_bundle。配置键为 figure_id/output_dir。
 
     返回 meta 保留既有键，并增加 layout_audit:[(severity, msg), ...] 和
     layout_suggestions:[str, ...]。出图前自动审计，WARN 不阻断导出。
     """
     if isinstance(dz_frame, str):
         sep = '\t' if dz_frame.endswith(('.tsv', '.txt')) else ','
-        df = pd.read_csv(dz_frame, sep=sep)
+        if viewer is not False and viewer is not None:
+            import io
+            from pathlib import Path
+            source_bytes = Path(dz_frame).read_bytes()
+            df = pd.read_csv(io.BytesIO(source_bytes), sep=sep)
+        else:
+            df = pd.read_csv(dz_frame, sep=sep)
     else:
         df = dz_frame.copy()
     if effect_col not in df.columns:
@@ -210,12 +218,13 @@ def differential_plot(dz_frame: pd.DataFrame | str, *, effect_col: str = 'log2FC
         fig = ax.figure
 
     # Tier C：全 NS 灰背景 + Tier A/B 彩色显著
-    ax.scatter(x, y, s=6, c=SEM_NEUTRAL, alpha=.6, lw=0, label=None)
+    background_artist = ax.scatter(x, y, s=6, c=SEM_NEUTRAL, alpha=.6, lw=0, label=None)
+    down_artist = up_artist = None
     if down_mask.any():
-        ax.scatter(x[down_mask.to_numpy()], y[down_mask.to_numpy()], s=8,
+        down_artist = ax.scatter(x[down_mask.to_numpy()], y[down_mask.to_numpy()], s=8,
                    c=SEM_DOWN, alpha=.9, lw=0, label=f'down ({int(down_mask.sum())})')
     if up_mask.any():
-        ax.scatter(x[up_mask.to_numpy()], y[up_mask.to_numpy()], s=8,
+        up_artist = ax.scatter(x[up_mask.to_numpy()], y[up_mask.to_numpy()], s=8,
                    c=SEM_UP, alpha=.9, lw=0, label=f'up ({int(up_mask.sum())})')
 
     # 阈值线（数据解释结构，进图）
@@ -336,6 +345,49 @@ def differential_plot(dz_frame: pd.DataFrame | str, *, effect_col: str = 'log2FC
         elif severity == 'FAIL':
             suggestions.append('配置可覆盖缺失字形的字体，再运行布局自检。')
     meta['layout_suggestions'] = list(dict.fromkeys(suggestions))
+    viewer_enabled = viewer is not False and viewer is not None
+    if viewer_enabled:
+        if viewer is not True and not isinstance(viewer, dict):
+            raise ValueError('viewer must be False, True or an explicit configuration dict')
+        from figurelib.figview import FigureBinding, sha256
+        options = viewer if isinstance(viewer, dict) else {}
+        if set(options) - {'figure_id', 'output_dir'}:
+            raise ValueError('Unknown viewer options; supported: figure_id, output_dir')
+        source = {'kind': 'dataframe'}
+        parser = {'kind': 'dataframe'}
+        if isinstance(dz_frame, str):
+            from pathlib import Path
+            source = {'kind': 'file', 'label': Path(dz_frame).name,
+                      'file_sha256': sha256(source_bytes)}
+            parser = {'kind': 'pandas.read_csv', 'delimiter': sep, 'encoding': 'utf-8',
+                      'options': {'header': 0, 'index_col': None}}
+        parameters = dict(effect_col=effect_col, p_col=p_col, padj_col=padj_col,
+                          base_mean_col=base_mean_col, label_col=label_col, mode=mode,
+                          alpha=alpha, effect_threshold=effect_threshold, use_padj=use_padj,
+                          user_labels=list(user_labels or []), top_k=top_k,
+                          journal=journal, legend_loc=legend_loc)
+        binding = FigureBinding(fig, df, id_column=label_col if label_col in df else None,
+                                source=source, parser=parser,
+                                lineage={'filters': [], 'sort': [], 'aggregations': []},
+                                redraw={'recipe_id': 'figurelib.differential_plot',
+                                        'script_path': __file__, 'parameters': parameters,
+                                        'seed': None, 'allowed_parameters': ['alpha', 'effect_threshold',
+                                        'top_k', 'user_labels', 'journal', 'legend_loc']},
+                                provenance={'binding': 'explicit', 'mode': mode})
+        for name, artist, mask in [('ns', background_artist, ns_mask),
+                                    ('down', down_artist, down_mask), ('up', up_artist, up_mask)]:
+            if artist is None:
+                continue
+            positions = np.flatnonzero(mask.to_numpy()).tolist()
+            binding.bind_points(artist, series_id=name, row_groups=[[i] for i in positions],
+                                plotted_values=np.column_stack([x[positions], y[positions]]),
+                                point_indices=positions if name == 'ns' else None,
+                                semantics={'classification': name, 'mode': mode,
+                                           'x': effect_col if mode == 'volcano' else f'log10({base_mean_col})',
+                                           'y': f'-log10(clip({sig_basis.split(" <")[0]},1e-300))' if mode == 'volcano' else effect_col,
+                                           'alpha': alpha, 'effect_threshold': effect_threshold,
+                                           'sig_basis': sig_basis})
+        fig.figview_binding = binding
     if out_file:
         from figurelib.export_figure import export_figure
         exported = export_figure(fig, os.path.splitext(out_file)[0],
@@ -343,6 +395,11 @@ def differential_plot(dz_frame: pd.DataFrame | str, *, effect_col: str = 'log2FC
                                  dpi=300)
         meta['exported_files'] = exported
         meta['out_file'] = exported[0] if exported else out_file
+        if viewer_enabled:
+            from figurelib.figview import export_bundle
+            meta['viewer_manifest'] = export_bundle(
+                binding, options.get('output_dir', os.path.splitext(out_file)[0] + '.figview'),
+                figure_id=options.get('figure_id', 'differential-plot'))
         # 审稿人复现代码 bundle（出图即落盘，agent 零操作）
         try:
             import inspect as _inspect

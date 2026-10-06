@@ -120,3 +120,24 @@ scipilot 原版有"渲 PNG → 多模态读图核对"环节。dsh 插件本身**
 - 子图 a/b/c 用 `add_panel_labels`，别手摆 `ax.text`（会错位）。
 - 导出前 `finalize_figure(fig)` 兜底版面；`audit_layout` 只对 Figure 对象有效（落盘文件只能走 bio_fig_export）。
 - bio_fig_export 的 PDF 审计需要 pypdf（不在环境）→ 字体嵌入检查会降级为 INFO 提示，这不是失败；PNG 审计（DPI/尺寸）是完整能力。
+
+## 9. 显式导出 fig-viewer sidecar v1
+
+需要逐点查原始数据时，在仍持有源表和 Figure 的配方调用中 opt-in：
+
+```python
+fig, ax, meta = differential_plot(
+    df, label_col='gene', out_file='figs/volcano.pdf',
+    viewer={'figure_id': 'volcano-001', 'output_dir': 'figs/viewer'})
+manifest_path = meta['viewer_manifest']
+```
+
+无 `out_file` 时，`viewer=True` 只登记 `fig.figview_binding`；完成轴尺度、布局和
+DPI 设置后调用 `figurelib.figview.export_bundle(fig.figview_binding, 'figs/viewer',
+figure_id='volcano-001', dpi=300)`。自定义散点需使用 `FigureBinding` 和
+`bind_points` 显式登记源行组；现有 PNG/PDF 无法补猜出行映射。
+
+源表缺失时仅导出 preview；点数、JSON 或 PNG 超限会拒绝并给出缩减建议。
+交付 manifest 引用，不把全部 rows/hits 塞入会话；sidecar 中的脚本仅供哈希追溯，
+禁止直接执行。合同、校验命令、预算及能力边界见
+[sidecar v1](../fig-viewer-sidecar-v1.md)。原工具 schema 与默认出图返回不变。
