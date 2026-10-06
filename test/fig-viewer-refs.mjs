@@ -980,15 +980,16 @@ await check('R234b dims: illegal renderer object rejected AND error text stays s
 await check('R24 redraw: request text carries ids, patch and the no-source-change requirement', () => {
   const M = plugin.__figureViewerMath
   const m = { figure_id: 'figX', revision: 'abc123',
-    redraw: { recipe_id: 'volcano_r1', parameters: { alpha: 0.05 } },
+    redraw: { recipe_id: 'volcano_r1', allowed_parameters: ['alpha'], parameters: { alpha: 0.05 } },
     source: { snapshot_sha256: 'deadbeef' } }
   const text = M.buildRedrawRequest(m, { alpha: { from: 0.05, to: '0.1' } }, '标题改为Y')
   assert.ok(text.includes('figure_id: figX'))
   assert.ok(text.includes('base_revision: abc123'))
   assert.ok(text.includes('recipe_id: volcano_r1'))
   assert.ok(text.includes('deadbeef'))
-  assert.ok(text.includes('alpha: 0.05 -> 0.1'))
+  assert.ok(text.includes('alpha: 0.05 -> ' + JSON.stringify('0.1')))
   assert.ok(text.includes('备注: 标题改为Y'))
+  assert.ok(text.includes('allowed_parameters: ["alpha"]'), '含白名单审计字段')
   assert.ok(text.includes('新 revision'), '要求以新 revision 导出')
   assert.ok(text.includes('源表/原始行不动'), '声明不改源数据')
 })
@@ -1159,6 +1160,76 @@ await check('R26 viewer: list toggle, source line and copy button present', asyn
   })(tree)
   assert.ok(found.list, '列表按钮在工具栏')
   assert.ok(found.src, '来源行渲染')
+})
+
+// ── R2-4.1：选区折叠 / === true / canRedraw 门 / proto 键 ────────────
+await check('R241 fill: non-collapsed selection folds to its end (never replaces)', () => {
+  const M = plugin.__figureViewerMath
+  const seen = []
+  const actions = {
+    captureInsertion: () => ({ start: 0, end: 5, draftRev: 3 }),
+    insertText: (tx, span) => { seen.push(span); return true },
+    setDraft: () => {},
+  }
+  const r = M.applyRedrawFill(actions, null, 'TXT')
+  assert.equal(r.ok, true)
+  assert.equal(r.mode, 'insert')
+  assert.equal(seen[0].start, 5, '折叠到选区末端')
+  assert.equal(seen[0].end, 5)
+  assert.equal(seen[0].draftRev, 3, 'draftRev 保留')
+  // 折叠光标不动
+  const seen2 = []
+  const a2 = { captureInsertion: () => ({ start: 2, end: 2, draftRev: 8 }),
+    insertText: (tx, span) => { seen2.push(span); return true }, setDraft: () => {} }
+  M.applyRedrawFill(a2, null, 'T')
+  assert.equal(seen2[0].start, 2)
+  // 返回值非严格 true 不算成功（宿主合同）
+  const r3 = M.applyRedrawFill({ captureInsertion: () => ({ start: 0, end: 0, draftRev: 1 }),
+    insertText: () => 1, setDraft: () => {} }, null, 'T')
+  assert.equal(r3.ok, false)
+  assert.equal(r3.reason, 'no-draft-info')
+})
+
+await check('R241 form: request_redraw=false disables fill with reason notice', async () => {
+  const M = plugin.__figureViewerMath
+  const frames = await framesOf(world.providers[0], ADDRESS)
+  const base = frames[0].value
+  const m2 = JSON.parse(JSON.stringify(base.manifest))
+  m2.capabilities.request_redraw = false
+  const v2 = { manifest: m2, rows: base.rows, hits: base.hits, image: base.image }
+  const form = M.RedrawForm({ value: v2, inputActions: null, useInputState: null })
+  const found = { fill: null, notice: false }
+  ;(function walk(n) {
+    if (!n || typeof n !== 'object') return
+    if (Array.isArray(n)) { n.forEach(walk); return }
+    const a = n.props || {}
+    if (a['data-figview'] === 'redraw-fill') found.fill = n
+    if (a['data-figview'] === 'redraw-unavailable') found.notice = true
+    ;(n.children || []).forEach(walk)
+  })(form)
+  assert.ok(found.notice, '不可重绘提示')
+  assert.equal(found.fill.props.disabled, true, '回填按钮禁用')
+})
+
+await check('R241 form: proto keys do not leak inherited values into preview', async () => {
+  const M = plugin.__figureViewerMath
+  const frames = await framesOf(world.providers[0], ADDRESS)
+  const base = frames[0].value
+  const m3 = JSON.parse(JSON.stringify(base.manifest))
+  m3.redraw.allowed_parameters = ['constructor']
+  const v3 = { manifest: m3, rows: base.rows, hits: base.hits, image: base.image }
+  const form = M.RedrawForm({ value: v3, inputActions: null, useInputState: null })
+  let preview = null
+  ;(function walk(n) {
+    if (!n || typeof n !== 'object') return
+    if (Array.isArray(n)) { n.forEach(walk); return }
+    const a = n.props || {}
+    if (a['data-figview'] === 'redraw-preview') preview = n
+    ;(n.children || []).forEach(walk)
+  })(form)
+  assert.ok(preview, '预览存在')
+  const text = JSON.stringify(preview.children || [])
+  assert.ok(!text.includes('function Object'), '不泄漏继承值')
 })
 
 // ── tab / 卡片 / 查看器 ─────────────────────────────────────────────────
