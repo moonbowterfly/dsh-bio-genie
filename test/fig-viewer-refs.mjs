@@ -1328,6 +1328,22 @@ await check('R261 chain: viewer source/script paths flow from tool event to card
   assert.equal(st2.figures[0].sourcePath, 'C:/w/r.csv', '后续 update 补全来源元数据')
 })
 
+await check('R263 rows: full match reachable (601 rows, no truncation)', () => {
+  const M = plugin.__figureViewerMath
+  const rowsTable = { rows: [] }
+  const ids = []
+  for (let i = 0; i < 601; i++) { const rid = 'r' + i; rowsTable.rows.push({ row_id: rid, values: { x: i } }); ids.push(rid) }
+  const matched = M.matchRowsByIds(rowsTable, ids)
+  assert.equal(matched.length, 601, '601 行全量匹配')
+  assert.equal(matched[600].row_id, 'r600', '末行可达')
+  // 乱序 ids 也全量
+  const shuffled = ids.slice().reverse()
+  assert.equal(M.matchRowsByIds(rowsTable, shuffled).length, 601)
+  // 空/非法输入
+  assert.equal(M.matchRowsByIds(null, ids).length, 0)
+  assert.equal(M.matchRowsByIds(rowsTable, null).length, 0)
+})
+
 // ── tab / 卡片 / 查看器 ─────────────────────────────────────────────────
 await check('tab claims only well-formed bio-figure session addresses; title derives from stem', () => {
   const tab = world.tabs[0]
