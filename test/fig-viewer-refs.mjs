@@ -1083,12 +1083,15 @@ await check('R26 edit: buildEditRequest carries ids, edits and audit requirement
     source: { kind: 'file', label: 'data.csv', path: 'C:/w/data.csv', file_sha256: 'f'.repeat(64) } }
   const text = M.buildEditRequest(m,
     { deletes: ['r1:0'], sets: [{ row_id: 'r2:0', column: 'pvalue', from: 0.2, to: '0.05' }] },
-    '剔除离群点')
+    '剔除离群点',
+    [{ name: 'pvalue', type: 'number' }])
   assert.ok(text.includes('figure_id: figX'))
   assert.ok(text.includes('base_revision: abc123'))
   assert.ok(text.includes('source_path: C:/w/data.csv'))
   assert.ok(text.includes('删除行 r1:0'))
-  assert.ok(text.includes('修改行 r2:0 的 pvalue: 0.2 -> 0.05'))
+  assert.ok(text.includes('修改行 r2:0 的 pvalue [type=number]: 0.2 -> ' + JSON.stringify('0.05')))
+  assert.ok(text.includes('source_file_sha256: ' + 'f'.repeat(64)))
+  assert.ok(text.includes('parent_revision=base_revision'))
   assert.ok(text.includes('备注: 剔除离群点'))
   assert.ok(text.includes('审计'), '要求保留审计')
 })
@@ -1241,6 +1244,88 @@ await check('R241b: explicit null from stays literal; missing from shows placeho
   const t2 = M.buildRedrawRequest(m, { b: { from: undefined, to: 'Z' } })
   assert.ok(t2.includes('b: (当前值) -> ' + JSON.stringify('Z')), '未提供显示当前值占位')
   assert.ok(!t2.includes('b: null'), '不把未提供写成 null')
+})
+
+await check('R261 list: pager reaches element 301; row cap raised to 500', () => {
+  const M = plugin.__figureViewerMath
+  const els = []
+  for (let i = 0; i < 301; i++) els.push({ element_id: 'ns:' + (1000 + i), kind: 'point', row_ids: [], geometry: { center: [0, 0], radius: 0 } })
+  els.push({ element_id: 'ns:1', kind: 'point', row_ids: [], geometry: { center: [0, 0], radius: 0 } })
+  const hits = { elements: els }
+  // 第 1 页：300 行 + 分页器
+  const p0 = M.ElementsPanel({ hits, sel: null, page: 0, onPage: () => {}, onPick: () => {} })
+  let pager = null
+  let rowCount = 0
+  ;(function walk(n) {
+    if (!n || typeof n !== 'object') return
+    if (Array.isArray(n)) { n.forEach(walk); return }
+    const a = n.props || {}
+    if (a['data-figview'] === 'elements-pager') pager = n
+    if (a['data-figview'] === 'element-row') rowCount += 1
+    ;(n.children || []).forEach(walk)
+  })(p0)
+  assert.equal(rowCount, 300, '第 1 页 300 行')
+  assert.ok(pager, '分页器（当 >300 时）')
+  // 第 2 页：最后 2 个元素可达（含第 301 个）
+  const p1 = M.ElementsPanel({ hits, sel: null, page: 1, onPage: () => {}, onPick: () => {} })
+  const texts = []
+  ;(function walk(n) {
+    if (!n || typeof n !== 'object') return
+    if (Array.isArray(n)) { n.forEach(walk); return }
+    if ((n.props || {})['data-figview'] === 'element-row') texts.push(JSON.stringify(n.children || []))
+    ;(n.children || []).forEach(walk)
+  })(p1)
+  assert.ok(texts.some(x => x.includes('ns:1 ·')), '第 301 个元素在第 2 页可达（精确行标记）')
+  assert.ok(!texts.some(x => x.includes('ns:1000 ·')), '第 2 页不含第 1 页元素')
+})
+
+await check('R261 chain: viewer source/script paths flow from tool event to card buttons', () => {
+  const tail = world.entries.find(({ entry }) => entry.name === 'conversation.chat.turnTail')
+  const event = {
+    type: 'tool/result', seq: 60, data: { turn: 6, step: 1, message: { role: 'tool', isError: false,
+      source: { kind: 'tool', callId: 'call-x' },
+      content: [{ type: 'text', text: JSON.stringify({ count: 1, results: [{
+        path: 'C:/w/recipe.png', verdict: 'PASS',
+        viewer: { available: true, manifest: 'C:/w/recipe/abc/recipe.figview.json', figure_id: 'recipe',
+          source_path: 'C:/w/data.csv', script_path: 'C:/w/recipe/abc/recipe.py' },
+      }] }) }] } },
+  }
+  let st = def.start({}, { event: { data: { turn: 6 } } })
+  st = def.update({ state: st }, { event, seq: 60 })
+  assert.equal(st.figures[0].sourcePath, 'C:/w/data.csv')
+  assert.equal(st.figures[0].scriptPath, 'C:/w/recipe/abc/recipe.py')
+  const loc = def.buildLocationData({ state: st }, 'turn', null)
+  const files = []
+  const card = tail.component({ sessionId: SESSION, seq: 60,
+    turn: { data: { get: k => (k === 'bio-figures' ? loc.value : undefined) } },
+    openFile: p2 => files.push(p2) })
+  const list = card.children.find(Array.isArray)
+  const btns = []
+  ;(function walk(n) {
+    if (Array.isArray(n)) { n.forEach(walk); return }
+    if (n && typeof n === 'object') {
+      if (n.type === 'button') btns.push(n)
+      ;(n.children || []).forEach(walk)
+    }
+  })(list[0])
+  const srcBtn = btns.find(b => String((b.children || [])[0]).includes('源数据'))
+  const scrBtn = btns.find(b => String((b.children || [])[0]).includes('脚本'))
+  assert.ok(srcBtn && scrBtn, '链末端按钮存在（事件驱动，非手工构造）')
+  srcBtn.props.onClick()
+  scrBtn.props.onClick()
+  assert.deepEqual(files, ['C:/w/data.csv', 'C:/w/recipe/abc/recipe.py'])
+  // 后续 update 补全来源元数据（同 ref）
+  let st2 = def.start({}, { event: { data: { turn: 7 } } })
+  const evNoSrc = { type: 'tool/result', seq: 61, data: { turn: 7, step: 1, message: { role: 'tool', isError: false,
+    content: [{ type: 'text', text: JSON.stringify({ count: 1, results: [{ path: 'C:/w/r.png', verdict: 'PASS',
+      viewer: { available: true, manifest: 'C:/w/r/abc/r.figview.json', figure_id: 'r' } }] }) }] } } }
+  st2 = def.update({ state: st2 }, { event: evNoSrc, seq: 61 })
+  assert.equal(st2.figures[0].sourcePath, null)
+  const evSrc = { type: 'tool/result', seq: 62, data: { turn: 7, step: 2, message: { role: 'tool', isError: false,
+    content: [{ type: 'text', text: JSON.stringify({ count: 1, results: [{ path: 'C:/w/r.png', verdict: 'PASS',
+      viewer: { available: true, manifest: 'C:/w/r/abc/r.figview.json', figure_id: 'r', source_path: 'C:/w/r.csv' } }] }) }] } } }
+  st2 = def.update({ state: st2 }, { event: evSrc, seq: 62 })
+  assert.equal(st2.figures[0].sourcePath, 'C:/w/r.csv', '后续 update 补全来源元数据')
 })
 
 // ── tab / 卡片 / 查看器 ─────────────────────────────────────────────────
