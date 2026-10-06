@@ -17,6 +17,7 @@ const bundle = {
   'recipe.figview.json': readFileSync(new URL('recipe.figview.json', bundleDir)),
   'recipe.rows.json': readFileSync(new URL('recipe.rows.json', bundleDir)),
   'recipe.hits.json': readFileSync(new URL('recipe.hits.json', bundleDir)),
+  'recipe.png': readFileSync(new URL('recipe.png', bundleDir)),
 }
 const manifestObj = JSON.parse(bundle['recipe.figview.json'].toString('utf8'))
 const REV = manifestObj.revision
@@ -74,12 +75,19 @@ async function check(name, body) { await body(); count++; console.log(`PASS ${na
 function load(href) {
   let plugin
   vm.runInNewContext(source, {
-    URL, atob, TextDecoder, TextEncoder, console, crypto: webcrypto,
+    URL, atob, btoa, TextDecoder, TextEncoder, console, crypto: webcrypto,
     window: { location: { href }, __ModuleLoader__: { load({ id, factory }) {
       assert.equal(id, '@dsh-bio/dsh-bio-genie')
       plugin = factory(name => {
         assert.equal(name, 'react')
-        return { createElement: (type, props, ...children) => ({ type, props, children }) }
+        return {
+          createElement: (type, props, ...children) => ({ type, props, children }),
+          useState: v => [typeof v === 'function' ? v() : v, () => {}],
+          useEffect: () => {},
+          useRef: () => ({ current: null }),
+          useMemo: f => f(),
+          useCallback: f => f,
+        }
       })
     } } },
   })
@@ -250,8 +258,10 @@ await check('provider reads manifest/rows/hits, verifies sha256 and content dige
   assert.equal(v.manifest.figure_id, 'recipe')
   assert.equal(v.rows.rows.length, 9)
   assert.equal(v.hits.elements.length, 9)
+  assert.ok(v.image && typeof v.image.dataBase64 === 'string' && v.image.dataBase64.indexOf('iVBOR') === 0,
+    'PNG 图片应内嵌（base64）')
   assert.deepEqual(world.readCalls.map(c => c.path.split('/').pop()),
-    ['recipe.figview.json', 'recipe.rows.json', 'recipe.hits.json'])
+    ['recipe.figview.json', 'recipe.rows.json', 'recipe.hits.json', 'recipe.png'])
   assert.ok(world.readCalls[1].options.range, '有界读取应通过 range 段读实现')
 })
 
@@ -477,7 +487,7 @@ await check('renderer guard: malformed value renders without throwing', async ()
     rows: { schema_version: 1, columns: [], rows: {} }, hits: null }
   const rendered = body.component({ useTabInfo: () => ({ tab: { contentId: 'x' } }),
     useResource: () => ({ status: 'live', value: weird }) })
-  assert.equal(rendered.props['data-figview'], 'pane-v1')
+  assert.equal(rendered.props['data-figview'], 'pane-v2')
 })
 
 await check('unsupported address and pre-aborted signal produce the right outcomes', async () => {
@@ -656,6 +666,49 @@ await check('R224 host eof is required; UNC case-insensitive placement accepted'
   assert.ok(f2[0].ok, f2[0].error && f2[0].error.message)
 })
 
+// ── R2-3：画布变换与命中数学 ────────────────────────────────────────
+await check('R23 math: fit / center / zoom-anchor invariance / inverse roundtrip / clamp', () => {
+  const M = plugin.__figureViewerMath
+  assert.ok(M, '数学钩子应已暴露')
+  const f = M.fitView(1000, 500, 500, 500)
+  assert.ok(Math.abs(f.scale - 0.49) < 1e-12)
+  assert.ok(Math.abs(f.tx - 5) < 1e-12)
+  assert.ok(Math.abs(f.ty - 127.5) < 1e-12)
+  const one = M.viewAtScale(1000, 500, 500, 500, 1)
+  assert.ok(Math.abs(one.tx + 250) < 1e-12 && Math.abs(one.ty) < 1e-12)
+  const v0 = { scale: 0.5, tx: 10, ty: 20 }
+  const z = M.zoomAt(v0, 1.5, 123, 45)
+  const before = M.toImageCoords(v0, 123, 45)
+  const after = M.toImageCoords(z, 123, 45)
+  assert.ok(Math.abs(before.u - after.u) < 1e-9 && Math.abs(before.v - after.v) < 1e-9, '缩放锚点处的图像坐标应不变')
+  const p = M.toImageCoords(z, 200, 100)
+  assert.ok(Math.abs(p.u * z.scale + z.tx - 200) < 1e-9)
+  assert.ok(Math.abs(p.v * z.scale + z.ty - 100) < 1e-9)
+  assert.equal(M.zoomAt({ scale: 50, tx: 0, ty: 0 }, 2, 5, 5).scale, 64)
+})
+
+await check('R23 math: hit test radius (css 8px at scale) / ordering / zorder tie / junk skip', () => {
+  const M = plugin.__figureViewerMath
+  const els = [
+    { element_id: 'a', zorder: 5, geometry: { kind: 'point', center: [100, 100], radius: 3 } },
+    { element_id: 'b', zorder: 1, geometry: { kind: 'point', center: [104, 100], radius: 3 } },
+    { element_id: 'c', zorder: 9, geometry: { kind: 'point', center: [500, 500], radius: 3 } },
+  ]
+  const hit = M.hitTestElements(els, 105.5, 100, 8, 2)
+  assert.equal(hit.length, 2)
+  assert.equal(hit[0].el.element_id, 'b')
+  assert.equal(hit[1].el.element_id, 'a')
+  const lone = [els[0]]
+  assert.equal(M.hitTestElements(lone, 107.6, 100, 8, 2).length, 0, '半径边界外应不命中')
+  assert.equal(M.hitTestElements(lone, 106.9, 100, 8, 2).length, 1, '半径边界内应命中')
+  const tie = [
+    { element_id: 'lo', zorder: 1, geometry: { center: [10, 10], radius: 0 } },
+    { element_id: 'hi', zorder: 7, geometry: { center: [10, 10], radius: 0 } },
+  ]
+  assert.equal(M.hitTestElements(tie, 10, 10, 8, 1)[0].el.element_id, 'hi')
+  assert.equal(M.hitTestElements([{ element_id: 'x' }, null], 0, 0, 8, 1).length, 0)
+})
+
 // ── tab / 卡片 / 查看器 ─────────────────────────────────────────────────
 await check('tab claims only well-formed bio-figure session addresses; title derives from stem', () => {
   const tab = world.tabs[0]
@@ -690,7 +743,7 @@ await check('viewer tab renders summary + preview payload and handles failure fr
   const body = world.entries.find(({ entry }) => entry.name === 'sidebar.right.pane.tab')
   const frames = await framesOf(world.providers[0], ADDRESS)
   const ok = body.component({ useTabInfo: () => ({ tab: { contentId: ADDRESS } }), useResource: () => ({ status: 'live', value: frames[0].value }) })
-  assert.equal(ok.props['data-figview'], 'pane-v1')
+  assert.equal(ok.props['data-figview'], 'pane-v2')
   const err = body.component({ useTabInfo: () => ({ tab: { contentId: ADDRESS } }), useResource: () => ({ status: 'failed', failure: { code: 'x', message: 'boom' } }) })
   assert.equal(err.props['data-figview'], 'pane-error')
 })
