@@ -127,7 +127,10 @@ def export_figure(
     try:
         from .origin import write_origin
         for p2 in list(saved):
-            if p2.lower().endswith('.png'):
+            norm = p2.replace(chr(92), '/')
+            # 跳过 fig-viewer bundle 的 staging 目录（.pending-*）：其中文件集由
+            # bundle 协议管理，写入额外文件会破坏其自校验/审核。
+            if p2.lower().endswith('.png') and '/.pending-' not in norm:
                 write_origin(p2)
     except Exception:
         pass

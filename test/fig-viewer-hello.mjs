@@ -50,8 +50,8 @@ check('adapter rejects a missing or incompatible service before registering', ()
   assert.equal(broken.entries.length + broken.tabs.length + broken.providers.length, 0)
 })
 const tail = probe.entries.find(({entry}) => entry.name === 'conversation.chat.turnTail')
-const body = probe.entries.find(({entry}) => entry.name === 'sidebar.right.pane.tab')
-const tab = probe.tabs[0]
+const body = probe.entries.find(({entry}) => entry.name === 'sidebar.right.pane.tab' && entry.key === 'bio-figure-viewer')
+const tab = probe.tabs.find(x => x.id === 'bio-figure-viewer')
 check('sidebar body is selected by definition id, independently of kind', () => {
   assert.equal(body.entry.key, tab.id)
   assert.notEqual(tab.id, tab.kind)

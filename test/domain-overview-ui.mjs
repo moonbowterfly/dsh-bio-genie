@@ -23,6 +23,7 @@ const responses = {
   '/metabolic?probe=install': { ok: true, value: { installed: false } },
   '/editing?probe=install': { ok: true, value: { installed: false } },
   '/protein?probe=install': { ok: true, value: { installed: false } },
+  '/figorigin': { ok: true, value: { mode: 'auto', configPath: 'C:/x/config.json' } },
   '/domain-overview': {
     ok: true,
     value: {
@@ -63,7 +64,7 @@ runInNewContext(readFileSync(new URL('../lib/client.js', import.meta.url), 'utf8
 let section
 plugin.apply({ slots: {
   inject(_name, register) { register() },
-  register(_entry, component) { section = component },
+  register(entry, component) { if (entry && entry.name === 'settings.section') section = component },
 } })
 assert.equal(typeof section, 'function')
 

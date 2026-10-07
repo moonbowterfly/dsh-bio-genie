@@ -1387,7 +1387,7 @@ await check('R27 figorigin: card exposes origin button for sidecar and preview f
 
 // ── tab / 卡片 / 查看器 ─────────────────────────────────────────────────
 await check('tab claims only well-formed bio-figure session addresses; title derives from stem', () => {
-  const tab = world.tabs[0]
+  const tab = world.tabs.find(x => x.id === 'bio-figure-viewer')
   assert.ok(tab.canOpen(ADDRESS))
   assert.ok(!tab.canOpen('dsh-resource://file/session/s1/plot.png'))
   assert.ok(!tab.canOpen('dsh-resource://bio-figure/absolute/x'))
