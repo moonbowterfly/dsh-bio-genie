@@ -122,6 +122,15 @@ def export_figure(
         gray_path = _grayscale_from(fig, basename, dpi=dpi)
         if gray_path:
             saved.append(gray_path)
+    # figorigin：开关开启时为每张 PNG 写来源侧车（默认 auto；off 关闭）。
+    # 一切图（含发育树/示意图）由此获得「可查来源」能力；失败不影响导出。
+    try:
+        from .origin import write_origin
+        for p2 in list(saved):
+            if p2.lower().endswith('.png'):
+                write_origin(p2)
+    except Exception:
+        pass
     return saved
 
 

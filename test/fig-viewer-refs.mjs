@@ -159,14 +159,16 @@ async function framesOf(provider, address, signal) {
 const plugin = load('http://localhost/')
 const world = makeContext()
 plugin.apply(world.ctx)
-await check('production viewer installs: definition + provider + tab + two slots (+ settings section)', () => {
+await check('production viewer installs: definition + providers + tabs + two slots (+ settings section)', () => {
   assert.deepEqual(world.definitions.map(d => d.kind), ['bio-figures'])
-  assert.equal(world.providers.length, 1)
-  assert.equal(world.providers[0].protocol, 'bio-figure')
-  assert.equal(world.tabs.length, 1)
-  assert.equal(world.tabs[0].id, 'bio-figure-viewer')
-  assert.deepEqual(world.entries.map(({ entry }) => entry.name).sort(),
-    ['conversation.chat.turnTail', 'settings.section', 'sidebar.right.pane.tab'])
+  assert.ok(world.providers.some(p => p.protocol === 'bio-figure'), 'figure provider')
+  assert.ok(world.providers.some(p => p.protocol === 'figorigin'), 'figorigin provider')
+  assert.ok(world.tabs.some(x => x.id === 'bio-figure-viewer'), 'figure tab')
+  assert.ok(world.tabs.some(x => x.id === 'figorigin-viewer'), 'figorigin tab')
+  const names = world.entries.map(({ entry }) => entry.name)
+  assert.ok(names.includes('conversation.chat.turnTail'))
+  assert.ok(names.includes('settings.section'))
+  assert.equal(names.filter(n => n === 'sidebar.right.pane.tab').length, 2, 'figure + figorigin 两个 pane.tab')
 })
 
 await check('missing remote service degrades silently (no throw, no viewer registrations)', () => {
@@ -489,7 +491,7 @@ await check('mid-read abort stops further IO and emits no success frame', async 
 })
 
 await check('renderer guard: malformed value renders without throwing', async () => {
-  const body = world.entries.find(({ entry }) => entry.name === 'sidebar.right.pane.tab')
+  const body = world.entries.find(({ entry }) => entry.name === 'sidebar.right.pane.tab' && entry.key === 'bio-figure-viewer')
   const weird = { manifest: { figure_id: 'w', revision: 'r', capabilities: {} },
     rows: { schema_version: 1, columns: [], rows: {} }, hits: null }
   const rendered = body.component({ useTabInfo: () => ({ tab: { contentId: 'x' } }),
@@ -758,7 +760,7 @@ await check('R231 zoom: shrink never increases scale below fit floor', () => {
 })
 
 await check('R231 fallback: omitted image renders row browser instead of canvas', async () => {
-  const body = world.entries.find(({ entry }) => entry.name === 'sidebar.right.pane.tab')
+  const body = world.entries.find(({ entry }) => entry.name === 'sidebar.right.pane.tab' && entry.key === 'bio-figure-viewer')
   const frames = await framesOf(world.providers[0], ADDRESS)
   const noImg = { manifest: frames[0].value.manifest, rows: frames[0].value.rows, hits: frames[0].value.hits,
     image: { omitted: true, reason: 'missing' } }
@@ -780,7 +782,7 @@ await check('R231 fallback: omitted image renders row browser instead of canvas'
 
 // ── R2-3.2：分页 / 平局 point_order / 稳定地板 / clip 数值防护 ────────
 await check('R232 pager: 60-row fallback shows page 1 of 2 with prev/next controls', async () => {
-  const body = world.entries.find(({ entry }) => entry.name === 'sidebar.right.pane.tab')
+  const body = world.entries.find(({ entry }) => entry.name === 'sidebar.right.pane.tab' && entry.key === 'bio-figure-viewer')
   const rows60 = { schema_version: 1, columns: [{ name: 'gene', type: 'string', unit: null, precision: 'p', dtype: 'object' }], rows: [] }
   for (let i = 0; i < 60; i++) rows60.rows.push({ row_id: 'r' + i, values: { gene: 'g' + i } })
   const value = { manifest: manifestObj, rows: rows60, hits: null, image: { omitted: true, reason: 'test' } }
@@ -840,7 +842,7 @@ await check('R232 hit: malformed clip never throws (element skipped)', () => {
 
 // ── R2-3.3：renderer 必填（onLoad 注入）/ 清理 effect 依赖就绪 ────────
 await check('R233 dims: renderer size required — missing/string rejected at load', async () => {
-  const body = world.entries.find(({ entry }) => entry.name === 'sidebar.right.pane.tab')
+  const body = world.entries.find(({ entry }) => entry.name === 'sidebar.right.pane.tab' && entry.key === 'bio-figure-viewer')
   const frames = await framesOf(world.providers[0], ADDRESS)
   const base = frames[0].value
   const mw = base.manifest.image.width
@@ -872,7 +874,7 @@ await check('R233 dims: renderer size required — missing/string rejected at lo
 })
 
 await check('R233 lifecycle: cleanup effect deps ready at render (boolean + status)', async () => {
-  const body = world.entries.find(({ entry }) => entry.name === 'sidebar.right.pane.tab')
+  const body = world.entries.find(({ entry }) => entry.name === 'sidebar.right.pane.tab' && entry.key === 'bio-figure-viewer')
   const frames = await framesOf(world.providers[0], ADDRESS)
   const v = frames[0].value
   const b1 = testHooks.effects.length
@@ -891,7 +893,7 @@ await check('R233 lifecycle: cleanup effect deps ready at render (boolean + stat
 })
 
 await check('R233b cleanup: effect body clears selection when image absent, keeps it otherwise', async () => {
-  const body = world.entries.find(({ entry }) => entry.name === 'sidebar.right.pane.tab')
+  const body = world.entries.find(({ entry }) => entry.name === 'sidebar.right.pane.tab' && entry.key === 'bio-figure-viewer')
   const frames = await framesOf(world.providers[0], ADDRESS)
   const v = frames[0].value
   // omitted 态：清理 effect 提交 → setSel(null)
@@ -918,7 +920,7 @@ await check('R233b cleanup: effect body clears selection when image absent, keep
 })
 
 await check('R232b pager: next button invokes page advance with correct argument', async () => {
-  const body = world.entries.find(({ entry }) => entry.name === 'sidebar.right.pane.tab')
+  const body = world.entries.find(({ entry }) => entry.name === 'sidebar.right.pane.tab' && entry.key === 'bio-figure-viewer')
   const rows60 = { schema_version: 1, columns: [{ name: 'gene', type: 'string' }], rows: [] }
   for (let i = 0; i < 60; i++) rows60.rows.push({ row_id: 'r' + i, values: { gene: 'g' + i } })
   const value = { manifest: manifestObj, rows: rows60, hits: null, image: { omitted: true, reason: 'test' } }
@@ -946,7 +948,7 @@ await check('R232b pager: next button invokes page advance with correct argument
 })
 
 await check('R234b dims: illegal renderer object rejected AND error text stays string-safe', async () => {
-  const body = world.entries.find(({ entry }) => entry.name === 'sidebar.right.pane.tab')
+  const body = world.entries.find(({ entry }) => entry.name === 'sidebar.right.pane.tab' && entry.key === 'bio-figure-viewer')
   const frames = await framesOf(world.providers[0], ADDRESS)
   const base = frames[0].value
   const mw = base.manifest.image.width
@@ -1060,7 +1062,7 @@ await check('R24 redraw: form renders whitelist params, buttons, preview; fill b
 })
 
 await check('R24 redraw: viewer tab exposes the redraw toggle', async () => {
-  const body = world.entries.find(({ entry }) => entry.name === 'sidebar.right.pane.tab')
+  const body = world.entries.find(({ entry }) => entry.name === 'sidebar.right.pane.tab' && entry.key === 'bio-figure-viewer')
   const frames = await framesOf(world.providers[0], ADDRESS)
   const tree = body.component({ useTabInfo: () => ({ tab: { contentId: 'x' } }),
     useResource: () => ({ status: 'live', value: frames[0].value }) })
@@ -1148,7 +1150,7 @@ await check('R26 list: ElementsPanel renders rows and picks by click', () => {
 })
 
 await check('R26 viewer: list toggle, source line and copy button present', async () => {
-  const body = world.entries.find(({ entry }) => entry.name === 'sidebar.right.pane.tab')
+  const body = world.entries.find(({ entry }) => entry.name === 'sidebar.right.pane.tab' && entry.key === 'bio-figure-viewer')
   const frames = await framesOf(world.providers[0], ADDRESS)
   const tree = body.component({ useTabInfo: () => ({ tab: { contentId: 'x' } }),
     useResource: () => ({ status: 'live', value: frames[0].value }) })
@@ -1344,6 +1346,45 @@ await check('R263 rows: full match reachable (601 rows, no truncation)', () => {
   assert.equal(M.matchRowsByIds(rowsTable, null).length, 0)
 })
 
+await check('R27 figorigin: address codec roundtrip and origin path derivation', () => {
+  const M = plugin.__figureViewerMath
+  const addr = M.encodeOriginAddress('s-1', 'C:/w/a.figorigin.json')
+  assert.ok(addr.startsWith('dsh-resource://figorigin/session/'))
+  const back = M.decodeOriginAddress(addr)
+  assert.equal(back.sessionId, 's-1')
+  assert.equal(back.originPath, 'C:/w/a.figorigin.json')
+  assert.equal(M.decodeOriginAddress('dsh-resource://bio-figure/session/x/y'), null)
+  assert.equal(M.decodeOriginAddress('nonsense'), null)
+  // 路径推导
+  assert.equal(M.originPathOf('C:/w/recipe.figview.json'), 'C:/w/recipe.figorigin.json')
+  assert.equal(M.originPathOf('C:/w/tree.png'), 'C:/w/tree.figorigin.json')
+  assert.equal(M.originPathOf('C:/w/tree.pdf'), 'C:/w/tree.figorigin.json')
+  assert.equal(M.originPathOf(''), null)
+})
+
+await check('R27 figorigin: card exposes origin button for sidecar and preview figures', () => {
+  const tail = world.entries.find(({ entry }) => entry.name === 'conversation.chat.turnTail')
+  const figures = { figures: [
+    { kind: 'sidecar', manifest: 'C:/w/a.figview.json', imagePath: null, figureId: 'a', seq: 1 },
+    { kind: 'preview', imagePath: 'C:/w/b.png', manifest: null, figureId: null, name: null, seq: 2 },
+  ] }
+  const props = { sessionId: SESSION, seq: 9, turn: { data: { get: k => (k === 'bio-figures' ? figures : undefined) } }, openFile: () => {} }
+  const card = tail.component(props)
+  const btns = []
+  ;(function walk(n) {
+    if (Array.isArray(n)) { n.forEach(walk); return }
+    if (n && typeof n === 'object') {
+      if (n.type === 'button' && (n.props || {})['data-figview'] === 'origin-btn') btns.push(n)
+      ;(n.children || []).forEach(walk)
+    }
+  })(card)
+  assert.equal(btns.length, 2, 'sidecar 与 preview 均带「来源」按钮')
+  const prevOpened = world.opened.length
+  btns[1].props.onClick()
+  assert.equal(world.opened.length, prevOpened + 1, '点击打开 figorigin 资源')
+  assert.ok(String(world.opened[world.opened.length - 1]).indexOf('figorigin') !== -1)
+})
+
 // ── tab / 卡片 / 查看器 ─────────────────────────────────────────────────
 await check('tab claims only well-formed bio-figure session addresses; title derives from stem', () => {
   const tab = world.tabs[0]
@@ -1378,8 +1419,9 @@ await check('figure card renders rows and opens sidecar via encoded address / pr
   }
   const buttons = list.map(flatButtons)
   assert.ok(buttons[0].length >= 1 && buttons[1].length >= 1)
+  const baseOpened = world.opened.length
   buttons[0][0].props.onClick()
-  assert.equal(world.opened.length, 1)
+  assert.equal(world.opened.length, baseOpened + 1)
   buttons[1][0].props.onClick()
   assert.deepEqual(files, ['C:/w/b.png'])
   // R2-6：sidecar 行带 sourcePath 时出现「源数据」按钮，点击走 openFile
@@ -1404,7 +1446,7 @@ await check('figure card renders rows and opens sidecar via encoded address / pr
 })
 
 await check('viewer tab renders summary + preview payload and handles failure frame', async () => {
-  const body = world.entries.find(({ entry }) => entry.name === 'sidebar.right.pane.tab')
+  const body = world.entries.find(({ entry }) => entry.name === 'sidebar.right.pane.tab' && entry.key === 'bio-figure-viewer')
   const frames = await framesOf(world.providers[0], ADDRESS)
   const ok = body.component({ useTabInfo: () => ({ tab: { contentId: ADDRESS } }), useResource: () => ({ status: 'live', value: frames[0].value }) })
   assert.equal(ok.props['data-figview'], 'pane-v2')

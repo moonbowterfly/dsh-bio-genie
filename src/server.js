@@ -729,6 +729,57 @@ export async function handleEditing(req, res) {
 }
 
 /** galatea 数据根（~/.dsh/dsh-bio-galatea，受 DSH_HOME 影响）。 */
+/** genie 数据根：<DSH_HOME>/dsh-bio-genie */
+function genieDataRoot() {
+  const dshHome = process.env.DSH_HOME ?? pathJoin(os.homedir(), '.dsh')
+  return pathJoin(dshHome, 'dsh-bio-genie')
+}
+
+/**
+ * fig-viewer 图来源记录开关端点：
+ * GET  → { ok, value: { mode, configPath } }（mode: 'auto' | 'off'，默认 auto）
+ * POST { mode } → 原子写入 config.json 的 figorigin 字段。
+ */
+async function handleFigorigin(req, res) {
+  const dirRoot = genieDataRoot()
+  const cfgPath = pathJoin(dirRoot, 'config.json')
+  if (req.method === 'GET') {
+    let mode = 'auto'
+    try {
+      const cfg = JSON.parse(readFileSync(cfgPath, 'utf8'))
+      if (cfg && cfg.figorigin === 'off') mode = 'off'
+    } catch { /* 缺省 auto */ }
+    return writeJson(res, 200, { ok: true, value: { mode, configPath: cfgPath } })
+  }
+  const body = req.body ?? {}
+  const mode = typeof body.mode === 'string' ? body.mode.trim() : ''
+  if (mode !== 'auto' && mode !== 'off') {
+    return writeJson(res, 400, { ok: false, code: 'invalid-mode', message: "mode 仅支持 'auto' / 'off'。" })
+  }
+  let cfg = {}
+  try {
+    if (existsSync(cfgPath)) {
+      const parsed = JSON.parse(readFileSync(cfgPath, 'utf8'))
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) cfg = parsed
+    }
+  } catch { cfg = {} }
+  cfg.figorigin = mode
+  try {
+    mkdirSync(dirRoot, { recursive: true })
+    const tmp = cfgPath + '.' + Date.now() + '.tmp'
+    try {
+      writeFileSync(tmp, JSON.stringify(cfg, null, 2) + String.fromCharCode(10), 'utf8')
+      renameSync(tmp, cfgPath)
+    } catch (err) {
+      try { rmSync(tmp, { force: true }) } catch { /* ignore */ }
+      throw err
+    }
+  } catch (err) {
+    return writeJson(res, 500, { ok: false, code: 'write-failed', message: '写入配置失败：' + (err && err.message ? err.message : String(err)) })
+  }
+  return writeJson(res, 200, { ok: true, value: { mode } })
+}
+
 function galateaDataRoot() {
   const dshHome = process.env.DSH_HOME ?? pathJoin(os.homedir(), '.dsh')
   return pathJoin(dshHome, 'dsh-bio-galatea')
@@ -971,6 +1022,7 @@ export function registerApiRoutes(ctx, config = {}) {
     { kind: 'exact', path: `${ROUTE_PREFIX}/protein`,         handler: guard((req, res) => handleGalatea(req, res, config)) },
     // galatea 模型目录管理（读写 <DSH_HOME>/dsh-bio-galatea/config.json 的 modelsDir）
     { kind: 'exact', path: `${ROUTE_PREFIX}/galatea-models`,  handler: guard((req, res) => handleGalateaModels(req, res, config)) },
+    { kind: 'exact', path: `${ROUTE_PREFIX}/figorigin`,  handler: guard((req, res) => handleFigorigin(req, res)) },
   ]) {
     disposers.push(ctx.webServer.register(route))
   }

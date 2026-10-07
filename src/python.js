@@ -10,9 +10,22 @@
  * @module dsh-bio-genie/python
  */
 import { spawn } from 'node:child_process'
+import { readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { join } from 'node:path'
 
 const BRIDGE_PATH = join(import.meta.dirname, '..', 'python', 'bridge.py')
+
+/** figview 来源记录开关：<DSH_HOME>/dsh-bio-genie/config.json 的 figorigin 字段（off 关闭；默认 auto）。 */
+function figoriginMode() {
+  try {
+    const dshHome = process.env.DSH_HOME ?? join(homedir(), '.dsh')
+    const cfgPath = join(dshHome, 'dsh-bio-genie', 'config.json')
+    const cfg = JSON.parse(readFileSync(cfgPath, 'utf8'))
+    if (cfg && cfg.figorigin === 'off') return 'off'
+  } catch {}
+  return 'auto'
+}
 const OPS_PATH = join(import.meta.dirname, '..', 'python', 'bio_ops.py')
 
 export function spawnPython(exe, script, payload, { cwd, timeoutMs, signal } = {}) {
@@ -22,7 +35,7 @@ export function spawnPython(exe, script, payload, { cwd, timeoutMs, signal } = {
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
       // 隔离宿主环境：-I 已忽略 PYTHONPATH，这里再清一次保险
-      env: { ...process.env, PYTHONPATH: '', PYTHONHOME: '' },
+      env: { ...process.env, PYTHONPATH: '', PYTHONHOME: '', DSH_BIO_FIGORIGIN: figoriginMode() },
     })
     let stdout = ''
     let stderr = ''
