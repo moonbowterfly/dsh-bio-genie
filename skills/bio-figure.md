@@ -24,7 +24,8 @@ language: python
                差异分析直接 figurelib.differential_plot（volcano/MA 双模），
                重要基因标注自动用 adjustText 避碰（未装则静态 offset 兜底）
 6. 自检        figurelib.visual_qa.audit_layout(fig) 程序自检（缺字/裁切/刻度重叠）
-7. 导出        figurelib.export_figure.export_figure(...) 按最终尺寸多格式导出
+7. 导出        figurelib.export_figure.export_figure(...) 按最终尺寸多格式导出；
+               散点类图（每点对应数据行）带 viewer 开交互检索（见下节）
 8. lint+审计   bio_fig_lint（FIG 级语义：配色/灰度/统计元数据）+ bio_fig_export（文件级）
 ```
 
@@ -71,6 +72,23 @@ fig, ax, meta = differential_plot(df, effect_col='log2FC', p_col='pvalue', padj_
 `meta.repro_script`（`<图名>_reproduce.py`，含环境版本+参数重放+DATA TODO 段）
 与 `meta.repro_readme` 自动生成——**在报告里主动告知用户"出图代码已随图落盘"**，
 审稿人要求给代码时把 `_reproduce.py` 直接交给用户，无需临时补写。
+
+## 交互检索导出（viewer）——散点类图默认开
+
+**凡「每个点/元素对应源表数据行」的图（散点 / 火山图 / MA / 气泡图）**，导出时**默认带交互检索**：
+用户在会话中点击任意数据点即可核对其原始行数据（并可按行删除/修改，
+生成带审计的编辑请求）。这是默认建议、不是可选项——除非用户明确只要静态图。
+
+```python
+fig, ax, meta = differential_plot(
+    df, label_col='gene', out_file='figs/volcano.png',
+    viewer={'figure_id': 'volcano-001', 'output_dir': 'figs/viewer'})
+# meta['viewer_manifest'] 随工具结果透出 → 对话图卡出现「交互查看」
+```
+
+- 成本：sidecar bundle（rows/hits JSON；点数上限 1 万，超限会被拒绝并给出缩减建议）；中小图可忽略。
+- 不适用：纯语义图（示意图 / 流程图 / 序列图谱）——无逐点数据映射，不要开。
+- 手动路径与合同：`docs/agent-guide/plotting.md` §9、`docs/fig-viewer-sidecar-v1.md`。
 
 ## 选图决策速查表
 
