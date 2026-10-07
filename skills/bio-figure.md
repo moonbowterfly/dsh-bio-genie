@@ -89,6 +89,8 @@ fig, ax, meta = differential_plot(
 - 成本：sidecar bundle（rows/hits JSON；点数上限 1 万，超限会被拒绝并给出缩减建议）；中小图可忽略。
 - 不适用：纯语义图（示意图 / 流程图 / 序列图谱）——无逐点数据映射，不要开。
 - 手动路径与合同：`docs/agent-guide/plotting.md` §9、`docs/fig-viewer-sidecar-v1.md`。
+- **来源记录（figorigin）**：画图前用 `figurelib.origin.set_source_context(inputs=[...], params={...})`
+  声明输入文件——图卡「来源」按钮将显示原始数据；未声明时系统会推断工作区近期数据文件（不精确）。
 
 ## 选图决策速查表
 

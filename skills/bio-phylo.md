@@ -90,3 +90,20 @@ print("saved tree.png")
 - Bootstrap 值 ≥70% 才可信（1000 次重复）
 - 低于 70% 的分支应标注为"低支持度"
 - 报告中说明使用了什么建树方法和参数
+
+## 出图时声明来源（fig-viewer 来源记录）
+
+画树图（或任何图）前声明输入与参数——图卡「来源」按钮将展示原始数据来源；
+未声明时系统仅能推断工作区近期数据文件：
+
+```python
+from figurelib.origin import set_source_context
+set_source_context(inputs=[{'path': 'agro_tree/aln_trimmed.fasta', 'note': '16S 比对'}],
+                   params={'method': 'nj', 'model': 'K2P'}, tool='figurelib.Phylo')
+```
+## 验收标准
+
+- [ ] 建树输入（比对文件/序列）与构建方法（nj/upgma、模型）在结果中明示
+- [ ] Newick 写出后回读校验（叶节点数一致），叶名与输入一一对应
+- [ ] 树图导出前调用 `set_source_context` 声明输入与参数（来源可溯）
+- [ ] 自举/支持率如报告，须注明重复数与所用工具版本

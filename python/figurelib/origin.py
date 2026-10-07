@@ -55,6 +55,37 @@ def origin_enabled():
     return v not in ('off', '0', 'false', 'no', 'disabled')
 
 
+_DATA_EXTS = ('.fasta', '.fa', '.fas', '.aln', '.faa', '.csv', '.tsv', '.txt', '.nwk',
+              '.newick', '.tree', '.gb', '.gbk', '.gbff', '.embl', '.sbol', '.xml', '.json',
+              '.xlsx', '.sdf', '.mol', '.pdb', '.cif', '.sto', '.stockholm')
+
+
+def _recent_datafiles(base, limit=12, window_hours=3):
+    """近 window_hours 小时内修改、扩展名像数据的文件（用于未声明输入的推断兜底）。"""
+    out = []
+    try:
+        now = time.time()
+        for name in os.listdir(base):
+            p = os.path.join(base, name)
+            if not os.path.isfile(p):
+                continue
+            low = name.lower()
+            if low.endswith(('.png', '.pdf', '.svg', '.figorigin.json')):
+                continue
+            if not low.endswith(_DATA_EXTS):
+                continue
+            try:
+                st = os.stat(p)
+            except Exception:
+                continue
+            if now - st.st_mtime <= window_hours * 3600:
+                out.append((st.st_mtime, p))
+    except Exception:
+        return []
+    out.sort(reverse=True)
+    return [p for _, p in out[:limit]]
+
+
 def _sha256_file(path, limit=64 * 1024 * 1024):
     try:
         st = os.stat(path)
@@ -96,6 +127,28 @@ def write_origin(png_path, *, generator='figurelib.export_figure'):
                 'sha256': _sha256_file(p) if is_file else None,
                 'note': it.get('note'),
             })
+        inferred = []
+        cwd = os.getcwd()
+        if not inputs:
+            bases = [cwd]
+            try:
+                for name in sorted(os.listdir(cwd))[:60]:
+                    p = os.path.join(cwd, name)
+                    if os.path.isdir(p) and not name.startswith('.'):
+                        bases.append(p)
+            except Exception:
+                pass
+            seen = set()
+            for base in bases[:12]:
+                for p in _recent_datafiles(base, limit=6):
+                    if p not in seen:
+                        seen.add(p)
+                        inferred.append({'path': p, 'kind': 'inferred',
+                                         'sha256': _sha256_file(p), 'note': None})
+                    if len(inferred) >= 12:
+                        break
+                if len(inferred) >= 12:
+                    break
         src = None
         if inputs:
             first = inputs[0]
@@ -111,6 +164,8 @@ def write_origin(png_path, *, generator='figurelib.export_figure'):
                           'written': time.strftime('%Y-%m-%dT%H:%M:%S')},
             'source': src,
             'inputs': inputs,
+            'inferred_inputs': inferred,
+            'cwd': cwd if not inputs else None,
             'params': ctx.get('params') or {},
             'tool': ctx.get('tool'),
             'note': ctx.get('note'),
