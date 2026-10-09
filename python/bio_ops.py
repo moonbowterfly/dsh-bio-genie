@@ -2172,6 +2172,11 @@ def main():
             return
         result = OPS[op](args)
         result = _sanitize_json(result)
+        if op in {'deseq2', 'gsea', 'ml_pipeline'} and isinstance(result, dict) and result.get('error'):
+            print(json.dumps({'ok': False, 'code': result.get('code', 'ANALYSIS_FAILED'),
+                              'error': result['error'], 'details': result},
+                             ensure_ascii=False, cls=SafeEncoder))
+            return
         print(json.dumps({'ok': True, 'result': result}, ensure_ascii=False, cls=SafeEncoder))
     except Exception as e:
         traceback.print_exc(file=sys.stderr)

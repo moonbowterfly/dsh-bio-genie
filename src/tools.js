@@ -85,7 +85,9 @@ function bioTool(config, opts) {
       await throttle(opts.op)
       const py = await requireEnv(config)
       // 第二层按需依赖（EXTRA_DEPS）：op 声明的额外包缺失时自动 uv pip install
-      const deps = await ensureExtraDeps(opts.op, py)
+      // Explicit legacy Welch uses the base SciPy stack; it must not require PyDESeq2.
+      const dependencyOp = opts.op === 'deseq2' && args.backend === 'legacy_welch' ? null : opts.op
+      const deps = await ensureExtraDeps(dependencyOp, py)
       if (!deps.ok) {
         throw new Error(`dsh-bio-genie 依赖自动安装失败（op=${opts.op}）: ${deps.error}`)
       }
@@ -841,7 +843,8 @@ function semanticTools(config) {
     bioTool(config, {
       name: 'bio_ml_pipeline',
       description:
-        '通用 ML 管道：读 CSV → 训练模型 → 评估。支持分类（accuracy/cv）和回归（r2/rmse）。' +
+        '通用 ML 管道：先划分，再逐折拟合 Pipeline；CV 仅训练集，holdout 最后一次评估。' +
+        '小类别或组不足时返回不可评估，不降级随机划分。支持分类（accuracy/cv）和回归（r2/rmse）。' +
         'model 可选 random_forest/svm/logistic/linear。返回评估指标和特征重要性。' +
         '触发词：机器学习、训练模型、分类、回归、预测。',
       parameters: {
@@ -851,6 +854,9 @@ function semanticTools(config) {
         model: { type: 'string', enum: ['random_forest', 'svm', 'logistic', 'linear'], description: '模型类型，默认 random_forest' },
         test_size: { type: 'number', description: '测试集比例，默认 0.2' },
         cv: { type: 'number', description: '交叉验证折数，默认 5' },
+        seed: { type: 'number', description: '非负整数随机种子，默认 42' },
+        group_col: { type: 'string', description: '患者/组列，holdout 和 CV 内不得跨集合，且不作特征' },
+        exclude_cols: { type: 'array', items: { type: 'string' }, description: '明确排除样本/患者 ID 等非特征列' },
       },
       op: 'ml_pipeline',
       timeoutMs: 120_000,
@@ -1343,32 +1349,56 @@ function semanticTools(config) {
       op: 'circuit_simulate',
       timeoutMs: 300_000,
     }),
-    // ---- Python 差异表达/GSEA 工具（替代 R 引擎）----
+    // ---- Python 差异表达/GSEA 工具（正式后端：PyDESeq2 / GSEApy）----
     bioTool(config, {
       name: 'bio_deseq2',
       description:
-        '差异表达分析（归一化 Welch 近似实现）：counts 矩阵 + 样本信息 → 差异基因表（top10 + ' +
-        '可选 out_csv 全量落盘）。方法：median-of-ratios 文库归一化 + log2 空间 Welch t 检验 + ' +
-        'BH-FDR；**非完整 DESeq2**（无负二项 GLM/离散度/收缩），小样本（每组<4）下用于筛选排序而非定量结论。' +
-        '注意：返回体自带 method 元数据与 size_factors，引用结论时按 method 字段如实转述。触发词：差异表达、DEG。',
+        '差异表达分析（正式后端 PyDESeq2 0.5.4：负二项 GLM + 离散度估计 + Wald 检验；本版不执行 LFC 收缩）。counts 矩阵 + ' +
+        '样本信息 → 差异基因表（gene/baseMean/log2FoldChange/lfcSE/stat/pvalue/padj + ' +
+        '可选 out_csv 全量落盘）。支持单因素与多因素设计（design="~ type + condition" + ' +
+        'factor/numerator/denominator 显式比较）。backend 默认 pydeseq2；旧 Welch 近似仅 ' +
+        'legacy_welch 显式选择（缺包/正式后端失败不静默降级）。' +
+        '触发词：差异表达、DEG、DESeq2。',
       parameters: {
-        counts_file: { type: 'string', required: true, description: 'counts 矩阵 CSV（行=基因，列=样本）' },
-        meta_file: { type: 'string', required: true, description: '样本信息 CSV（sample, condition 两列）' },
+        counts_file: { type: 'string', required: true, description: 'counts 矩阵 CSV（行=基因，列=样本；raw 非负整数）' },
+        meta_file: { type: 'string', required: true, description: '样本信息 CSV（sample, condition 两列；多因素可加 type 等）' },
         contrast: { type: 'string', default: 'trt_vs_ctrl', description: '对比组（如 heat_vs_ctrl；格式 group1_vs_group2）' },
-        out_csv: { type: 'string', description: '可选：全量结果表落盘路径（gene/baseMean/log2FoldChange/pvalue/padj）。需要完整结果表时用它，不要为了全表重复实现同一算法' },
+        design: { type: 'string', description: '设计公式（如 "~ type + condition"；默认 ~condition）' },
+        factor: { type: 'string', description: '比较因子列（默认 condition）' },
+        numerator: { type: 'string', description: '多因素时分子组（与 denominator 成对）' },
+        denominator: { type: 'string', description: '多因素时分母组' },
+        backend: { type: 'string', enum: ['pydeseq2', 'legacy_welch'], description: '后端（默认 pydeseq2；legacy_welch 为旧近似）' },
+        out_csv: { type: 'string', description: '可选：全量结果表落盘路径' },
       },
       op: 'deseq2',
-      timeoutMs: 120_000,
+      timeoutMs: 300_000,
     }),
     bioTool(config, {
       name: 'bio_gsea',
-      description: 'GSEA 富集分析（Python）：差异表达结果 → 富集通路。触发词：GSEA、富集。',
+      description: 'GSEA 富集分析（GSEApy 正式 prerank）。差异表达**完整排序表** + GMT 或命名库 ' +
+        '→ ES/NES/nominal p/FDR/leading edge（禁止 ES×10 简化）。ranking_column 默认 stat ' +
+        '（全量受检基因，不取 DEG/top10）；固定 seed/permutation。' +
+        '触发词：GSEA、富集、prerank。',
       parameters: {
-        de_results_file: { type: 'string', required: true, description: '差异表达结果 CSV' },
-        gene_sets: { type: 'string', default: 'hallmark', description: '基因集' },
+        de_results_file: { type: 'string', required: true, description: '差异表达完整结果 CSV（含 gene + 排序列）' },
+        ranking_column: { type: 'string', default: 'stat', description: '排序列（默认 stat；缺列明确失败，可显式指定 log2FoldChange）' },
+        gene_set_file: { type: 'string', description: 'GMT 文件路径（用户提供）' },
+        gene_sets: { type: 'string', description: 'gseapy 命名库（如 MSigDB_Hallmark_2020）；与 gene_set_file 二选一' },
+        permutation_num: { type: 'number', description: '排列数（默认 1000）' },
+        min_size: { type: 'number', description: '最小集合规模（默认 15）' },
+        max_size: { type: 'number', description: '最大集合规模（默认 500）' },
+        seed: { type: 'number', description: '随机种子（默认 42）' },
+        species: { type: 'string', description: 'rank 数据物种（如 human；未知时标未核验）' },
+        id_namespace: { type: 'string', description: 'rank 基因 ID 命名空间（如 gene_symbol）' },
+        gene_set_species: { type: 'string', description: 'GMT 基因集物种声明（与 rank 冲突则拒绝）' },
+        gene_set_id_namespace: { type: 'string', description: 'GMT 基因 ID 命名空间声明' },
+        gene_set_source: { type: 'string', description: 'GMT 来源名称' },
+        gene_set_version: { type: 'string', description: 'GMT/命名库来源版本' },
+        gene_set_license_source: { type: 'string', description: '许可信息来源 URL/文档' },
+        out_csv: { type: 'string', description: '完整结果表落盘路径（可选）' },
       },
       op: 'gsea',
-      timeoutMs: 120_000,
+      timeoutMs: 300_000,
     }),
   ]
 }
@@ -1395,4 +1425,4 @@ function renderBioPython(_args, value) {
 }
 
 
-    
+

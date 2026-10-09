@@ -26,7 +26,12 @@ if (!script) {
   process.exit(2)
 }
 const repoRoot = resolve(import.meta.dirname, '..')
-const r = spawnSync(findPython(), [script], { cwd: repoRoot, stdio: 'inherit', windowsHide: true })
+// Formal scientific backend acceptance uses the isolated, version-pinned interpreter.
+// Ordinary tests keep the complete first-layer Genie environment.
+const formalTests = new Set(['test/test_deg_backends.py', 'test/test_genie_r2_contract.py'])
+const python = formalTests.has(script.replaceAll('\\', '/')) && process.env.DSH_BIO_FORMAL_PYTHON
+  ? process.env.DSH_BIO_FORMAL_PYTHON : findPython()
+const r = spawnSync(python, ['-B', script], { cwd: repoRoot, stdio: 'inherit', windowsHide: true })
 if (r.error) {
   console.error(`failed to spawn python: ${r.error.message}`)
   process.exit(1)

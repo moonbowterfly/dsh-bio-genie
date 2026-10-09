@@ -43,6 +43,12 @@ export const EXTRA_DEPS = {
   // 纯 Python wheel，但要求 Python ≥3.12（引导器即 CPython 3.12，实测可装）。
   // 体积较大（含 numba/igraph 等传递依赖），故放第二层按需安装而非第一层。
   sc_qc: ['scanpy>=1.10', 'anndata', 'h5py'],
+  // GN-1/GN-2（2026-10-07 G 系列一期）：正式差异表达与 GSEA 后端。
+  // PyDESeq2（负二项 GLM + 离散度 + Wald；本版不调用 LFC 收缩）与 GSEApy（prerank）。
+  // R2 仅核验这两个精确版本；变更版本须先独立重跑科学对照。
+  // 缺包/正式后端失败不静默降级（legacy_welch 仅显式选择）。
+  deseq2: ['pydeseq2==0.5.4'],
+  gsea: ['gseapy==1.3.1'],
   // Phase 2 预留：
   // cobra_model: ['cobra', 'glpk'],
 }

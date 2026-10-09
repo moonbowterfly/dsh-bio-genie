@@ -1,10 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""bio_deseq2 统计口径 v2 回归测试（median-of-ratios 归一化 + log2 空间 Welch t）。
+"""bio_deseq2 旧近似（legacy_welch）回归测试（median-of-ratios 归一化 + log2 空间 Welch t）。
 
 背景（2026-10-05）：v1 为原始计数上的等方差 t 检验且无文库归一化，
 agent 实测反推发现「声称为 DESeq2 等效但既非负二项亦无归一化」——v2 修正为
 归一化 Welch 口径并新增 method 元数据 / out_csv 全量落盘。
+
+GN-1（2026-10-07）：默认 backend 改为 pydeseq2；本测试是**旧近似专门回归**，
+显式传 backend='legacy_welch'（不删除旧近似测试来掩盖变化）。
 
 运行：node scripts/run-python-test.mjs test/test_deg_method.py（已挂 bench 链）
 """
@@ -57,7 +60,7 @@ meta1 = pd.DataFrame({'sample': cols, 'condition': ['ctrl'] * 3 + ['trt'] * 3})
 
 with tempfile.TemporaryDirectory() as td:
     cf, mf = write_inputs(td, counts1, meta1)
-    res1 = op_deseq2_python({'counts_file': cf, 'meta_file': mf, 'contrast': 'trt_vs_ctrl'})
+    res1 = op_deseq2_python({'counts_file': cf, 'meta_file': mf, 'contrast': 'trt_vs_ctrl', 'backend': 'legacy_welch'})
 
 sf = res1.get('size_factors', {})
 ratio = (sum(sf.get(c, 0) for c in ['t1', 't2', 't3']) / 3) / \
@@ -80,7 +83,7 @@ counts2 = pd.DataFrame(mat2).T[cols]
 
 with tempfile.TemporaryDirectory() as td:
     cf, mf = write_inputs(td, counts2, meta1)
-    res2 = op_deseq2_python({'counts_file': cf, 'meta_file': mf, 'contrast': 'trt_vs_ctrl'})
+    res2 = op_deseq2_python({'counts_file': cf, 'meta_file': mf, 'contrast': 'trt_vs_ctrl', 'backend': 'legacy_welch'})
 sig2 = {g['gene'] for g in res2.get('top_genes', [])}
 top0 = res2.get('top_genes', [{}])[0]
 check('场景2 植入基因被检出为上调第一', top0.get('gene') == 'g00' or 'g00' in sig2, str(sig2))
@@ -98,7 +101,7 @@ with tempfile.TemporaryDirectory() as td:
     cf, mf = write_inputs(td, counts2, meta1)
     out_full = os.path.join(td, 'sub', 'de_full.csv')  # 不存在的子目录 → 自动创建
     res3 = op_deseq2_python({'counts_file': cf, 'meta_file': mf,
-                             'contrast': 'trt_vs_ctrl', 'out_csv': out_full})
+                             'contrast': 'trt_vs_ctrl', 'backend': 'legacy_welch', 'out_csv': out_full})
     oc = res3.get('out_csv', {})
     ok_file = oc.get('out_csv') and os.path.exists(out_full) and not oc.get('error')
     check('out_csv 全量落盘（含缺失子目录自动创建）', bool(ok_file), str(oc))
@@ -112,22 +115,22 @@ with tempfile.TemporaryDirectory() as td:
 # ── 场景 4：确定性（同输入两次结果完全一致）─────────────────────────────
 with tempfile.TemporaryDirectory() as td:
     cf, mf = write_inputs(td, counts2, meta1)
-    a = op_deseq2_python({'counts_file': cf, 'meta_file': mf, 'contrast': 'trt_vs_ctrl'})
-    b = op_deseq2_python({'counts_file': cf, 'meta_file': mf, 'contrast': 'trt_vs_ctrl'})
+    a = op_deseq2_python({'counts_file': cf, 'meta_file': mf, 'contrast': 'trt_vs_ctrl', 'backend': 'legacy_welch'})
+    b = op_deseq2_python({'counts_file': cf, 'meta_file': mf, 'contrast': 'trt_vs_ctrl', 'backend': 'legacy_welch'})
     check('确定性：两次调用逐位一致', json.dumps(a, sort_keys=True) == json.dumps(b, sort_keys=True))
 
 # ── 场景 5：退化路径 ────────────────────────────────────────────────────
 with tempfile.TemporaryDirectory() as td:
     meta_single = pd.DataFrame({'sample': ['c1', 't1'], 'condition': ['ctrl', 'trt']})
-    cf, mf = write_inputs(td, counts1, meta_single)
-    r5 = op_deseq2_python({'counts_file': cf, 'meta_file': mf, 'contrast': 'trt_vs_ctrl'})
+    cf, mf = write_inputs(td, counts1[['c1', 't1']], meta_single)
+    r5 = op_deseq2_python({'counts_file': cf, 'meta_file': mf, 'contrast': 'trt_vs_ctrl', 'backend': 'legacy_welch'})
     check('单样本组给出明确指引（非 nan 结果）', 'error' in r5 and '2 个样本' in r5.get('error', ''),
           str(r5.get('error'))[:100])
 
 with tempfile.TemporaryDirectory() as td:
     meta_bad = meta1.rename(columns={'condition': 'group'})
     cf, mf = write_inputs(td, counts1, meta_bad)
-    r6 = op_deseq2_python({'counts_file': cf, 'meta_file': mf, 'contrast': 'trt_vs_ctrl'})
+    r6 = op_deseq2_python({'counts_file': cf, 'meta_file': mf, 'contrast': 'trt_vs_ctrl', 'backend': 'legacy_welch'})
     check('缺 condition 列 → 可操作提示', 'error' in r6 and 'condition' in r6.get('error', ''))
 
 print(f"\n{'-'*60}\ndeg-method: {PASS} passed, {FAIL} failed")

@@ -136,7 +136,7 @@ bio_python：scipy 检验（ttest_ind/mannwhitneyu）+ 效应量（Cohen's d）+
 
 ```
 （文件系统工具确认 counts.csv / meta.csv 列名对齐）
-bio_deseq2 counts_file=<counts.csv> meta_file=<meta.csv> contrast=<trt_vs_ctrl>
+bio_deseq2 counts_file=<raw_counts.csv> meta_file=<meta.csv> contrast=<trt_vs_ctrl> out_csv=<new_run/de_full.csv>
 产出：de_results.csv（padj<0.05 且 |log2FC|>1 的上下调基因数 + top10）
 后续：火山图（bio_fig_profile → bio_python figurelib）→ 显著基因列表 bio_enrichr 富集
 ```
@@ -147,7 +147,7 @@ bio_deseq2 counts_file=<counts.csv> meta_file=<meta.csv> contrast=<trt_vs_ctrl>
 
 ```
 （差异表达结果已由 bio_deseq2 产出；只有显著列表没有排序 → 改 bio_enrichr）
-bio_gsea de_results_file=<de_results.csv> gene_sets=hallmark
+bio_gsea de_results_file=<de_full.csv> ranking_column=stat gene_set_file=<matching_species_ids.gmt> species=<species> id_namespace=<ID_type> gene_set_species=<species> gene_set_id_namespace=<ID_type> out_csv=<new_run/gsea_full.csv>
 产出：gsea_results.csv + 上/下调显著通路数（padj<0.25，GSEA 阈值）
 注意：非内置基因集需用户从 MSigDB 官网下载放入工作区
 ```

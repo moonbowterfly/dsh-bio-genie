@@ -43,7 +43,7 @@ language: python
 | `scanpy` / `pysam` | 单细胞 / NGS（设置面板「高级模块」安装后可用） | addon |
 | `figurelib.*` | **出版级绘图库**（吸收 scipilot）：`setup_style` / `profile_data` / `export_figure` / `check_figure` / `layout_tools` / `visual_qa` | builtin |
 
-**不在环境里、也不要引导用户安装**：torch/scanpy(未装时)/rdkit/ete3/gseapy/plotly/esmfold 等重依赖——见 troubleshooting 的边界表。需要时用对应语义化工具（如 `bio_circuit_simulate` 首调自动装 bioscrape）。
+**不应假定常驻环境已安装**：torch/scanpy(未装时)/rdkit/ete3/plotly/esmfold 等重依赖——见 troubleshooting 的边界表。PyDESeq2 0.5.4 与 GSEApy 1.3.1 分别由 `bio_deseq2`/`bio_gsea` 首调按需检查和安装；显式 `legacy_welch` 不要求 PyDESeq2。需要其他按需后端时使用对应语义化工具（如 `bio_circuit_simulate` 首调自动装 bioscrape）。
 
 ### 常见「库存在但 API 变」陷阱
 

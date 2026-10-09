@@ -150,9 +150,9 @@ language: none
 
 ### 组学分析
 
-**bio_deseq2** — 差异表达分析（归一化 Welch 近似实现）：`counts_file ★`（counts 矩阵 CSV，行=基因列=样本）、`meta_file ★`（样本信息 CSV，**必须含 `sample` 与 `condition` 两列**——condition 为分组列，取值如 ctrl/trt；缺列时返回可操作提示而非裸 KeyError）、`contrast`（对比组，格式 `trt_vs_ctrl`）、`out_csv`（可选，全量结果表落盘）。方法：median-of-ratios 文库归一化 + log2 空间 Welch t 检验 + BH-FDR（**非完整 DESeq2**，无 NB GLM/收缩；返回体含 `method` 元数据与 `size_factors`，结论引用时按 method 字段如实转述；小样本用于筛选排序而非定量结论）。返回差异基因表（top10；全表走 `out_csv`）。触发词：差异表达。
+**bio_deseq2** — raw counts 差异表达：`counts_file ★`（行=基因、列=样本，有限非负整数）、`meta_file ★`（含 `sample` 和设计因子，默认 `condition`）、`contrast`（`trt_vs_ctrl`）、`design`（如 `~type + condition`）、`factor`/`numerator`/`denominator`（显式比较）、`backend`（默认 `pydeseq2`，旧近似需显式 `legacy_welch`）、`out_csv`（全精度完整表路径）。正式后端固定核验 PyDESeq2 0.5.4，负二项 GLM、离散度估计、Wald 检验、BH-FDR；**本版不执行 LFC 收缩**。旧 Welch 不需要 PyDESeq2，返回自己的局限声明。完整样本匹配、设计秩和比较水平受检；`method` 保存实际样本顺序、输入 hash、过滤与后端版本。缺包/拟合/写盘失败不降级。`out_csv` 未给时返回 `full_results`。触发词：差异表达。
 
-**bio_gsea** — GSEA 富集分析（Python 实现）：`de_results_file ★`（差异表达结果 CSV）、`gene_sets`（基因集，默认 `hallmark`）。返回富集通路。触发词：GSEA、富集。
+**bio_gsea** — GSEApy 1.3.1 正式 prerank：`de_results_file ★`（完整受检基因排序表，含 `gene` 和 `ranking_column`，默认 `stat`）、`gene_set_file`（GMT）或 `gene_sets`（真实命名库，二选一且无示例回退）、`seed`、`permutation_num`、`min_size`/`max_size`、`out_csv`。`species`/`id_namespace` 与 `gene_set_species`/`gene_set_id_namespace` 用于拒绝已知冲突；缺可验证身份时标 `unverified`。NA 排除计数、GMT 字节 hash、集合原始/交集规模、完整结果路径/行数/hash 随结果返回。零有效集合产出空表并标 `no_effective_sets`。触发词：GSEA、富集。
 
 ## 三、工具选择速查（愿望 → 工具）
 
@@ -195,7 +195,7 @@ language: none
 
 **bio_pathway_design** — 代谢通路设计：`target_product`★（目标产物）、`host_organism`（默认 `eco`）、`strategy`（`shortest`/`max_yield`/`fewest_steps`）。触发词：通路设计、代谢工程。
 
-**bio_ml_pipeline** — 通用 ML 管道：`path`★（CSV 文件）、`target`★（目标列）、`task`（classification/regression）、`model`（random_forest/svm/logistic/linear）。返回评估指标 + 特征重要性。触发词：机器学习、训练、分类、回归。
+**bio_ml_pipeline** — 通用 ML 管道：`path`★、`target`★、`task`（classification/regression）、`model`（random_forest/svm/logistic/linear）、`seed`、`group_col`（患者/组隔离）、`exclude_cols`（样本/患者 ID 等明确排除列）、`test_size`、`cv`（0 关闭或至少 2）。先划分，再由 Pipeline 在每折独立拟合；CV 仅训练集，holdout 最后一次评估。分类不可分层、组/训练类不足与折失败返回不可评估，不输出伪独立 accuracy。返回真实索引、特征列表、变换后维度及指标。触发词：机器学习、训练、分类、回归。
 
 **bio_ml_reduce** — 降维分析：`path`★（CSV）、`method`（pca/tsne）、`n_components`（默认 2）。返回降维坐标 + 方差解释率。触发词：PCA、t-SNE、降维。
 
