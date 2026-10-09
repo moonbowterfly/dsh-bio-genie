@@ -49,6 +49,16 @@ ENSEMBL_UA = 'dsh-bio-genie/0.1.4'
 _ID_DBS = ('ncbi_nucleotide', 'ncbi_protein', 'ncbi_gene', 'uniprot', 'pdb', 'ensembl', 'pmid')
 _SEQ_DBS = ('ncbi_nucleotide', 'ncbi_protein', 'uniprot', 'ensembl')
 
+# db 别名：真机 E2E（2026-10-10）实测 agent 会写 nuccore / ncbi_nuccore 等自然名，统一归一到规范 db。
+_DB_ALIASES = {
+    'nuccore': 'ncbi_nucleotide',
+    'ncbi_nuccore': 'ncbi_nucleotide',
+    'nucleotide': 'ncbi_nucleotide',
+    'protein': 'ncbi_protein',
+    'gene': 'ncbi_gene',
+    'pubmed': 'pmid',
+}
+
 _CHECKS_SUPPORTED = {
     'ncbi_nucleotide': ('organism_contains', 'title_contains', 'length'),
     'ncbi_protein': ('organism_contains', 'title_contains', 'length'),
@@ -558,6 +568,7 @@ def _audit_item(mode, idx, item):
         if not isinstance(item, dict):
             return dict(base, status='error', detail='条目须为对象（dict）')
         db = str(item.get('db') or '').strip().lower()
+        db = _DB_ALIASES.get(db, db)
         rid = str(item.get('id') or item.get('accession') or '').strip()
         if not db:
             return dict(base, status='error', detail='缺少 db 字段')

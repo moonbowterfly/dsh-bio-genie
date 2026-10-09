@@ -1010,7 +1010,8 @@ function semanticTools(config) {
         'mode=identifiers（登录号/基因/文献 ID 的存在性 + organism/title/length/gene 比对）；' +
         'mode=sequences（序列须在记录中逐字出现或与其反向互补一致，返回 1-based 位置）；' +
         'mode=scan（从文本/文件抽取候选标识符与序列清单，不联网）。' +
-        '来源：NCBI（nuccore/protein/gene/pubmed）、UniProt、PDB、Ensembl。' +
+        '来源与 db 取值：ncbi_nucleotide / ncbi_protein / ncbi_gene / uniprot / pdb / ensembl / pmid' +
+        '（别名 nuccore→ncbi_nucleotide 已归一）。' +
         '状态严格区分：not_found=源明确无记录；unreachable=未能查询（不是准确性结论）；' +
         'mismatch=记录存在但比对失败；partial=部分项无法核验。仅报告所查项，不越界背书。' +
         '触发词：来源审计、核对来源、验证登录号、核验序列、核对引用、溯源审计、数据来源核查。',

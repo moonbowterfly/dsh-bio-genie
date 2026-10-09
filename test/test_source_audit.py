@@ -178,6 +178,9 @@ r3 = sat.op_source_audit({'mode': 'identifiers', 'out_md': md_path,
                           'items_json': json.dumps([{'db': 'uniprot', 'id': 'OK1'}])})
 check('out_md written', os.path.exists(md_path) and '来源审计报告' in open(md_path, encoding='utf-8').read())
 
+r_al = sat.op_source_audit({'mode': 'identifiers', 'items_json': json.dumps([{'db': 'ncbi_nuccore', 'id': 'OK1'}])})
+check('db alias nuccore accepted', r_al['items'][0]['status'] == 'verified' and r_al['items'][0]['db'] == 'ncbi_nucleotide', str(r_al['items'][0]))
+
 sat._fetch_record = ORIG_FETCH
 
 print('==== B. 实网冒烟 ====')
