@@ -1002,6 +1002,29 @@ function semanticTools(config) {
       timeoutMs: 120_000,
       cache: true,
     }),
+    // ---- 来源审计（2026-10-10 新增）----
+    bioTool(config, {
+      name: 'bio_source_audit',
+      description:
+        '数据来源审计：把报告/交付物里的标识符与序列与权威来源逐项核验。' +
+        'mode=identifiers（登录号/基因/文献 ID 的存在性 + organism/title/length/gene 比对）；' +
+        'mode=sequences（序列须在记录中逐字出现或与其反向互补一致，返回 1-based 位置）；' +
+        'mode=scan（从文本/文件抽取候选标识符与序列清单，不联网）。' +
+        '来源：NCBI（nuccore/protein/gene/pubmed）、UniProt、PDB、Ensembl。' +
+        '状态严格区分：not_found=源明确无记录；unreachable=未能查询（不是准确性结论）；' +
+        'mismatch=记录存在但比对失败；partial=部分项无法核验。仅报告所查项，不越界背书。' +
+        '触发词：来源审计、核对来源、验证登录号、核验序列、核对引用、溯源审计、数据来源核查。',
+      parameters: {
+        mode: { type: 'string', enum: ['identifiers', 'sequences', 'scan'], required: true, description: '审计模式' },
+        items_json: { type: 'string', description: 'identifiers/sequences：JSON 数组字符串；identifiers 条目形如 {"db":"uniprot","id":"P04637","expect":{"organism_contains":"Homo sapiens"}}，sequences 条目为 {"db","id","sequence"}' },
+        items_file: { type: 'string', description: '同上，改用 JSON 文件路径（与 items_json 二选一）' },
+        text: { type: 'string', description: 'scan 模式：待抽取文本（与 file 二选一）' },
+        file: { type: 'string', description: 'scan 模式：待抽取文本文件路径' },
+        out_md: { type: 'string', description: '可选：审计结果 Markdown 报告输出路径' },
+      },
+      op: 'source_audit',
+      timeoutMs: 300_000,
+    }),
     bioTool(config, {
       name: 'bio_phylo_compare',
       description:

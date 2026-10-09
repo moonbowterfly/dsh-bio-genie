@@ -2,7 +2,7 @@
  * dsh-bio-genie — 可选 webServer 动态注入验证（2026-09-19 审计修复的回归门）。
  *
  * 背景：webServer 曾经在静态 inject 数组里——缺少它的部署（非 web 宿主）中整个
- * 插件保持 pending、apply() 永不执行、62 个工具注册为 0。修复=webServer 改为
+ * 插件保持 pending、apply() 永不执行、63 个工具注册为 0。修复=webServer 改为
  * apply() 内动态注入（ctx.inject(['webServer'], cb)，gem 插件同款模式）：
  *   - 无 webServer：工具/skill 照常注册（本文件的 ctx 桩不提供 webServer 回调）
  *   - 有 webServer：面板路由被注册到 webServer 上
@@ -34,8 +34,8 @@ const ctx = {
 plugin.apply(ctx, { warmUp: false })
 
 // ② 无 webServer 环境下：工具与 skill 已注册、rigor-guard 事件已挂
-assert.equal(toolRegistrations, 62, `expected 62 tool registrations, got ${toolRegistrations}`)
-assert.equal(skillRegistrations, 50, `expected 50 skill registrations, got ${skillRegistrations}`)
+assert.equal(toolRegistrations, 63, `expected 63 tool registrations, got ${toolRegistrations}`)
+assert.equal(skillRegistrations, 51, `expected 51 skill registrations, got ${skillRegistrations}`)
 assert.ok(onEvents.includes('tools/post-execute'), 'rigor-guard post-execute hook missing')
 assert.ok(onEvents.includes('agent/turn-stopping'), 'rigor-guard turn-stopping hook missing')
 

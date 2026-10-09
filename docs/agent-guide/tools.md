@@ -2,7 +2,7 @@
 language: none
 ---
 
-# 工具全参考（62 个）
+# 工具全参考（63 个）
 
 > 每个工具：功能 → 参数（★=必填）→ 返回关键字段 → 典型触发词。**选工具第一优先，`bio_python` 执行器第二优先**。
 
@@ -138,6 +138,9 @@ language: none
 
 **bio_plasmid_info** — 按 ID 取质粒完整元数据：`plasmid_id ★`（如 `"52961"` = lentiCRISPR v2）。返回 `{name, description, fields{...30+ 字段}, sections{按节分组}, sequence_access{sequences_page, login_required, how_to_get}}`。字段含 Purpose / Bacterial Resistance(s) / Copy number / Growth Strain(s) / Growth Temperature / Vector type / Selectable markers / Total vector size (bp) / Promoter / Tag / Insert Size (bp) / Cloning method / 5′·3′ cloning site 与测序引物等。
 
+**bio_source_audit** — 数据来源审计（「先查后写」工具化）：把交付物里的标识符/序列与权威来源逐项核验。`mode ★`（`identifiers` 存在性+比对项 / `sequences` 序列溯源 / `scan` 候选抽取·不联网）、`items_json` 或 `items_file`（JSON 数组）、`text` 或 `file`（scan）、`out_md`（可选审计报告）。
+`identifiers` 条目：`{"db": "ncbi_nucleotide|ncbi_protein|ncbi_gene|uniprot|pdb|ensembl|pmid", "id": "...", "expect": {"organism_contains"?, "title_contains"?, "length"?, "year"?, "gene_contains"?}}`；`sequences` 条目：`{"db", "id", "sequence"}`——逐字命中（正链）或反向互补一致（负链）均算命中，返回 strand 与 1-based 位置。**六态严禁混用**：`verified` / `mismatch` / `partial` / `not_found`（源明确无记录）/ `unreachable`（未能查询，不是准确性结论）/ `error`。单次 ≤25 条；多源核验自带节流。
+
 ### 出版级绘图
 
 **bio_fig_profile** — 数据剖析+图型建议（画图前必跑）：`path ★`（CSV/TSV/Excel）、`group_cols`（分组列名数组）。返回 `{source, n_rows, n_cols, columns{列名:{type, n, mean, median, sd, min, max, skewness, n_outliers_iqr, missing_rate, ...}}, correlation, group_summary, warnings[], suggestions[]}`。suggestions 是图型建议+风险警告（小样本均值柱、偏态、跨量级）。
@@ -173,6 +176,7 @@ language: none
 | "两棵进化树是否一致" | `bio_phylo_compare`（RF 距离） |
 | "看序列有没有重复/重排" | `bio_seq_dotplot` |
 | "这条 RNA 的二级结构/稳不稳" | `bio_rna_fold` |
+| "报告里的登录号/序列是不是真的" | `bio_source_audit`（先 scan 抽候选 → identifiers/sequences 核验） |
 | "单细胞数据质控/过滤低质量细胞" | `bio_sc_qc` |
 | "这组数据怎么画/画成论文图" | `bio_fig_profile` → bio_python 画 → `bio_fig_export` 审计 |
 | "中文图会不会出方框" | `bio_fig_qa` |

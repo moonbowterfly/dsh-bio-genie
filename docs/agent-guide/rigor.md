@@ -86,6 +86,17 @@ handle = Entrez.esearch(db="nucleotide",
 > 但它支撑的结论仍可能很弱（n=1、单批次、无正交验证）——那时只能写「提示」，
 > 不能写「证明」。写讨论/结论段前加载该 skill。
 
+## 1c. 来源审计（标识符 / 序列的「先查后写」）
+
+**任何写进交付物的登录号（NCBI/UniProt/PDB/Ensembl）或引用 ID（PMID），必须先核验再用；序列必须溯源到记录。** 工具：`bio_source_audit`（工作流见 skill `bio-proto-source-audit`）。
+
+- **先查后写**：凭记忆写出的编号是高危行为——「一个数字之差」的假编号是最高频的幻觉形态；
+- **存在 ≠ 是你说的那个**：核验时带上 `expect`（organism/title/length/gene），只查存在性不算核验；
+- **六态严禁混用**：`not_found`（源明确无记录）≠ `unreachable`（未能查询——不是结论）；`partial` 不得读成通过；
+- **序列**：逐字命中（正链）或与反向互补一致（负链）都算命中——报告给出 strand 与 1-based 位置；
+- **交付前审计**：报告/图表交付前，把其中全部标识符/序列过一遍 `bio_source_audit`；`out_md` 留审计报告；
+- 分工：数字溯源 → provenance 台账（自动）；结论措辞 → `bio-evidence-appraisal`；本条管**标识符/序列与源的一致性**。
+
 ## 2. 报告格式（模板）
 
 ### 分析报告通用结构

@@ -237,6 +237,12 @@ export const SKILL_MANIFEST = [
     description: 'NGS 重型流程协议（nf-core/Nextflow）：环境门、测试档先行、样本表校验、决策点、产物验证。',
     file: 'protocols/ngs-pipeline.md',
   },
+  {
+    name: 'bio-proto-source-audit',
+    category: 'protocol',
+    description: '来源审计协议：标识符/序列与权威来源核验（bio_source_audit）——何时审计、三模式、六态解读、修正与留痕纪律。',
+    file: 'protocols/source-audit.md',
+  },
   // ---- 科研专精（preset skills，含统计严谨性 + 完整代码模板）----
   {
     name: 'bio-survival-analysis',

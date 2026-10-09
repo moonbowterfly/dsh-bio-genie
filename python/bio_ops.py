@@ -43,6 +43,8 @@ from analysis_ext import (op_seq_introns, op_seq_dotplot, op_uniprot,
                           op_phylo_compare, op_rna_fold)
 # 单细胞 RNA-seq 质控（scanpy，第二层按需依赖，2026-09-16）
 from sc_tools import op_sc_qc
+# 来源审计（2026-10-10 新增）
+from source_audit_tools import op_source_audit
 from seq_util import read_seq_input
 socket.setdefaulttimeout(20)
 from retry_utils import retry_on_network_error
@@ -2118,6 +2120,8 @@ OPS = {
     'phylo_compare': op_phylo_compare,
     'rna_fold': op_rna_fold,
     'sc_qc': op_sc_qc,
+    # 来源审计（2026-10-10 新增）
+    'source_audit': op_source_audit,
 }
 
 

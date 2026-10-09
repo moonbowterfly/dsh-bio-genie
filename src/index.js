@@ -3,8 +3,8 @@
  *
  * 注入 tools / skills / systemPrompt，贡献：
  *  - 系统提示词段（许愿式分析指引，persona.md 可编辑）
- *  - skill 目录（17 领域 + 5 研究 + 19 协议 + 8 指南 + 1 主 skill，共 50 个注册条目）
- *  - bio_python 执行器 + bio_env + bio_log/bio_memory + bio_goal + 57 个语义化工具（共 62 个工具）
+ *  - skill 目录（17 领域 + 5 研究 + 20 协议 + 8 指南 + 1 主 skill，共 51 个注册条目）
+ *  - bio_python 执行器 + bio_env + bio_log/bio_memory + bio_goal + 58 个语义化工具（共 63 个工具）
  *  - rigor-guard 计算防火墙（_provenance 台账 + turn-stopping 无溯源数字提醒）
  *  - 后台预热 Python 环境（零依赖自举：uv + venv + biopython）
  *
@@ -34,7 +34,7 @@ export const name = 'dsh-bio-genie'
  * 现在改用 apply() 内的动态注入 ctx.inject(['webServer'], cb)（官方 dsh 插件
  * 同款模式）：webServer 可用时注册浏览器侧设置面板的 /api/dsh-bio-genie/*
  * 路由（skill 清单 / Python 包列表 / addons / 代谢与编辑域数据）；不可用时
- * 62 个工具与 50 个 skill 照常注册，面板静态部分照常渲染。
+ * 63 个工具与 51 个 skill 照常注册，面板静态部分照常渲染。
  */
 export const inject = ['tools', 'skills', 'systemPrompt']
 
@@ -64,7 +64,7 @@ export function apply(ctx, config) {
 
   // 设置面板 RPC 路由（loopback-only）：skill 清单 / Python 包列表 / 域数据。
   // webServer 是可选服务——动态注入：可用时注册路由；不可用时什么都不做，
-  // 插件其余部分（62 工具 + 50 skill + rigor-guard）已在上方完成注册。
+  // 插件其余部分（63 工具 + 51 skill + rigor-guard）已在上方完成注册。
   ctx.inject(['webServer'], (webCtx) => {
     webCtx.effect(() => registerApiRoutes(webCtx, cfg), 'dsh-bio-genie: api routes')
   })

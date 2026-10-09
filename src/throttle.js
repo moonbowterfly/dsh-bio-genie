@@ -24,6 +24,8 @@ const RATE_LIMIT_MS = {
   // Addgene 公开目录页：礼貌抓取，避免连续检索被 Cloudflare 拦（2026-09-16 新增）
   plasmid_search: 1200,
   plasmid_info: 1200,
+  // 来源审计：多源逐条核验（2026-10-10 新增）
+  source_audit: 400,
 }
 /** 缓存 TTL（查询类 op 结果 24h 内视为新鲜）。 */
 const CACHE_TTL_MS = 24 * 3600_000
