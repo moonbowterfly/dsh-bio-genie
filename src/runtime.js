@@ -355,7 +355,7 @@ function findManagedPython(pyDir) {
  * v0.6.16 下沉进 EXTRA_DEPS）绝不能出现在这里——否则冷启动后完整性检查永远判缺、
  * 触发 repairPackages 重装仍补不齐，陷入「修复循环」直至误走完整自举重建。
  * 第二层的缺失由 ensureExtraDeps 在对应 op 首次调用时负责补装，两层互不越界。 */
-const REQUIRED_PACKAGES = ['matplotlib', 'pandas', 'seaborn', 'scipy', 'PIL']
+const REQUIRED_PACKAGES = ['matplotlib', 'pandas', 'seaborn', 'scipy', 'PIL', 'jsonschema']
 
 /** 查询解释器元数据（python 版本 / 核心库 / 绘图栈）。 */
 async function inspect(exe) {
@@ -374,7 +374,7 @@ async function inspect(exe) {
     '        "packages": {"matplotlib": _ver("matplotlib"), "pandas": _ver("pandas"),',
     '                     "seaborn": _ver("seaborn"), "scipy": _ver("scipy"), "PIL": _ver("PIL"),',
     '                     "primer3": _ver("primer3"), "dna_features_viewer": _ver("dna_features_viewer"),',
-    '                     "dnachisel": _ver("dnachisel")}}',
+    '                     "dnachisel": _ver("dnachisel"), "jsonschema": _ver("jsonschema")}}',
     'print(json.dumps(info))',
   ].join(NL)
   const { code, stdout } = await run(exe, ['-I', '-c', probe])

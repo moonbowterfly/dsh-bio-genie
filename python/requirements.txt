@@ -43,6 +43,10 @@ statsmodels>=0.14
 # 两者 uv 实测解析干净（Resolved 24 packages，仅需新增 4 个 wheel）。
 vcfpy>=0.14
 lifelines>=0.30
+# Design casefile 语义校验锚点（v0.6 §E2 冻结 pin；A8 自愈链）：
+#  - jsonschema: casefile 工件三处校验点（Python 写盘前 / TS 登记前 / validate 时）的实现载体。
+#    pin 精确版本（兼容闭包含 typing-extensions marker 依赖，见 packet locks）。
+jsonschema==4.26.0
 # ⚠️ 合成生物学五项已下沉第二层（v0.6.16 分层调整，2026-08-26）：
 # primer3-py / dnachisel / dna-features-viewer 不再随环境引导安装，改由
 # src/extra-deps.js EXTRA_DEPS 首次调用对应 op 时自动补装。下沉原因：第一层是
