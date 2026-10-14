@@ -45,3 +45,7 @@ Thumbs.db
 Desktop.ini
 .idea/
 .vscode/
+
+# ---- 哈希绑定嵌入物（design/packet 全量必须入库；其 build/ 目录与通用规则冲突，显式豁免）----
+!design/packet/build/
+!design/packet/build/**
