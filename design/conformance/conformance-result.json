@@ -1,0 +1,95 @@
+{
+  "req_id": "G-LOOP-20261015-E2-001",
+  "title": "dual-end conformance report (c14n + schema corpus + environment versions)",
+  "generated_at": "2026-10-14T22:24:59.866Z",
+  "date": "2026-10-15",
+  "command": "node scripts/conformance-report.mjs --out design/conformance/conformance-result.json",
+  "environment": {
+    "node": {
+      "version": "v26.7.0",
+      "icu": "78.3",
+      "unicode": "17.0",
+      "v8": "14.6.202.34-node.28",
+      "platform": "win32",
+      "arch": "x64"
+    },
+    "ajv": "8.20.0",
+    "python": {
+      "python": "3.12.10",
+      "platform": "Windows-11-10.0.26300-SP0",
+      "unidata": "15.0.0",
+      "jsonschema": "4.26.0",
+      "referencing": "0.37.0"
+    },
+    "python_interpreter": "C:/Users/shuai/.dsh/dsh-bio-genie/python-env/Scripts/python.exe",
+    "evidence_deltas": [
+      {
+        "key": "python",
+        "prior": "3.12.11",
+        "now": "3.12.10"
+      }
+    ],
+    "evidence_file": "design/packet/evidence/conformance-environment.txt",
+    "evidence_prior": {
+      "node": "26.7.0",
+      "icu": "78.3",
+      "unicode": "17.0",
+      "v8": "14.6.202.34-node.28",
+      "python": "3.12.11",
+      "unidata": "15.0.0"
+    }
+  },
+  "schema_corpus": {
+    "corpus": "design/packet/schema-corpus/schema_cases.json",
+    "case_count": 99,
+    "expect_dist": {
+      "valid": 28,
+      "invalid": 71
+    },
+    "ts_side": "ts-prod",
+    "py_side": "py-prod",
+    "verdict_equal": true,
+    "verdict_mismatches": [],
+    "core_valid_equal": true,
+    "core_valid_mismatches": [],
+    "sem_equal": true,
+    "sem_mismatches": [],
+    "c14n_layer_equal": true,
+    "c14n_layer_mismatches": [],
+    "expect_equal": true,
+    "expect_mismatches": [],
+    "frozen_node_equal": true,
+    "frozen_py_equal": true,
+    "frozen_mismatches": [],
+    "missing": [],
+    "run_failures": []
+  },
+  "c14n_corpus": {
+    "corpus": "design/packet/corpus/c14n_cases.json",
+    "case_count": 58,
+    "expect_dist": {
+      "accept": 43,
+      "reject": 15
+    },
+    "accept_count": 43,
+    "reject_count": 15,
+    "js_side": "node",
+    "py_side": "python",
+    "status_equal": true,
+    "status_mismatches": [],
+    "canonical_equal": true,
+    "canonical_mismatches": [],
+    "frozen_canonical_equal": true,
+    "frozen_canonical_mismatches": [],
+    "expect_equal": true,
+    "expect_mismatches": [],
+    "code_diff_warns": [],
+    "missing": [],
+    "run_failures": []
+  },
+  "conclusion": "PASS",
+  "failures": [],
+  "warnings": [
+    "[env] evidence delta python: prior=3.12.11 now=3.12.10"
+  ]
+}
