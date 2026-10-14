@@ -1,0 +1,605 @@
+{
+  "schema_version": "1.0",
+  "matrix_id": "design-mutation-matrix@1",
+  "spec_refs": [
+    "genie-synbio-design-spec-v0.3-2026-10-12.md#8 (M0-M16 完整枚举)",
+    "genie-synbio-design-spec-v0.4-2026-10-12.md#C7 (矩阵字段 / M7a-M7b / M11 增补负例)",
+    "genie-synbio-design-spec-v0.4-2026-10-12.md#C1 (ticket 契约与 M11 负例集)"
+  ],
+  "fields": [
+    "mutation_id",
+    "name",
+    "owner",
+    "summary",
+    "injection",
+    "target_gate",
+    "expected_status",
+    "expected_reason",
+    "expected_failure_class",
+    "check_id",
+    "not_yet_runnable",
+    "note"
+  ],
+  "owner_vocab": ["P0b-fixture", "P1a-E2E", "P1b-reference"],
+  "expected_status_vocab": ["deny", "NOT_RUN", "INDETERMINATE", "deterministic_pass_break", "roundtrip_mismatch", "semantic_oracle_mismatch"],
+  "mutations": [
+    {
+      "mutation_id": "M0",
+      "name": "deterministic-replay",
+      "owner": "P0b-fixture",
+      "summary": "deterministic replay：不同临时目录/启动时间两跑，canonical + content hashes 必须相同（receipt 可异）；注入时间戳/运行元数据后双跑 hash 分叉。",
+      "injection": {
+        "kind": "not_yet_runnable",
+        "description": "planned：在 canonical 输入中注入运行期元数据（如 _provenance.at / fetched_at 漂移），断言双跑 content/canonical hash 分叉被门拒绝。"
+      },
+      "target_gate": {
+        "planned": "P0b: design-casefile replay probe（canonicalizeViaPacket + deriveCaseContentId 双跑对照）— 尚未实现"
+      },
+      "expected_status": "deny",
+      "expected_reason": "DETERMINISM_VIOLATION",
+      "expected_failure_class": "DETERMINISM_VIOLATION",
+      "check_id": "pending:design-casefile-replay-probe",
+      "not_yet_runnable": true,
+      "note": "仓库层尚无双跑 replay 门（packet 内部 check_readonly_replay.py 仅覆盖 packet 树）。"
+    },
+    {
+      "mutation_id": "M1",
+      "name": "hash-tamper-packet-file",
+      "owner": "P0b-fixture",
+      "summary": "hash 篡改：对 design/packet 登记文件做字节篡改，enable gate 必须 fail-closed 报 CONTRACT_PACKET_UNREVIEWED。",
+      "injection": {
+        "kind": "append_bytes",
+        "target": "design/packet/schemas/claim.json",
+        "delta": " "
+      },
+      "target_gate": {
+        "command": ["node", "test/design-gate.mjs"],
+        "timeout_ms": 120000
+      },
+      "expected_status": "deny",
+      "expected_reason": "CONTRACT_PACKET_UNREVIEWED",
+      "expected_failure_class": "CONTRACT_PACKET_UNREVIEWED",
+      "check_id": "design-gate.mjs::A.baseline (verifyDesignPacket fail-closed)",
+      "not_yet_runnable": false,
+      "note": "design/README 不变量：任何字节变化 = acceptance 撤销触发；verifyDesignPacket 无缓存全量核验。"
+    },
+    {
+      "mutation_id": "M2",
+      "name": "semantic-oracle-ring-fixture",
+      "owner": "P1a-E2E",
+      "summary": "语义 oracle（固定环形 fixture 期望向量单独冻结并 hash）：注入 fixture 期望向量漂移后，oracle 对照必须报红。",
+      "injection": {
+        "kind": "not_yet_runnable",
+        "description": "planned：篡改环形 fixture 冻结期望向量（含其 hash 绑定），断言语义 oracle 对照失败。"
+      },
+      "target_gate": {
+        "planned": "P1a: B1 语义 oracle 对照门（冻结向量 + hash 绑定）— 依赖 B1 工具"
+      },
+      "expected_status": "semantic_oracle_mismatch",
+      "expected_reason": "ORACLE_VECTOR_MISMATCH",
+      "expected_failure_class": "ORACLE_VECTOR_MISMATCH",
+      "check_id": "pending:B1-semantic-oracle",
+      "not_yet_runnable": true,
+      "note": "环形 fixture 与冻结向量依赖 B1（产者实现）交付。"
+    },
+    {
+      "mutation_id": "M3",
+      "name": "semantic-oracle-expected-vector",
+      "owner": "P1a-E2E",
+      "summary": "语义 oracle：期望向量单独冻结并 hash；注入向量 hash 绑定破坏后必须拒绝。",
+      "injection": {
+        "kind": "not_yet_runnable",
+        "description": "planned：破坏期望向量冻结 hash 绑定（向量文件或绑定清单），断言 oracle 门以 hash 类别拒绝。"
+      },
+      "target_gate": {
+        "planned": "P1a: B1 语义 oracle 冻结绑定门 — 依赖 B1 工具"
+      },
+      "expected_status": "deny",
+      "expected_reason": "ORACLE_HASH_MISMATCH",
+      "expected_failure_class": "ORACLE_HASH_MISMATCH",
+      "check_id": "pending:B1-semantic-oracle",
+      "not_yet_runnable": true,
+      "note": ""
+    },
+    {
+      "mutation_id": "M4",
+      "name": "gpr-mapping-kill",
+      "owner": "P1a-E2E",
+      "summary": "GPR：改基因映射后即使同步更新 hash，仍须由 mapping 依据断言杀死（不能仅靠 hash 一致性放行）。",
+      "injection": {
+        "kind": "not_yet_runnable",
+        "description": "planned：注入 gpr_proof@1 的 source→GEM 双 namespace mapping 漂移并同步重算 ast_hash，断言 mapping 依据校验杀死。"
+      },
+      "target_gate": {
+        "planned": "P1a: B1 gpr_proof 反查门（mapping 依据 + ast_hash 双通道）— 依赖 B1 工具"
+      },
+      "expected_status": "deny",
+      "expected_reason": "GPR_MAPPING_MISMATCH",
+      "expected_failure_class": "GPR_MAPPING_MISMATCH",
+      "check_id": "pending:B1-gpr-proof",
+      "not_yet_runnable": true,
+      "note": "v0.3 §8：含「改后更新 hash」仍须被 mapping 依据断言杀死。"
+    },
+    {
+      "mutation_id": "M5",
+      "name": "medium-unregistered-change",
+      "owner": "P1a-E2E",
+      "summary": "medium 未登记改动：注入未登记状态变化后必须被登记门拒绝。",
+      "injection": {
+        "kind": "not_yet_runnable",
+        "description": "planned：对 medium 载体注入未登记改动（无 receipt/audit 痕迹），断言登记完整性门拒绝。"
+      },
+      "target_gate": {
+        "planned": "P1a: 登记完整性门（receipt/audit 全终态覆盖）— 依赖 P1a 产者实现"
+      },
+      "expected_status": "deny",
+      "expected_reason": "UNREGISTERED_CHANGE",
+      "expected_failure_class": "UNREGISTERED_CHANGE",
+      "check_id": "pending:P1a-registry-gate",
+      "not_yet_runnable": true,
+      "note": ""
+    },
+    {
+      "mutation_id": "M6a",
+      "name": "qualitative-numeric-fba-forbidden",
+      "owner": "P1a-E2E",
+      "summary": "qualitative 路径禁止数值 FBA：注入数值 FBA/FVA/pFBA 输出后必须被拒绝。",
+      "injection": {
+        "kind": "not_yet_runnable",
+        "description": "planned：在 qualitative consequence 路径注入 FBA 数值（flux/FVA 数值字段），断言门以类别拒绝。"
+      },
+      "target_gate": {
+        "planned": "P1a: consequence 路径门（qualitative 禁数值；validator 反查 rule→evidence→gpr_proof）— 依赖 B1"
+      },
+      "expected_status": "deny",
+      "expected_reason": "FBA_NUMERICS_FORBIDDEN",
+      "expected_failure_class": "FBA_NUMERICS_FORBIDDEN",
+      "check_id": "pending:B1-consequence-gate",
+      "not_yet_runnable": true,
+      "note": "v0.3 §3.2 R3：qualitative 路径禁一切 FBA/FVA/pFBA 数值。"
+    },
+    {
+      "mutation_id": "M6b",
+      "name": "calibrated-rule-deletion-not-run",
+      "owner": "P1a-E2E",
+      "summary": "calibrated 路径删规则必 NOT_RUN：注入删除定量 coupling rule 后相关 consequence 必须 NOT_RUN。",
+      "injection": {
+        "kind": "not_yet_runnable",
+        "description": "planned：从 coupling_profile@1 删除一条 mandatory 定量规则，断言 consequence 门以 NOT_RUN 拒绝。"
+      },
+      "target_gate": {
+        "planned": "P1a: coupling_profile 完整性门（mandatory rule 覆盖计数）— 依赖 B1"
+      },
+      "expected_status": "NOT_RUN",
+      "expected_reason": "NOT_RUN",
+      "expected_failure_class": "NOT_RUN",
+      "check_id": "pending:B1-coupling-gate",
+      "not_yet_runnable": true,
+      "note": "v0.3 §8 M6b：calibrated 路径删规则必 NOT_RUN。"
+    },
+    {
+      "mutation_id": "M7a",
+      "name": "baseline-infeasible-not-run",
+      "owner": "P1a-E2E",
+      "summary": "baseline infeasible/unbounded/non-optimal ⇒ NOT_RUN 且无定量 claim（v0.4 §C7 M7a）。",
+      "injection": {
+        "kind": "not_yet_runnable",
+        "description": "planned：注入 baseline 求解为 infeasible/unbounded/non-optimal 的 fixture，断言 consequence 门 NOT_RUN 且无定量 claim。"
+      },
+      "target_gate": {
+        "planned": "P1a: baseline 求解状态门（infeasible/unbounded/non-optimal → NOT_RUN）— 依赖 B1"
+      },
+      "expected_status": "NOT_RUN",
+      "expected_reason": "NOT_RUN",
+      "expected_failure_class": "NOT_RUN",
+      "check_id": "pending:B1-baseline-gate",
+      "not_yet_runnable": true,
+      "note": "v0.4 §C7：M7a baseline 非优 → NOT_RUN 且无定量 claim。"
+    },
+    {
+      "mutation_id": "M7b",
+      "name": "scenario-failure-indeterminate",
+      "owner": "P1a-E2E",
+      "summary": "已声明 scenario 失败 ⇒ 相关 claim INDETERMINATE 且不得 ROBUST_DIRECTION（v0.4 §C7 M7b）。",
+      "injection": {
+        "kind": "not_yet_runnable",
+        "description": "planned：注入 scenario 求解失败，断言相关 claim INDETERMINATE 且禁止 ROBUST_DIRECTION 结论。"
+      },
+      "target_gate": {
+        "planned": "P1a: claim 分类门（scenario 失败 → INDETERMINATE；禁 ROBUST_DIRECTION）— 依赖 B1"
+      },
+      "expected_status": "INDETERMINATE",
+      "expected_reason": "INDETERMINATE",
+      "expected_failure_class": "INDETERMINATE",
+      "check_id": "pending:B1-claim-gate",
+      "not_yet_runnable": true,
+      "note": "v0.4 §C7：M7b 已声明 scenario 失败 → 相关 claim INDETERMINATE 且不得 ROBUST_DIRECTION。"
+    },
+    {
+      "mutation_id": "M8",
+      "name": "sbol-roundtrip",
+      "owner": "P1a-E2E",
+      "summary": "SBOL 往返：注入往返不一致（序列/URI 漂移）后必须被往返门拒绝。",
+      "injection": {
+        "kind": "not_yet_runnable",
+        "description": "planned：注入 SBOL 读→写→读往返不一致，断言 roundtrip 门以类别拒绝。"
+      },
+      "target_gate": {
+        "planned": "P1a: SBOL 往返一致性门 — 依赖 SBOL 工具接线"
+      },
+      "expected_status": "roundtrip_mismatch",
+      "expected_reason": "SBOL_ROUNDTRIP_MISMATCH",
+      "expected_failure_class": "SBOL_ROUNDTRIP_MISMATCH",
+      "check_id": "pending:P1a-sbol-roundtrip",
+      "not_yet_runnable": true,
+      "note": ""
+    },
+    {
+      "mutation_id": "M9",
+      "name": "manifest-missing-entry",
+      "owner": "P0b-fixture",
+      "summary": "manifest 缺条目：删除 packet 内已登记文件后 enable gate 必须 fail-closed（listed file missing）。",
+      "injection": {
+        "kind": "delete_file",
+        "target": "design/packet/meta/x-canonical.meta.json"
+      },
+      "target_gate": {
+        "command": ["node", "test/design-gate.mjs"],
+        "timeout_ms": 120000
+      },
+      "expected_status": "deny",
+      "expected_reason": "CONTRACT_PACKET_UNREVIEWED",
+      "expected_failure_class": "CONTRACT_PACKET_UNREVIEWED",
+      "check_id": "design-gate.mjs::A.baseline (listed file missing branch)",
+      "not_yet_runnable": false,
+      "note": "verifyDesignPacket 对 index 全量集合逐文件存在性+重算核验；缺文件 → fail-closed。"
+    },
+    {
+      "mutation_id": "M10",
+      "name": "unit-dimension-algebra",
+      "owner": "P1a-E2E",
+      "summary": "单位维度：注入违反 unit_vocabulary@1 维度代数（量纲不兼容混算）后必须被拒绝，非仅 JSON Schema。",
+      "injection": {
+        "kind": "not_yet_runnable",
+        "description": "planned：注入维度不兼容的定量 coupling rule / consequence 单位，断言 unit 维度代数门拒绝。"
+      },
+      "target_gate": {
+        "planned": "P1a: unit_vocabulary@1 维度代数门（量纲向量 + 禁止混算矩阵）— unit_vocabulary 未实现"
+      },
+      "expected_status": "deny",
+      "expected_reason": "UNIT_DIMENSION_MISMATCH",
+      "expected_failure_class": "UNIT_DIMENSION_MISMATCH",
+      "check_id": "pending:B1-unit-vocabulary",
+      "not_yet_runnable": true,
+      "note": "v0.3 §8 M10：受控 unit vocabulary/dimension algebra，非仅 JSON Schema；v0.4 §C6 物化工件。"
+    },
+    {
+      "mutation_id": "M11a",
+      "name": "tier-capability-tamper",
+      "owner": "P0b-fixture",
+      "summary": "tier/capability 篡改 ⇒ 拒绝：篡改 capability policy bundle 后加载门必须 POLICY_HASH_MISMATCH fail-closed。",
+      "injection": {
+        "kind": "replace_text",
+        "target": "design/capability-policy/policy-v0.json",
+        "old": "\"policy_version\": \"0\"",
+        "new": "\"policy_version\": \"X\""
+      },
+      "target_gate": {
+        "command": ["node", "test/design-capability.mjs"],
+        "timeout_ms": 120000
+      },
+      "expected_status": "deny",
+      "expected_reason": "POLICY_HASH_MISMATCH",
+      "expected_failure_class": "POLICY_HASH_MISMATCH",
+      "check_id": "design-capability.mjs::T0.loadCapabilityPolicy (hash freeze)",
+      "not_yet_runnable": false,
+      "note": "v0.3 §8 M11：tier/capability 篡改或绕过 consequence ⇒ 拒绝；policy 为 hash-frozen bundle（v0.4 §C5）。"
+    },
+    {
+      "mutation_id": "M11-t1",
+      "name": "ticket-absent",
+      "owner": "P1a-E2E",
+      "summary": "M11 增补负例（v0.4 §C1）：无票调用 design handler ⇒ TICKET_INVALID 拒绝。",
+      "injection": {
+        "kind": "not_yet_runnable",
+        "description": "planned：无 case_ticket 直接调用 design handler，断言 TICKET_INVALID。"
+      },
+      "target_gate": {
+        "planned": "P1a: ticket 契约门（§C1 全入口验票）— ticket 实现未落地"
+      },
+      "expected_status": "deny",
+      "expected_reason": "TICKET_INVALID",
+      "expected_failure_class": "TICKET_INVALID",
+      "check_id": "pending:C1-ticket-gate",
+      "not_yet_runnable": true,
+      "note": "v0.4 §C1：无票 / 伪票 / 过期票 / 复用票 / 错 snapshot / 错 op / raw executor 直调 handler 全部必须拒绝。"
+    },
+    {
+      "mutation_id": "M11-t2",
+      "name": "ticket-forged",
+      "owner": "P1a-E2E",
+      "summary": "M11 增补负例（v0.4 §C1）：伪票（HMAC 不符）⇒ 拒绝。",
+      "injection": {
+        "kind": "not_yet_runnable",
+        "description": "planned：构造 HMAC 签名不符的伪票，断言 TICKET_INVALID。"
+      },
+      "target_gate": {
+        "planned": "P1a: ticket 契约门（HMAC 验签）— ticket 实现未落地"
+      },
+      "expected_status": "deny",
+      "expected_reason": "TICKET_INVALID",
+      "expected_failure_class": "TICKET_INVALID",
+      "check_id": "pending:C1-ticket-gate",
+      "not_yet_runnable": true,
+      "note": ""
+    },
+    {
+      "mutation_id": "M11-t3",
+      "name": "ticket-expired",
+      "owner": "P1a-E2E",
+      "summary": "M11 增补负例（v0.4 §C1）：过期票（expires_at 已过）⇒ 拒绝。",
+      "injection": {
+        "kind": "not_yet_runnable",
+        "description": "planned：构造 expires_at 已过的票据，断言 TICKET_INVALID。"
+      },
+      "target_gate": {
+        "planned": "P1a: ticket 契约门（TTL 校验）— ticket 实现未落地"
+      },
+      "expected_status": "deny",
+      "expected_reason": "TICKET_INVALID",
+      "expected_failure_class": "TICKET_INVALID",
+      "check_id": "pending:C1-ticket-gate",
+      "not_yet_runnable": true,
+      "note": ""
+    },
+    {
+      "mutation_id": "M11-t4",
+      "name": "ticket-replay",
+      "owner": "P1a-E2E",
+      "summary": "M11 增补负例（v0.4 §C1）：复用票（一次性消费后重放）⇒ 拒绝。",
+      "injection": {
+        "kind": "not_yet_runnable",
+        "description": "planned：同票第二次消费（CAS 已消费），断言 TICKET_INVALID。"
+      },
+      "target_gate": {
+        "planned": "P1a: ticket 契约门（一次性 CAS 消费）— ticket 实现未落地"
+      },
+      "expected_status": "deny",
+      "expected_reason": "TICKET_INVALID",
+      "expected_failure_class": "TICKET_INVALID",
+      "check_id": "pending:C1-ticket-gate",
+      "not_yet_runnable": true,
+      "note": ""
+    },
+    {
+      "mutation_id": "M11-t5",
+      "name": "ticket-wrong-snapshot",
+      "owner": "P1a-E2E",
+      "summary": "M11 增补负例（v0.4 §C1）：错 snapshot（票绑定 parent_snapshot 与当前不符）⇒ 拒绝。",
+      "injection": {
+        "kind": "not_yet_runnable",
+        "description": "planned：票绑定 A 快照却对 B 快照消费，断言 TICKET_INVALID。"
+      },
+      "target_gate": {
+        "planned": "P1a: ticket 契约门（snapshot 绑定校验）— ticket 实现未落地"
+      },
+      "expected_status": "deny",
+      "expected_reason": "TICKET_INVALID",
+      "expected_failure_class": "TICKET_INVALID",
+      "check_id": "pending:C1-ticket-gate",
+      "not_yet_runnable": true,
+      "note": ""
+    },
+    {
+      "mutation_id": "M11-t6",
+      "name": "ticket-wrong-op",
+      "owner": "P1a-E2E",
+      "summary": "M11 增补负例（v0.4 §C1）：错 op（票绑定 operation 与调用不符）⇒ 拒绝。",
+      "injection": {
+        "kind": "not_yet_runnable",
+        "description": "planned：票绑定 op A 却调用 op B，断言 TICKET_INVALID。"
+      },
+      "target_gate": {
+        "planned": "P1a: ticket 契约门（operation 绑定校验）— ticket 实现未落地"
+      },
+      "expected_status": "deny",
+      "expected_reason": "TICKET_INVALID",
+      "expected_failure_class": "TICKET_INVALID",
+      "check_id": "pending:C1-ticket-gate",
+      "not_yet_runnable": true,
+      "note": ""
+    },
+    {
+      "mutation_id": "M11-t7",
+      "name": "ticket-raw-executor-direct-call",
+      "owner": "P1a-E2E",
+      "summary": "M11 增补负例（v0.4 §C1）：raw executor 直调 design handler（绕过 designTool 通道）⇒ 拒绝。",
+      "injection": {
+        "kind": "not_yet_runnable",
+        "description": "planned：经 raw dispatcher 直调 handler（无 ticket），断言拒绝且 handler 不消费/不生成 design artifact。"
+      },
+      "target_gate": {
+        "planned": "P1a: ticket 契约门（raw 通道全拒 + 无票不消费）— ticket 实现未落地"
+      },
+      "expected_status": "deny",
+      "expected_reason": "TICKET_INVALID",
+      "expected_failure_class": "TICKET_INVALID",
+      "check_id": "pending:C1-ticket-gate",
+      "not_yet_runnable": true,
+      "note": "§4.5 raw-op 旁路的行为负测已由 design-containment.mjs（raw POST → PANEL_OP_NOT_ALLOWED、callBio → DESIGN_TOOL_REQUIRED）覆盖；此处为变异注入语义（破坏 allowlist 后仍须被门以稳定类别抓住），需 ticket 实现后落门。"
+    },
+    {
+      "mutation_id": "M12-R1a",
+      "name": "redline-circuit-sbml-to-consequence",
+      "owner": "P1a-E2E",
+      "summary": "M12 拆分 R1a：circuit SBML 传给 consequence ⇒ 拒。",
+      "injection": {
+        "kind": "not_yet_runnable",
+        "description": "planned：将 circuit SBML 作为 consequence 输入注入，断言 R1a 红线拒绝。"
+      },
+      "target_gate": {
+        "planned": "P1a: consequence 输入类别门（R1a）— 依赖 B1"
+      },
+      "expected_status": "deny",
+      "expected_reason": "R1A_INPUT_CLASS_FORBIDDEN",
+      "expected_failure_class": "R1A_INPUT_CLASS_FORBIDDEN",
+      "check_id": "pending:B1-consequence-gate",
+      "not_yet_runnable": true,
+      "note": ""
+    },
+    {
+      "mutation_id": "M12-R1b",
+      "name": "redline-fbc-gem-to-contextualize",
+      "owner": "P1a-E2E",
+      "summary": "M12 拆分 R1b：FBC GEM 传 contextualize 当 CRN ⇒ 拒。",
+      "injection": {
+        "kind": "not_yet_runnable",
+        "description": "planned：将 FBC GEM 作为 CRN 输入注入 contextualize，断言 R1b 红线拒绝。"
+      },
+      "target_gate": {
+        "planned": "P1a: contextualize 输入类别门（R1b）— 依赖 B1"
+      },
+      "expected_status": "deny",
+      "expected_reason": "R1B_INPUT_CLASS_FORBIDDEN",
+      "expected_failure_class": "R1B_INPUT_CLASS_FORBIDDEN",
+      "check_id": "pending:B1-contextualize-gate",
+      "not_yet_runnable": true,
+      "note": ""
+    },
+    {
+      "mutation_id": "M12-R2",
+      "name": "redline-score-as-bound",
+      "owner": "P1a-E2E",
+      "summary": "M12 拆分 R2：score 当 bound ⇒ 拒。",
+      "injection": {
+        "kind": "not_yet_runnable",
+        "description": "planned：将 score 字段注入为 coupling bound，断言 R2 红线拒绝。"
+      },
+      "target_gate": {
+        "planned": "P1a: coupling 输入类别门（R2）— 依赖 B1"
+      },
+      "expected_status": "deny",
+      "expected_reason": "R2_SCORE_AS_BOUND",
+      "expected_failure_class": "R2_SCORE_AS_BOUND",
+      "check_id": "pending:B1-coupling-gate",
+      "not_yet_runnable": true,
+      "note": ""
+    },
+    {
+      "mutation_id": "M12-R3",
+      "name": "redline-no-coupling-quantitative-not-run",
+      "owner": "P1a-E2E",
+      "summary": "M12 拆分 R3：无 coupling 的定量 ⇒ NOT_RUN。",
+      "injection": {
+        "kind": "not_yet_runnable",
+        "description": "planned：在无 coupling_profile@1 时请求定量 consequence，断言 NOT_RUN。"
+      },
+      "target_gate": {
+        "planned": "P1a: consequence 前置门（coupling 必须已注册）— 依赖 B1"
+      },
+      "expected_status": "NOT_RUN",
+      "expected_reason": "NOT_RUN",
+      "expected_failure_class": "NOT_RUN",
+      "check_id": "pending:B1-consequence-gate",
+      "not_yet_runnable": true,
+      "note": "v0.3 §3.2 R3：coupling_profile@1 为唯一跨层入口。"
+    },
+    {
+      "mutation_id": "M12-PT",
+      "name": "redline-provenance-tampering",
+      "owner": "P1a-E2E",
+      "summary": "M12 拆分 provenance tampering：改 input_kind/单位/transform/source ⇒ 拒。",
+      "injection": {
+        "kind": "not_yet_runnable",
+        "description": "planned：篡改 provenance 的 input_kind / 单位 / transform / source 字段，断言 DAG 反查门拒绝。"
+      },
+      "target_gate": {
+        "planned": "P1a: provenance_dag@1 反查门（claim→evidence→gpr_proof 链路）— 依赖 B1"
+      },
+      "expected_status": "deny",
+      "expected_reason": "PROVENANCE_TAMPERED",
+      "expected_failure_class": "PROVENANCE_TAMPERED",
+      "check_id": "pending:B1-provenance-gate",
+      "not_yet_runnable": true,
+      "note": "v0.3 §3.2 R3：validator 反查 rule→evidence→gpr_proof。"
+    },
+    {
+      "mutation_id": "M13",
+      "name": "circular-topology",
+      "owner": "P1a-E2E",
+      "summary": "circular/topology：注入 provenance DAG 环或非法拓扑后必须被拒绝。",
+      "injection": {
+        "kind": "not_yet_runnable",
+        "description": "planned：构造 provenance_dag@1 环/重复边/悬空端点，断言拓扑门拒绝。"
+      },
+      "target_gate": {
+        "planned": "P1a: provenance_dag@1 拓扑门（acyclic + typed edges + 端点存在性）— 依赖 B1"
+      },
+      "expected_status": "deny",
+      "expected_reason": "DAG_TOPOLOGY_INVALID",
+      "expected_failure_class": "DAG_TOPOLOGY_INVALID",
+      "check_id": "pending:B1-provenance-gate",
+      "not_yet_runnable": true,
+      "note": "v0.3 §5 provenance_dag@1：acyclic 校验 + typed edges。"
+    },
+    {
+      "mutation_id": "M14",
+      "name": "archive-roundtrip",
+      "owner": "P1b-reference",
+      "summary": "archive round-trip：bundle.zip 导出→导入往返不一致必须被拒绝。",
+      "injection": {
+        "kind": "not_yet_runnable",
+        "description": "planned：注入导出 zip 内容漂移（缺 artifact / hash 不符），断言 archive round-trip 门拒绝。"
+      },
+      "target_gate": {
+        "planned": "P1b: export/archive round-trip 门（bundle 引用 snapshot_id，不包含自身 hash）— 依赖 P1a"
+      },
+      "expected_status": "roundtrip_mismatch",
+      "expected_reason": "ARCHIVE_ROUNDTRIP_MISMATCH",
+      "expected_failure_class": "ARCHIVE_ROUNDTRIP_MISMATCH",
+      "check_id": "pending:P1b-archive-gate",
+      "not_yet_runnable": true,
+      "note": "v0.3 §4.2：bundle.zip 是 export 侧产物，不得作为包含自身 hash 的 snapshot artifact。"
+    },
+    {
+      "mutation_id": "M15",
+      "name": "schema-version-drift",
+      "owner": "P1a-E2E",
+      "summary": "schema-version：注入 schema 版本漂移后必须被拒绝（语义版本门，非仅字节 hash）。",
+      "injection": {
+        "kind": "not_yet_runnable",
+        "description": "planned：篡改 schemas 的 $schema/$id 版本或 validator-init.json 版本契约，断言显式版本门拒绝。"
+      },
+      "target_gate": {
+        "planned": "P1a: schema 版本契约门（validator-init 契约 + 双端版本一致）— 当前 gate 仅字节 hash 层，语义版本门未接线"
+      },
+      "expected_status": "deny",
+      "expected_reason": "SCHEMA_VERSION_MISMATCH",
+      "expected_failure_class": "SCHEMA_VERSION_MISMATCH",
+      "check_id": "pending:P1a-schema-version-gate",
+      "not_yet_runnable": true,
+      "note": "注：字节篡改类漂移已被 M1/gate 的 hash 层覆盖；M15 需要的是版本语义门（$id/$schema/validator-init 契约），尚未实现。"
+    },
+    {
+      "mutation_id": "M16",
+      "name": "strict-bypass",
+      "owner": "P0b-fixture",
+      "summary": "strict-bypass：篡改 packet 后经 dispatch 通道提交 design op，gate 必须先行拦截（python 不启动、无 staging 残留）。",
+      "injection": {
+        "kind": "append_bytes",
+        "target": "design/packet/meta/unicode-domain-table.json",
+        "delta": " "
+      },
+      "target_gate": {
+        "command": ["node", "test/design-containment.mjs"],
+        "timeout_ms": 180000
+      },
+      "expected_status": "deny",
+      "expected_reason": "CONTRACT_PACKET_UNREVIEWED",
+      "expected_failure_class": "CONTRACT_PACKET_UNREVIEWED",
+      "check_id": "design-containment.mjs::4.dispatch tampered (gate-first, python not spawned)",
+      "not_yet_runnable": false,
+      "note": "strict 语义（v0.3 §3.1）下任何绕过尝试必须 fail-closed；design-containment §4 以真代码路径 + 子进程 + 假 venv 哨兵证明「gate 先行、python 未启动、无 staging 残留」。"
+    }
+  ]
+}
