@@ -1,0 +1,114 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "bundle://schemas/case_manifest.json",
+  "title": "case_manifest@1 (canonical snapshot manifest; snapshot_sha = sha256(canonical(doc without snapshot_sha)))",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_content_id",
+    "artifacts",
+    "policy"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "case_content_id": {
+      "$ref": "bundle://meta/common.defs.json#/definitions/sha256Hex"
+    },
+    "snapshot_sha": {
+      "$ref": "bundle://meta/common.defs.json#/definitions/sha256Hex"
+    },
+    "artifacts": {
+      "type": "array",
+      "x-canonical": "set",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "artifact_id": {
+            "$ref": "bundle://meta/common.defs.json#/definitions/sha256Hex"
+          },
+          "type": {
+            "enum": [
+              "genome_ref@1",
+              "input_snapshot@1",
+              "host_profile@1",
+              "condition_card@1",
+              "evidence_item@1",
+              "circuit_design@1",
+              "kinetic_crn_ref@1",
+              "integration_candidate@1",
+              "expression_scenario@1",
+              "gem_card_raw@1",
+              "metabolic_model_ref@1",
+              "host_model_binding@1",
+              "gpr_proof@1",
+              "coupling_profile@1",
+              "consequence_run@1",
+              "tier_decision@1",
+              "numeric_policy@1",
+              "unit_vocabulary@1",
+              "integration_ruleset@1",
+              "provenance_dag@1",
+              "case_report@1"
+            ]
+          },
+          "inputs": {
+            "type": "array",
+            "x-canonical": "set",
+            "items": {
+              "$ref": "bundle://meta/common.defs.json#/definitions/sha256Hex"
+            }
+          },
+          "producer": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "schema_major": {
+            "const": "1"
+          },
+          "canonical_path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          }
+        },
+        "required": [
+          "artifact_id",
+          "type",
+          "inputs",
+          "producer",
+          "schema_major",
+          "canonical_path"
+        ]
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "policy_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "policy_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "policy_hash": {
+          "$ref": "bundle://meta/common.defs.json#/definitions/sha256Hex"
+        }
+      },
+      "required": [
+        "policy_id",
+        "policy_version",
+        "policy_hash"
+      ]
+    }
+  }
+}

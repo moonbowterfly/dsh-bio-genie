@@ -1,0 +1,136 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "bundle://schemas/unit_vocabulary.json",
+  "title": "unit_vocabulary@1 (units + dimension algebra + forbidden mixes)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_type",
+    "units",
+    "conversions",
+    "forbidden_mixes"
+  ],
+  "properties": {
+    "artifact_type": {
+      "const": "unit_vocabulary@1"
+    },
+    "units": {
+      "type": "array",
+      "x-canonical": "set",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "unit_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32
+          },
+          "dimension": {
+            "type": "array",
+            "x-canonical": "set",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "base": {
+                  "enum": [
+                    "mass",
+                    "length",
+                    "time",
+                    "amount",
+                    "charge",
+                    "temperature",
+                    "dimensionless"
+                  ]
+                },
+                "exponent": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "base",
+                "exponent"
+              ]
+            }
+          }
+        },
+        "required": [
+          "unit_id",
+          "symbol",
+          "dimension"
+        ]
+      }
+    },
+    "conversions": {
+      "type": "array",
+      "x-canonical": "set",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "from": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "to": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "factor": {
+            "type": "string",
+            "x-decimal-string": true,
+            "pattern": "^(0|-?(0\\.[0-9]*[1-9]|[1-9][0-9]*(\\.[0-9]*[1-9])?))$",
+            "maxLength": 320
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 1024
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "factor"
+        ]
+      }
+    },
+    "forbidden_mixes": {
+      "type": "array",
+      "x-canonical": "set",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "a": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "b": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          }
+        },
+        "required": [
+          "a",
+          "b",
+          "reason"
+        ]
+      }
+    }
+  }
+}

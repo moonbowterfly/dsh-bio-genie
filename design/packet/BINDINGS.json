@@ -1,0 +1,34 @@
+{
+  "title": "packet-level bindings (I3 + v0.12/rev3): profile / grammar chain / pattern library / locks",
+  "profile": {
+    "id": "casefile-c14n@1",
+    "rev": "2026-10-13b",
+    "sha256": "cfe0b23c06ca0908bf3583cd9e9ce93bfef65c3eeb342cc435d78ce1c1d44a0f",
+    "superseded": "ea48988ad9eecf454263cbb21311d45fecdb7e2d74664844fb31e7c46b622ca8"
+  },
+  "spec_chain": {
+    "v0.9": "29795b10a999fd953cd25ab4202d3f39e00e2ec61fdc099c1d8fb8dfaffa2e79",
+    "v0.10": "34f244c6ff0f45de0c86fa417b9fae2f81d17f8fdaed521dc7bd19d821d98aa3",
+    "v0.11": "74088732bbfe4c4ed18b57673d3760045812b9e198b2e617b3a26f841aa20bcd",
+    "v0.12": "9b38d84633b8f18a61b1733390c570809febd5724b95827e5d02ab2fc3448f73"
+  },
+  "common_defs": {
+    "sha256": "c500b67fcd4588c308eaa9f7ea64e2aa52a8f51156375e11c7925b657b0fd98c"
+  },
+  "pattern_library": {
+    "sha256": "a0bf46ccef54a774987af2e58e576eea44bef8f95ab7ea1fa58071155f45349e",
+    "patterns_canonical_sha256": "8d324aeb0a88d61885c31c94436c7b2f20fca5c03a2c40bd229bcd75a6ffa053"
+  },
+  "unicode_domain_table": {
+    "sha256": "89c605f4ee45cd60e4037cc2d705af5195a44d5de6a40dbdd2502e68884a3845"
+  },
+  "bundle_manifest_sha256": "fef3b1135036cfb8fd787e803d2ee44f32b2161c9809431a591cf7eda2e91b56",
+  "corpora": {
+    "c14n": "6f2f473e0f893575cd6e1d12f2c2b0d3f55dd958faaf561cf80f8efb1fa97719",
+    "schema": "e5732db900423bc364680696e06efdc328d37564c171f227b9269fd090065309"
+  },
+  "locks": {
+    "npm_package_lock_sha256": "faba1972fc69f6854d46ca5bf58210342b94d1817761e4fe374b8d00a1c6a273",
+    "python_requirements_lock_sha256": "1944f54fa5c7ec3c11e92211e26f42d7188979bbce2afa8d0724967733947fc4"
+  }
+}

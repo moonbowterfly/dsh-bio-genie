@@ -1,0 +1,59 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "bundle://schemas/host_model_binding.json",
+  "title": "host_model_binding@1 (only exact enters reference quantitative use)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_type",
+    "genome_sha256",
+    "model_sbml_sha256",
+    "binding_method",
+    "evidence_source",
+    "match_result"
+  ],
+  "properties": {
+    "artifact_type": {
+      "const": "host_model_binding@1"
+    },
+    "genome_sha256": {
+      "$ref": "bundle://meta/common.defs.json#/definitions/sha256Hex"
+    },
+    "model_sbml_sha256": {
+      "$ref": "bundle://meta/common.defs.json#/definitions/sha256Hex"
+    },
+    "binding_method": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      },
+      "required": [
+        "id",
+        "version"
+      ]
+    },
+    "evidence_source": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024
+    },
+    "match_result": {
+      "enum": [
+        "exact",
+        "evidence_missing",
+        "conflict",
+        "unresolved"
+      ]
+    }
+  }
+}

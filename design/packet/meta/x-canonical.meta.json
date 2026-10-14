@@ -1,0 +1,90 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "bundle://meta/x-canonical.meta.json",
+  "meta": "x-canonical",
+  "version": 1,
+  "keywords": {
+    "x-canonical": {
+      "kind": "annotation",
+      "valueDomain": ["set", "seq"],
+      "allowedOn": "array",
+      "registration": "ajv.addKeyword({keyword:'x-canonical', schemaType:'string'}) (annotation only, no validate)"
+    },
+    "x-decimal-string": {
+      "kind": "annotation",
+      "valueDomain": [true],
+      "allowedOn": "string",
+      "pairing": {
+        "mustCarry": "pattern equal to the canonicalDecimal library literal",
+        "enforcedBy": "lint L6",
+        "truth": "DECIMAL_STRING scanner runs at the three casefile semantic gates and takes precedence over any pattern"
+      }
+    }
+  },
+  "patterns_registry": {
+    "file": "bundle://meta/pattern-library.json",
+    "collection": "#/patterns",
+    "membership": "J1: a schema pattern value must byte-equal exactly one library literal (UTF-8 bytes)",
+    "duplicate_literal": "PATTERN_LIBRARY_AMBIGUOUS (lint rejects)",
+    "loader_note": "v0.12 K1: the library is an independent non-schema data resource; no validator compiles it and no keyword registration is used anywhere; the two frozen extension keywords remain the only extension keywords.",
+    "execution": {
+      "table": "per-entry execution_mode and matcher_id live in the packet-level validator-init.json under pattern_execution (kept out of the library so entries match the frozen I2 shape exactly: pattern / match_mode / domain / max_len)",
+      "matcher_layer": "shared matchers are the truth (matcher_id per entry in the table)",
+      "hosted_pattern": "for execution_mode=hosted_and entries, the hosted engine result participates with AND semantics; for matcher_only entries the hosted pattern is metadata and is not executed as a gate",
+      "convergence": "overall verdict = matcher AND hosted(where applicable); regressions covered by schema corpus including trailing-LF pathologies"
+    },
+    "length_accounting": "domain=ascii runs BEFORE max_len; on the ASCII path UTF-16 code units equal Unicode scalar values, so the two counts are equivalent after the gate; both sides nevertheless count Unicode scalar values explicitly (defense-in-depth); R6/R7 assert the gate order via exact stable codes",
+    "per_entry_audit": {
+      "requirement": "I2: every entry needs a length cap + ReDoS audit + dual-side corpus verdict samples",
+      "canonicalDecimal": {"max_len": 320, "redos": "linear; alternation branches prefix-distinct; no nested quantifiers", "corpus": "evidence/pattern_samples.py and .mjs (dual-side samples) + evidence/decimal_string_probe.py and .mjs (38 cases: H2 truth table + I1 additions + J3 additions) + schema corpus end-to-end (evi-05, cpl-07)"},
+      "sha256Hex": {"max_len": 64, "redos": "trivial; fixed-width character-class run", "corpus": "evidence/pattern_samples.py and .mjs + schema corpus end-to-end (gvr-05, gvr-01)"},
+      "jsonPointer": {"max_len": 2048, "redos": "linear; tilde excluded from the main class so the ~0/~1 branches are prefix-distinct; outer loop consumes at least one slash per iteration", "corpus": "evidence/pattern_samples.py and .mjs; semantics note: control characters are allowed by the RFC 6901 token alphabet (the class only excludes slash and tilde) — call sites that need stricter identifiers must bound inputs additionally"},
+      "bundlePath": {"max_len": 512, "redos": "trivial; single character-class run", "corpus": "evidence/pattern_samples.py and .mjs"},
+      "isoTimestamp": {"max_len": 20, "redos": "trivial; fixed-width pattern", "corpus": "evidence/pattern_samples.py and .mjs + schema corpus end-to-end (gvr-06); lexical-only (calendar fields are not validated)"}
+    }
+  },
+  "c14n_pipeline": [
+    "lossless-parse",
+    "reject-raw-duplicate-keys-and-lone-surrogates",
+    "nfc-normalize-all-strings",
+    "reject-post-nfc-key-collision",
+    "schema-validate-on-normalized-tree",
+    "canonical-serialize"
+  ],
+  "reject_codes": [
+    "INVALID_JSON",
+    "DUP_KEY",
+    "LONE_SURROGATE",
+    "NFC_KEY_COLLISION",
+    "NUMBER_OUT_OF_RANGE",
+    "UNANNOTATED_ARRAY",
+    "BAD_ANNOTATION",
+    "SET_DUPLICATE",
+    "DECIMAL_STRING_NONCANONICAL",
+    "PATTERN_LIBRARY_AMBIGUOUS",
+    "PATTERN_NOT_IN_LIBRARY",
+    "PATTERN_MAX_LEN",
+    "REF_FORM_INVALID",
+    "REGISTRY_UNRESOLVED",
+    "REF_ESCAPE",
+    "REF_REMOTE_FORBIDDEN",
+    "FORMAT_FORBIDDEN",
+    "UNEVAULATED_PROPERTIES_FORBIDDEN",
+    "SCHEMA_BUNDLE_UNPINNED",
+    "CORPUS_UNPINNED"
+  ],
+  "lint_checks": [
+    {"id": "L1", "rule": "schemas must not contain the keyword 'format' (FORMAT_FORBIDDEN)"},
+    {"id": "L2", "rule": "schemas must not contain 'unevaluatedProperties' (draft-07 does not define it)"},
+    {"id": "L3", "rule": "every 'pattern' value byte-equals exactly one library literal; otherwise PATTERN_NOT_IN_LIBRARY"},
+    {"id": "L4", "rule": "library literals are pairwise distinct; duplicates are PATTERN_LIBRARY_AMBIGUOUS"},
+    {"id": "L5", "rule": "'x-canonical' appears only on array nodes; value in set|seq"},
+    {"id": "L6", "rule": "'x-decimal-string' appears only on string nodes with value true and must pair with the canonicalDecimal literal"},
+    {"id": "L7", "rule": "$ref is either absolute form 'bundle://<manifest-path>[#pointer]' or same-file fragment form '#<pointer>'"},
+    {"id": "L8", "rule": "no remote or relative refs (REF_REMOTE_FORBIDDEN / REF_FORM_INVALID); bundle-escape is REF_ESCAPE"},
+    {"id": "L9", "rule": "every bundle file carries $schema (draft-07) and $id = bundle://<manifest path>"},
+    {"id": "L10", "rule": "the 'patterns' keyword appears only in meta/pattern-library.json (data resource; never compiled by any validator)"},
+    {"id": "L11", "rule": "object schemas declare type:'object' alongside 'properties' (ajv strictTypes)"},
+    {"id": "L12", "rule": "arrays intended for runtime use must carry an x-canonical annotation somewhere so runtime UNANNOTATED_ARRAY rejections are intentional"}
+  ]
+}

@@ -1,0 +1,106 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "bundle://schemas/genome_ref.json",
+  "title": "genome_ref@1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_type",
+    "files",
+    "contigs",
+    "coord_convention",
+    "source"
+  ],
+  "properties": {
+    "artifact_type": {
+      "const": "genome_ref@1"
+    },
+    "files": {
+      "type": "array",
+      "x-canonical": "seq",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "sha256": {
+            "$ref": "bundle://meta/common.defs.json#/definitions/sha256Hex"
+          },
+          "format": {
+            "enum": [
+              "fasta",
+              "genbank",
+              "gff3",
+              "other"
+            ]
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "format"
+        ]
+      }
+    },
+    "assembly": {
+      "type": "string",
+      "maxLength": 256
+    },
+    "strain": {
+      "type": "string",
+      "maxLength": 256
+    },
+    "taxon": {
+      "type": "string",
+      "maxLength": 256
+    },
+    "contigs": {
+      "type": "array",
+      "x-canonical": "seq",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "length": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "topology": {
+            "enum": [
+              "linear",
+              "circular"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "length",
+          "topology"
+        ]
+      }
+    },
+    "coord_convention": {
+      "enum": [
+        "0-based-half-open",
+        "1-based-inclusive"
+      ]
+    },
+    "source": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "fetched_at": {
+      "$ref": "bundle://meta/common.defs.json#/definitions/isoTimestamp"
+    }
+  }
+}

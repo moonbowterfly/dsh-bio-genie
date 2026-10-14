@@ -1,0 +1,150 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "bundle://schemas/circuit_design.json",
+  "title": "circuit_design@1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_type",
+    "source",
+    "template_ref"
+  ],
+  "properties": {
+    "artifact_type": {
+      "const": "circuit_design@1"
+    },
+    "source": {
+      "enum": [
+        "sbol_file",
+        "components"
+      ]
+    },
+    "components": {
+      "type": "array",
+      "x-canonical": "seq",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "part_id": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "kind": {
+            "enum": [
+              "promoter",
+              "rbs",
+              "cds",
+              "terminator",
+              "spacer",
+              "other"
+            ]
+          },
+          "sequence": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100000
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      }
+    },
+    "sequence_hashes": {
+      "type": "array",
+      "x-canonical": "set",
+      "items": {
+        "$ref": "bundle://meta/common.defs.json#/definitions/sha256Hex"
+      }
+    },
+    "orientation": {
+      "enum": [
+        "forward",
+        "reverse",
+        "unspecified"
+      ]
+    },
+    "constraints": {
+      "type": "array",
+      "x-canonical": "set",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 512
+      }
+    },
+    "part_refs": {
+      "type": "array",
+      "x-canonical": "set",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "part_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "evidence_level": {
+            "enum": [
+              "E0",
+              "E1",
+              "E2",
+              "E3"
+            ]
+          }
+        },
+        "required": [
+          "part_id",
+          "evidence_level"
+        ]
+      }
+    },
+    "template_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "template_id": {
+          "enum": [
+            "expression_balance",
+            "metabolic_valve"
+          ]
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      },
+      "required": [
+        "template_id",
+        "version"
+      ]
+    },
+    "parameters": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "conformance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "enum": [
+            "pass",
+            "fail",
+            "not_run"
+          ]
+        },
+        "detail": {
+          "type": "string",
+          "maxLength": 2048
+        }
+      },
+      "required": [
+        "status"
+      ]
+    }
+  }
+}

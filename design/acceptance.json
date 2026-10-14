@@ -1,0 +1,73 @@
+{
+  "record_type": "packet_acceptance@1",
+  "packet": {
+    "bundle_manifest_sha256": "fef3b1135036cfb8fd787e803d2ee44f32b2161c9809431a591cf7eda2e91b56",
+    "packet_index_file": "synbio-design-packet-rev4-2026-10-14/SHA256SUMS-packet.txt",
+    "packet_index_sha256": "927dc8131233e2001dd34e801dcb26d140d1841540f535d9011caf9da6777242",
+    "file_count": 79
+  },
+  "review": {
+    "policy_id": "packet-review-policy@1",
+    "policy_sha256": "6226830a6fbe7c0350a2c621adde904e55cce4d65addaafaa77607181fcfecb9",
+    "policy_definition": "窄范围复验（rev4）：两项残余（P0-2 direct-CLI verified-loader 闭环 / P0-5 净环境回放+self-cert）逐条解除条件核对 + 负测台架 + 净环境回放 + 无回归复跑；只读纪律；独立复跑优先。",
+    "report_path": "genie-synbio-design-packet-review-rev4-2026-10-14.md",
+    "report_sha256": "c9ebaa4d2f4da55d0430070f705586e8caad01b418c14717e0da7d9565613d7b",
+    "reviewer": "Codex（线程 01a12ff0-554d-7bf3-8ad1-6e94cdad137f；req_id H-20261014-PKT4）",
+    "decision": "approved",
+    "blocker_count": 0,
+    "blockers": [],
+    "review_chain": [
+      "packet-review-1：否（5×P0）→ rev2",
+      "packet-review-rev2：否（4×P0 残余）→ rev3",
+      "packet-review-rev3：否（2 项残余）→ rev4",
+      "packet-review-rev4：两项残余已解除——approved"
+    ]
+  },
+  "bindings": {
+    "profile_id": "casefile-c14n@1",
+    "profile_rev": "2026-10-13b",
+    "profile_sha256": "cfe0b23c06ca0908bf3583cd9e9ce93bfef65c3eeb342cc435d78ce1c1d44a0f",
+    "spec_chain": {
+      "v0.9": "29795b10a999fd953cd25ab4202d3f39e00e2ec61fdc099c1d8fb8dfaffa2e79",
+      "v0.10": "34f244c6ff0f45de0c86fa417b9fae2f81d17f8fdaed521dc7bd19d821d98aa3",
+      "v0.11": "74088732bbfe4c4ed18b57673d3760045812b9e198b2e617b3a26f841aa20bcd",
+      "v0.12": "9b38d84633b8f18a61b1733390c570809febd5724b95827e5d02ab2fc3448f73"
+    },
+    "pattern_library_sha256": "a0bf46ccef54a774987af2e58e576eea44bef8f95ab7ea1fa58071155f45349e",
+    "unicode_domain_table_sha256": "89c605f4ee45cd60e4037cc2d705af5195a44d5de6a40dbdd2502e68884a3845",
+    "common_defs_sha256": "c500b67fcd4588c308eaa9f7ea64e2aa52a8f51156375e11c7925b657b0fd98c",
+    "corpora": {
+      "c14n": "6f2f473e0f893575cd6e1d12f2c2b0d3f55dd958faaf561cf80f8efb1fa97719",
+      "schema": "e5732db900423bc364680696e06efdc328d37564c171f227b9269fd090065309"
+    },
+    "note": "绑定集与 packet/BINDINGS.json 完全一致（均为 packet 内文件哈希）。"
+  },
+  "carried_to_implementation": {
+    "note": "P0a-实现清单（审阅方标注『不阻断升级』）——实现期处理，勿计为未解决阻断。",
+    "items": [
+      "probe_ajv.mjs T9 标签与实现不符（称 compiles schema set，实际仅 synthetic t5）→ 改标签或复用全集编译器（全量 23-schema 证据已由 check_compile.mjs 承担）",
+      "probe_jsonschema.py 未在 K8 的 18 个正式 runner inventory 内且未固定 UTF-8（当前仅 ASCII 输出）→ 补 pin 或在规格/README 明确其为非 runner 证据 probe"
+    ]
+  },
+  "producer": "Hermes bsp",
+  "storage": {
+    "version_chain": "D:/Program/sharespace/",
+    "packet_mirror": "D:/Program/sharespace/synbio-design-packet-rev4-2026-10-14/",
+    "working_copy": "D:/Program/dsh-plug-develop/genie-synbio-design-20261012/packet-rev2/"
+  },
+  "effective_from": "2026-10-14T01:24:47+08:00",
+  "supersedes": null,
+  "revocation": {
+    "triggers": [
+      "manifest 清单内任一文件字节变化（或 packet_index_sha256 不匹配）",
+      "bundle_manifest_sha256 与目标 packet 不一致",
+      "review policy 被新版本取代且声明追溯",
+      "显式撤销记录（本记录类型 + supersedes 指向本记录）"
+    ],
+    "mechanism": "新增 packet_acceptance@1（supersedes=<本记录哈希>）或撤销记录；消费者（design-tool 启用门）必须要求 active packet 的 manifest hash 与某条未撤销 acceptance 精确匹配，否则拒绝启用"
+  },
+  "expiry": {
+    "kind": "hash_bound_no_time_expiry",
+    "note": "有效性由哈希绑定决定，无时间过期；仅在触发条件命中或撤销时失效"
+  }
+}

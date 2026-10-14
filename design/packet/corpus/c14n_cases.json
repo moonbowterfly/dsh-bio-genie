@@ -1,0 +1,502 @@
+{
+ "corpus": "synbio-c14n-corpus",
+ "version": 1,
+ "profile": "casefile-c14n@1 (rev2026-10-13)",
+ "cases": [
+  {
+   "id": "c001",
+   "note": "key sorting basic",
+   "input": "{\"b\":1,\"a\":2}",
+   "annotations": {},
+   "expect": "accept",
+   "canonical": "{\"a\":2,\"b\":1}"
+  },
+  {
+   "id": "c002",
+   "note": "nested objects and seq array",
+   "input": "{\"z\":{\"y\":1},\"a\":[3,2]}",
+   "annotations": {
+    "$/a": "seq"
+   },
+   "expect": "accept",
+   "canonical": "{\"a\":[3,2],\"z\":{\"y\":1}}"
+  },
+  {
+   "id": "c003",
+   "note": "seq keeps order",
+   "input": "{\"x\":[\"b\",\"a\"]}",
+   "annotations": {
+    "$/x": "seq"
+   },
+   "expect": "accept",
+   "canonical": "{\"x\":[\"b\",\"a\"]}"
+  },
+  {
+   "id": "c004",
+   "note": "set sorts ascending",
+   "input": "{\"x\":[\"b\",\"a\"]}",
+   "annotations": {
+    "$/x": "set"
+   },
+   "expect": "accept",
+   "canonical": "{\"x\":[\"a\",\"b\"]}"
+  },
+  {
+   "id": "c025",
+   "note": "empty object and empty seq array",
+   "input": "{\"a\":{},\"b\":[]}",
+   "annotations": {
+    "$/b": "seq"
+   },
+   "expect": "accept",
+   "canonical": "{\"a\":{},\"b\":[]}"
+  },
+  {
+   "id": "c036",
+   "note": "set and seq side by side",
+   "input": "{\"s\":[\"b\",\"a\"],\"q\":[\"b\",\"a\"]}",
+   "annotations": {
+    "$/s": "set",
+    "$/q": "seq"
+   },
+   "expect": "accept",
+   "canonical": "{\"q\":[\"b\",\"a\"],\"s\":[\"a\",\"b\"]}"
+  },
+  {
+   "id": "c038",
+   "note": "true false null mix",
+   "input": "{\"a\":true,\"b\":false,\"c\":null}",
+   "annotations": {},
+   "expect": "accept",
+   "canonical": "{\"a\":true,\"b\":false,\"c\":null}"
+  },
+  {
+   "id": "c005",
+   "note": "set: U+FFFF vs U+10000 sorts by UTF-8 bytes (FFFF first)",
+   "input": "{\"x\":[\"￿\",\"𐀀\"]}",
+   "annotations": {
+    "$/x": "set"
+   },
+   "expect": "accept",
+   "canonical": "{\"x\":[\"￿\",\"𐀀\"]}"
+  },
+  {
+   "id": "c006",
+   "note": "keys: U+FFFF vs U+10000 sorts by UTF-16 units (10000 first)",
+   "input": "{\"￿\":1,\"𐀀\":2}",
+   "annotations": {},
+   "expect": "accept",
+   "canonical": "{\"𐀀\":2,\"￿\":1}"
+  },
+  {
+   "id": "c007",
+   "note": "NFC normalize key and value",
+   "input": "{\"é\":\"é\"}",
+   "annotations": {},
+   "expect": "accept",
+   "canonical": "{\"é\":\"é\"}"
+  },
+  {
+   "id": "c008",
+   "note": "NFC key collision rejects",
+   "input": "{\"é\":1,\"é\":2}",
+   "annotations": {},
+   "expect": "reject",
+   "code": "NFC_KEY_COLLISION"
+  },
+  {
+   "id": "c037",
+   "note": "root string NFC",
+   "input": "\"é\"",
+   "annotations": {},
+   "expect": "accept",
+   "canonical": "\"é\""
+  },
+  {
+   "id": "c023",
+   "note": "U+2028/U+2029 raw kept",
+   "input": "{\"s\":\"  \"}",
+   "annotations": {},
+   "expect": "accept",
+   "canonical": "{\"s\":\"  \"}"
+  },
+  {
+   "id": "c024",
+   "note": "DEL and C1 raw kept",
+   "input": "{\"s\":\"\"}",
+   "annotations": {},
+   "expect": "accept",
+   "canonical": "{\"s\":\"\"}"
+  },
+  {
+   "id": "c009",
+   "note": "lone surrogate in value rejects",
+   "input": "{\"s\":\"\\uD800\"}",
+   "annotations": {},
+   "expect": "reject",
+   "code": "LONE_SURROGATE"
+  },
+  {
+   "id": "c010",
+   "note": "duplicate raw keys reject",
+   "input": "{\"a\":1,\"a\":2}",
+   "annotations": {},
+   "expect": "reject",
+   "code": "DUP_KEY"
+  },
+  {
+   "id": "c029",
+   "note": "invalid json",
+   "input": "{",
+   "annotations": {},
+   "expect": "reject",
+   "code": "INVALID_JSON"
+  },
+  {
+   "id": "c030",
+   "note": "trailing garbage",
+   "input": "{\"a\":1} x",
+   "annotations": {},
+   "expect": "reject",
+   "code": "INVALID_JSON"
+  },
+  {
+   "id": "c012",
+   "note": "exponent/float/negative-zero normalize",
+   "input": "[1e0,1.0,-0]",
+   "annotations": {
+    "$": "seq"
+   },
+   "expect": "accept",
+   "canonical": "[1,1,0]"
+  },
+  {
+   "id": "c013",
+   "note": "safe integer max",
+   "input": "9007199254740991",
+   "annotations": {},
+   "expect": "accept",
+   "canonical": "9007199254740991"
+  },
+  {
+   "id": "c014",
+   "note": "2^53 out of range",
+   "input": "9007199254740992",
+   "annotations": {},
+   "expect": "reject",
+   "code": "NUMBER_OUT_OF_RANGE"
+  },
+  {
+   "id": "c015",
+   "note": "1e21 out of range integer",
+   "input": "1e21",
+   "annotations": {},
+   "expect": "reject",
+   "code": "NUMBER_OUT_OF_RANGE"
+  },
+  {
+   "id": "c016",
+   "note": "1e-7 scientific",
+   "input": "1e-7",
+   "annotations": {},
+   "expect": "accept",
+   "canonical": "1e-7"
+  },
+  {
+   "id": "c017",
+   "note": "1e-6 plain decimal",
+   "input": "1e-6",
+   "annotations": {},
+   "expect": "accept",
+   "canonical": "0.000001"
+  },
+  {
+   "id": "c018",
+   "note": "0.1",
+   "input": "0.1",
+   "annotations": {},
+   "expect": "accept",
+   "canonical": "0.1"
+  },
+  {
+   "id": "c019",
+   "note": "5e-324 min subnormal",
+   "input": "5e-324",
+   "annotations": {},
+   "expect": "accept",
+   "canonical": "5e-324"
+  },
+  {
+   "id": "c020",
+   "note": "1.5e300 out of range",
+   "input": "1.5e300",
+   "annotations": {},
+   "expect": "reject",
+   "code": "NUMBER_OUT_OF_RANGE"
+  },
+  {
+   "id": "c021",
+   "note": "1e20 out of range",
+   "input": "1e20",
+   "annotations": {},
+   "expect": "reject",
+   "code": "NUMBER_OUT_OF_RANGE"
+  },
+  {
+   "id": "c031",
+   "note": "exponent forms",
+   "input": "[1E+2,2e-2]",
+   "annotations": {
+    "$": "seq"
+   },
+   "expect": "accept",
+   "canonical": "[100,0.02]"
+  },
+  {
+   "id": "c032",
+   "note": "zero forms",
+   "input": "[0.0,0,-0.0]",
+   "annotations": {
+    "$": "seq"
+   },
+   "expect": "accept",
+   "canonical": "[0,0,0]"
+  },
+  {
+   "id": "c033",
+   "note": "-1.5e-8",
+   "input": "-1.5e-8",
+   "annotations": {},
+   "expect": "accept",
+   "canonical": "-1.5e-8"
+  },
+  {
+   "id": "c034",
+   "note": "long fraction shortest repr",
+   "input": "123456789.123456789",
+   "annotations": {},
+   "expect": "accept",
+   "canonical": "123456789.12345679"
+  },
+  {
+   "id": "c035",
+   "note": "negative safe integer max",
+   "input": "-9007199254740991",
+   "annotations": {},
+   "expect": "accept",
+   "canonical": "-9007199254740991"
+  },
+  {
+   "id": "c039",
+   "note": "-0",
+   "input": "-0",
+   "annotations": {},
+   "expect": "accept",
+   "canonical": "0"
+  },
+  {
+   "id": "c040",
+   "note": "-0.0",
+   "input": "-0.0",
+   "annotations": {},
+   "expect": "accept",
+   "canonical": "0"
+  },
+  {
+   "id": "c042",
+   "note": "1e-21",
+   "input": "1e-21",
+   "annotations": {},
+   "expect": "accept",
+   "canonical": "1e-21"
+  },
+  {
+   "id": "c043",
+   "note": "1.5",
+   "input": "1.5",
+   "annotations": {},
+   "expect": "accept",
+   "canonical": "1.5"
+  },
+  {
+   "id": "c044",
+   "note": "-2",
+   "input": "-2",
+   "annotations": {},
+   "expect": "accept",
+   "canonical": "-2"
+  },
+  {
+   "id": "c022",
+   "note": "escape set round-trip",
+   "input": "{\"s\":\"a\\\"b\\\\c\\u0001\\n\\t\"}",
+   "annotations": {},
+   "expect": "accept",
+   "canonical": "{\"s\":\"a\\\"b\\\\c\\u0001\\n\\t\"}"
+  },
+  {
+   "id": "c045",
+   "note": "forward slash not escaped",
+   "input": "{\"s\":\"a/b\"}",
+   "annotations": {},
+   "expect": "accept",
+   "canonical": "{\"s\":\"a/b\"}"
+  },
+  {
+   "id": "c011",
+   "note": "unannotated array rejects",
+   "input": "{\"x\":[1]}",
+   "annotations": {},
+   "expect": "reject",
+   "code": "UNANNOTATED_ARRAY"
+  },
+  {
+   "id": "c026",
+   "note": "set duplicate rejects",
+   "input": "[1,1]",
+   "annotations": {
+    "$": "set"
+   },
+   "expect": "reject",
+   "code": "SET_DUPLICATE"
+  },
+  {
+   "id": "c027",
+   "note": "set canonical-equivalent duplicate rejects",
+   "input": "[1.0,1]",
+   "annotations": {
+    "$": "set"
+   },
+   "expect": "reject",
+   "code": "SET_DUPLICATE"
+  },
+  {
+   "id": "c041",
+   "note": "set NFC-equivalent duplicate rejects",
+   "input": "[\"é\",\"é\"]",
+   "annotations": {
+    "$": "set"
+   },
+   "expect": "reject",
+   "code": "SET_DUPLICATE"
+  },
+  {
+   "id": "c046",
+   "note": "emoji non-BMP raw",
+   "input": "{\"s\":\"😀\"}",
+   "annotations": {},
+   "expect": "accept",
+   "canonical": "{\"s\":\"😀\"}"
+  },
+  {
+   "id": "c047",
+   "note": "key sort ascii vs non-ascii",
+   "input": "{\"z1\":1,\"一\":2,\"a2\":3}",
+   "annotations": {},
+   "expect": "accept",
+   "canonical": "{\"a2\":3,\"z1\":1,\"一\":2}"
+  },
+  {
+   "id": "c048",
+   "note": "set mixed types sorted by canonical bytes",
+   "input": "[\"b\",2,true,null,1,\"a\"]",
+   "annotations": {
+    "$": "set"
+   },
+   "expect": "accept",
+   "canonical": "[\"a\",\"b\",1,2,null,true]"
+  },
+  {
+   "id": "c049",
+   "note": "set duplicate via 1e2 vs 100",
+   "input": "[1e2,100]",
+   "annotations": {
+    "$": "set"
+   },
+   "expect": "reject",
+   "code": "SET_DUPLICATE"
+  },
+  {
+   "id": "c050",
+   "note": "set of objects sorted by canonical text",
+   "input": "[{\"b\":1,\"a\":2},{\"a\":1}]",
+   "annotations": {
+    "$": "set"
+   },
+   "expect": "accept",
+   "canonical": "[{\"a\":1},{\"a\":2,\"b\":1}]"
+  },
+  {
+   "id": "c051",
+   "note": "key lexicographic a10 vs a2",
+   "input": "{\"a2\":1,\"a10\":2}",
+   "annotations": {},
+   "expect": "accept",
+   "canonical": "{\"a10\":2,\"a2\":1}"
+  },
+  {
+   "id": "c052",
+   "note": "empty string key and value",
+   "input": "{\"\":\"\"}",
+   "annotations": {},
+   "expect": "accept",
+   "canonical": "{\"\":\"\"}"
+  },
+  {
+   "id": "c053",
+   "note": "string with only newline escape",
+   "input": "{\"s\":\"\\n\"}",
+   "annotations": {},
+   "expect": "accept",
+   "canonical": "{\"s\":\"\\n\"}"
+  },
+  {
+   "id": "c055",
+   "note": "gate: pre-15.0 combining mark ok",
+   "input": "{\"s\":\"A̕\"}",
+   "annotations": {},
+   "expect": "accept",
+   "canonical": "{\"s\":\"A̕\"}"
+  },
+  {
+   "id": "c056",
+   "note": "gate: U+1ACF outside UCD 15.0 rejects",
+   "input": "{\"s\":\"A̕᫏\"}",
+   "annotations": {},
+   "expect": "reject",
+   "code": "UNICODE_OUT_OF_FROZEN_DOMAIN"
+  },
+  {
+   "id": "c057",
+   "note": "gate: noncharacter U+FDD0 allowed",
+   "input": "{\"s\":\"﷐\"}",
+   "annotations": {},
+   "expect": "accept",
+   "canonical": "{\"s\":\"﷐\"}"
+  },
+  {
+   "id": "c058",
+   "note": "gate: private use U+E000 allowed",
+   "input": "{\"s\":\"\"}",
+   "annotations": {},
+   "expect": "accept",
+   "canonical": "{\"s\":\"\"}"
+  },
+  {
+   "id": "c059",
+   "note": "gate: astral assigned U+20000 allowed",
+   "input": "{\"s\":\"𠀀\"}",
+   "annotations": {},
+   "expect": "accept",
+   "canonical": "{\"s\":\"𠀀\"}"
+  },
+  {
+   "id": "c028",
+   "note": "deep nesting 20",
+   "input": "{\"k19\":{\"k18\":{\"k17\":{\"k16\":{\"k15\":{\"k14\":{\"k13\":{\"k12\":{\"k11\":{\"k10\":{\"k9\":{\"k8\":{\"k7\":{\"k6\":{\"k5\":{\"k4\":{\"k3\":{\"k2\":{\"k1\":{\"k0\":1}}}}}}}}}}}}}}}}}}}}",
+   "annotations": {},
+   "expect": "accept",
+   "canonical": "{\"k19\":{\"k18\":{\"k17\":{\"k16\":{\"k15\":{\"k14\":{\"k13\":{\"k12\":{\"k11\":{\"k10\":{\"k9\":{\"k8\":{\"k7\":{\"k6\":{\"k5\":{\"k4\":{\"k3\":{\"k2\":{\"k1\":{\"k0\":1}}}}}}}}}}}}}}}}}}}}"
+  }
+ ]
+}

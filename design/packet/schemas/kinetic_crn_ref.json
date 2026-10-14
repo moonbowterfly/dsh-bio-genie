@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "bundle://schemas/kinetic_crn_ref.json",
+  "title": "kinetic_crn_ref@1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_type",
+    "model_kind",
+    "sbml_ref"
+  ],
+  "properties": {
+    "artifact_type": {
+      "const": "kinetic_crn_ref@1"
+    },
+    "model_kind": {
+      "const": "kinetic_crn"
+    },
+    "sbml_ref": {
+      "$ref": "bundle://meta/common.defs.json#/definitions/artifactRef"
+    },
+    "compiled_from": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "type": "string",
+          "maxLength": 512
+        },
+        "tool": {
+          "type": "string",
+          "maxLength": 128
+        }
+      },
+      "required": [
+        "source",
+        "tool"
+      ]
+    }
+  }
+}

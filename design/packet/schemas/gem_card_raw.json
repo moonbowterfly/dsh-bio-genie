@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "bundle://schemas/gem_card_raw.json",
+  "title": "gem_card_raw@1 (frozen raw card bytes; no runtime augmentation)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_type",
+    "card_schema",
+    "raw_sha256",
+    "raw_bytes_ref"
+  ],
+  "properties": {
+    "artifact_type": {
+      "const": "gem_card_raw@1"
+    },
+    "card_schema": {
+      "enum": [
+        "v2",
+        "v3",
+        "legacy_missing_schema",
+        "unsupported_major"
+      ]
+    },
+    "raw_sha256": {
+      "$ref": "bundle://meta/common.defs.json#/definitions/sha256Hex"
+    },
+    "raw_bytes_ref": {
+      "$ref": "bundle://meta/common.defs.json#/definitions/artifactRef"
+    },
+    "original_filename": {
+      "type": "string",
+      "maxLength": 512
+    }
+  }
+}

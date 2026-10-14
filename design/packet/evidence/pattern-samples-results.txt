@@ -1,0 +1,52 @@
+PY | canonicalDecimal  | 0                              | want=True  got=True  OK | single zero
+PY | canonicalDecimal  | 12.5                           | want=True  got=True  OK | plain decimal
+PY | canonicalDecimal  | -0                             | want=False got=False OK | reject -0
+PY | canonicalDecimal  | 0<LF>                          | want=False got=False OK | trailing LF
+PY | canonicalDecimal  | 1e3                            | want=False got=False OK | exponent
+PY | sha256Hex         | bbbbbbbbbbbbbbbb...bbbbbbbb    | want=True  got=True  OK | 64 hex
+PY | sha256Hex         | bbbbbbbbbbbbbbbb...bbbbbbbb    | want=False got=False OK | 63 hex
+PY | sha256Hex         | BBBBBBBBBBBBBBBB...BBBBBBBB    | want=False got=False OK | uppercase
+PY | sha256Hex         | bbbbbbbbbbbbbbbb...bbbb<LF>    | want=False got=False OK | trailing LF
+PY | sha256Hex         | bbbbbbbbbbbbbbbb...bbbbbbb     | want=False got=False OK | trailing space
+PY | jsonPointer       |                                | want=True  got=True  OK | empty pointer
+PY | jsonPointer       | /a/b                           | want=True  got=True  OK | plain path
+PY | jsonPointer       | /a~0b~1c                       | want=True  got=True  OK | escaped tilde and slash
+PY | jsonPointer       | /a<LF>                         | want=True  got=True  OK | control char allowed by RFC 6901 token alphabet
+PY | jsonPointer       | /~                             | want=False got=False OK | lone tilde
+PY | jsonPointer       | /a~2b                          | want=False got=False OK | bad escape
+PY | jsonPointer       | a                              | want=False got=False OK | no leading slash
+PY | bundlePath        | bundle://schemas/genome_ref.json | want=True  got=True  OK | bundle uri
+PY | bundlePath        | bundle://                      | want=False got=False OK | empty path
+PY | bundlePath        | http://example.com             | want=False got=False OK | remote scheme
+PY | bundlePath        | bundle://a b                   | want=False got=False OK | space in path
+PY | isoTimestamp      | 2026-10-13T12:00:00Z           | want=True  got=True  OK | valid
+PY | isoTimestamp      | 2026-10-13T12:00:00Z<LF>       | want=False got=False OK | trailing LF
+PY | isoTimestamp      | 2026-13-99T99:99:99Z           | want=True  got=True  OK | lexical-only (calendar not validated)
+PY | isoTimestamp      | 2026-1-13T12:00:00Z            | want=False got=False OK | short month field
+PY_SAMPLES: cases=25 fails=0 ALL_PASS
+JS | canonicalDecimal  | 0                              | want=true  got=true  OK
+JS | canonicalDecimal  | 12.5                           | want=true  got=true  OK
+JS | canonicalDecimal  | -0                             | want=false got=false OK
+JS | canonicalDecimal  | 0<LF>                          | want=false got=false OK
+JS | canonicalDecimal  | 1e3                            | want=false got=false OK
+JS | sha256Hex         | bbbbbbbbbbbbbbbb...bbbbbbbb    | want=true  got=true  OK
+JS | sha256Hex         | bbbbbbbbbbbbbbbb...bbbbbbbb    | want=false got=false OK
+JS | sha256Hex         | BBBBBBBBBBBBBBBB...BBBBBBBB    | want=false got=false OK
+JS | sha256Hex         | bbbbbbbbbbbbbbbb...bbbb<LF>    | want=false got=false OK
+JS | sha256Hex         | bbbbbbbbbbbbbbbb...bbbbbbb     | want=false got=false OK
+JS | jsonPointer       |                                | want=true  got=true  OK
+JS | jsonPointer       | /a/b                           | want=true  got=true  OK
+JS | jsonPointer       | /a~0b~1c                       | want=true  got=true  OK
+JS | jsonPointer       | /a<LF>                         | want=true  got=true  OK
+JS | jsonPointer       | /~                             | want=false got=false OK
+JS | jsonPointer       | /a~2b                          | want=false got=false OK
+JS | jsonPointer       | a                              | want=false got=false OK
+JS | bundlePath        | bundle://schemas/genome_ref.json | want=true  got=true  OK
+JS | bundlePath        | bundle://                      | want=false got=false OK
+JS | bundlePath        | http://example.com             | want=false got=false OK
+JS | bundlePath        | bundle://a b                   | want=false got=false OK
+JS | isoTimestamp      | 2026-10-13T12:00:00Z           | want=true  got=true  OK
+JS | isoTimestamp      | 2026-10-13T12:00:00Z<LF>       | want=false got=false OK
+JS | isoTimestamp      | 2026-13-99T99:99:99Z           | want=true  got=true  OK
+JS | isoTimestamp      | 2026-1-13T12:00:00Z            | want=false got=false OK
+JS_SAMPLES: cases=25 fails=0 ALL_PASS

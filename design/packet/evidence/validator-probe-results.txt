@@ -1,0 +1,36 @@
+contract packet — validator behavior evidence (regenerated at rev4; K1 two-keyword contract)
+env: node v26.7.0 | ajv 8.20.0 (npm) | python 3.12.11 venv | jsonschema 4.26.0 | referencing 0.37.0
+date: 2026-10-14
+scripts: probe_ajv.mjs (v3: T8 = data document with a patterns key must never compile; T9 = two-keyword instance compiles the schema set; no third registration exists) / probe_jsonschema.py
+
+== A. ajv probe v3 output ==
+T1 unknown keyword under strict (any third keyword is refused): OK | refused as required: strict mode: unknown keyword: "patterns"
+T3 register the two frozen annotation keywords + use them: OK | compiles, validates ok=true
+T4 bundle:// ref via addSchema + definitions: OK | 64hex=true bad=false
+T5 bundle:// ref to an UNREGISTERED file (compile must fail): OK | refused: can't resolve reference bundle://meta/missing.json#/definitions/x from id bundle://schemas
+T6 remote http ref (compile must fail; no loader): OK | refused: can't resolve reference http://example.com/x.json#/definitions/y from id bundle://schemas/
+T7 pattern semantics: anchored literal has no trailing-LF hole: OK | plain=true trailingLF=false surrounded=false
+T8 (current contract) data document with patterns key must NEVER compile: OK | compile refused as required: strict mode: unknown keyword: "patterns"
+T9 (current contract) two-keyword instance compiles the schema set; no third registration exists: OK | two-keyword compiles; sample=true
+T10 anchored literal execution (sanity): OK | 22=true 2=false
+T11 unicodeRegExp note: anchored ASCII literal unaffected: OK | plain=true empty=false
+
+== B. jsonschema probe output ==
+P2a registry with $schema present : OK | with $schema: ok-errors=0 bad-errors=1
+P2b registry with default_specification : OK | default_specification=DRAFT7: ok-errors=0 bad-errors=1
+P4b search vs fullmatch on trailing LF (matcher design evidence) : OK | search=True fullmatch=False search-plain=True
+
+== C. conclusions (frozen into validator-init.json / x-canonical.meta.json) ==
+1. Registry = manifest-driven: build/bundle_loader.{py,mjs} verifies the exact manifest/hash set; unregistered and remote refs are compile-time hard errors (fail-closed).
+2. The active contract registers exactly TWO extension keywords (x-canonical, x-decimal-string). The pattern library (meta/pattern-library.json) is a non-schema data resource: it is never compiled by any validator and requires no keyword registration (probes T8/T9 v3).
+3. Hosted pattern execution diverges between engines on trailing-LF (historical probe P4 vs T7). Shared matcher layer is the truth: domain=ascii gate FIRST, then max_len in Unicode scalar values, then explicit full-match wrapper (py re.fullmatch / node anchored RegExp).
+4. Object schemas must declare type:"object" alongside properties (ajv strictTypes, discovered in probe v1).
+5. Both registry construction paths work on the python side; bundle documents carry $schema (draft-07) as required.
+
+== F. artifact-derived checks (regenerated) ==
+F1 common.defs.json has no root patterns key: True
+F2 pattern-library.json entries: 5 (literals distinct: True)
+F3 decimal literal (decoded): ^(0|-?(0\.[0-9]*[1-9]|[1-9][0-9]*(\.[0-9]*[1-9])?))$
+F4 backslashes in decoded literal: 2 (expect 2)
+F5 byte equality vs frozen spec v0.9 H2 literal: True
+F6 defs<->library byte equality (all 5): True

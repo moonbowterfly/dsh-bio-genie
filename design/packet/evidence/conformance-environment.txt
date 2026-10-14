@@ -1,0 +1,24 @@
+conformance environment record (F3.2) — dual-side corpus runtimes + Unicode data versions
+date: 2026-10-13
+
+[node side]
+node v26.7.0
+icu 78.3
+unicode 17.0
+v8 14.6.202.34-node.28
+
+[python side]
+python 3.12.11
+unicodedata 15.0.0
+
+note: verdicts may only be claimed for environments matching these values (spec v0.7 F3.2).
+scope note (F3.2 discipline):
+- The two sides' Unicode data versions are asymmetric: node ICU 78.3 (Unicode 17.0) vs
+  CPython 3.12 unicodedata 15.0. Per F3.2 the conformance claim is therefore qualified:
+  identical verdicts were observed for all corpus cases under this exact recorded pair;
+  the claim is scoped to this environment pair and any change invalidates it until re-run.
+- Unicode-sensitive corpus content (NFC cases, astral code-unit ordering, lone surrogates)
+  exercises only characters assigned in Unicode <= 15.0, i.e. inside both sides' data sets.
+  Characters assigned in Unicode 15.1+/16/17 are outside the tested scope of this corpus.
+- Flagged for packet review: whether the corpus must add cases beyond the shared Unicode
+  window, or whether a version-equalization requirement is intended by F3.2.

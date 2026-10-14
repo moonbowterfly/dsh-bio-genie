@@ -1,0 +1,60 @@
+{
+  "title": "Pinned validator initialization (both sides) — packet-level document (not a bundle member; no bundle $id)",
+  "ts": {
+    "package": "ajv",
+    "version": "8.20.0",
+    "npm_integrity": "sha512-Thbli+OlOj+iMPYFBVBfJ3OmCAnaSyNn4M1vz9T6Gka5Jt9ba/HIR56joy65tY6kx/FCF5VXNB819Y7/GUrBGA==",
+    "options": {
+      "strict": true,
+      "allErrors": true,
+      "coerceTypes": false,
+      "removeAdditional": false,
+      "useDefaults": false,
+      "validateFormats": false,
+      "validateSchema": true,
+      "addUsedSchema": false,
+      "$data": false,
+      "unicodeRegExp": true
+    },
+    "keyword_registrations": [
+      {"keyword": "x-canonical", "schemaType": "string", "kind": "annotation"},
+      {"keyword": "x-decimal-string", "schemaType": "boolean", "kind": "annotation"}
+    ],
+    "registry_protocol": [
+      "registry = build/bundle_loader.{py,mjs} (manifest-driven; v0.12 K2): read bundle.manifest.json, verify the exact file set (entry shape, duplicates, existence, extra files, per-entry sha256, $id), then register exactly the listed $ref-eligible documents and nothing else",
+      "no directory scanning for registration; no loadSchema callback, no remote resolution, no formats",
+      "unregistered target refs fail at compile: can't resolve reference (probe T5)",
+      "remote refs fail at compile (probe T6)",
+      "meta/pattern-library.json is a data resource: never compiled, never a $ref target; meta/x-canonical.meta.json is registered for identity only and never compiled; only meta/common.defs.json is compiled on demand as a $ref target"
+    ]
+  },
+  "python": {
+    "package": "jsonschema",
+    "version": "4.26.0",
+    "wheel_sha256": "d489f15263b8d200f8387e64b4c3a75f06629559fb73deb8fdfb525f2dab50ce",
+    "class": "jsonschema.Draft7Validator",
+    "format_checker": null,
+    "registry": "referencing.Registry().with_resources([(bundle://<path>, Resource.from_contents(doc, default_specification=DRAFT7)) for each manifest file])",
+    "notes": [
+      "documents should carry $schema draft-07 (both construction paths verified: probe P2a with $schema, P2b with default_specification)"
+    ]
+  },
+  "pattern_execution": {
+    "canonicalDecimal": {"execution_mode": "matcher_only", "matcher_id": "decimal-string-scanner@1"},
+    "sha256Hex": {"execution_mode": "hosted_and", "matcher_id": "fullmatch-v1"},
+    "jsonPointer": {"execution_mode": "hosted_and", "matcher_id": "fullmatch-v1"},
+    "bundlePath": {"execution_mode": "hosted_and", "matcher_id": "fullmatch-v1"},
+    "isoTimestamp": {"execution_mode": "hosted_and", "matcher_id": "fullmatch-v1"}
+  },
+  "pattern_execution_policy": {
+    "truth": "shared matcher layer (matcher_id from pattern_execution; matchers implemented in both languages and corpus-verified)",
+    "hosted_pattern": "redundant check with AND semantics for hosted_and entries; NOT executed for matcher_only entries (canonicalDecimal)",
+    "evidence": [
+      "probe T7/T10: ajv anchored literals have no trailing-LF hole (plain=true, trailingLF=false)",
+      "probe P4/P4b: python re.search accepts trailing LF for anchored literal (hole); re.fullmatch rejects",
+      "probe T1/T2: strict-mode unknown keyword behavior — a data document carrying a 'patterns' key must never be compiled; the two-keyword contract requires no third registration"
+    ],
+    "regression": "schema corpus must include trailing-LF and surrounding-whitespace pathologies for every library pattern"
+  },
+  "evidence_file": "evidence/validator-probe-results.txt"
+}

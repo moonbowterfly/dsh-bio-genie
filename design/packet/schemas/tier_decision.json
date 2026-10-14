@@ -1,0 +1,114 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "bundle://schemas/tier_decision.json",
+  "title": "tier_decision@1 (operation-level, recomputed from snapshot; input_snapshot_id points at the parent snapshot only)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_type",
+    "policy_id",
+    "policy_version",
+    "policy_hash",
+    "input_snapshot_id",
+    "per_operation"
+  ],
+  "properties": {
+    "artifact_type": {
+      "const": "tier_decision@1"
+    },
+    "policy_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "policy_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "policy_hash": {
+      "$ref": "bundle://meta/common.defs.json#/definitions/sha256Hex"
+    },
+    "input_snapshot_id": {
+      "$ref": "bundle://meta/common.defs.json#/definitions/sha256Hex"
+    },
+    "input_artifact_ids": {
+      "type": "array",
+      "x-canonical": "set",
+      "items": {
+        "$ref": "bundle://meta/common.defs.json#/definitions/sha256Hex"
+      }
+    },
+    "per_operation": {
+      "type": "array",
+      "x-canonical": "set",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "operation": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "max_tier": {
+            "enum": [
+              "reference_profile",
+              "transfer_profile",
+              "structural_only",
+              "blocked"
+            ]
+          },
+          "gates": {
+            "type": "array",
+            "x-canonical": "set",
+            "items": {
+              "$ref": "bundle://meta/common.defs.json#/definitions/checkResult"
+            }
+          },
+          "decision": {
+            "enum": [
+              "allow",
+              "deny"
+            ]
+          },
+          "capabilities": {
+            "type": "array",
+            "x-canonical": "set",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            }
+          },
+          "reason_codes": {
+            "type": "array",
+            "x-canonical": "set",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            }
+          }
+        },
+        "required": [
+          "operation",
+          "max_tier",
+          "gates",
+          "decision",
+          "capabilities",
+          "reason_codes"
+        ]
+      }
+    },
+    "gaps": {
+      "type": "array",
+      "x-canonical": "set",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1024
+      }
+    }
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "bundle://schemas/tool_result.json",
+  "title": "tool_result@1 (audit-only; never a scientific input)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_type",
+    "audit_only",
+    "status",
+    "generated_by"
+  ],
+  "properties": {
+    "artifact_type": {
+      "const": "tool_result@1"
+    },
+    "audit_only": {
+      "const": true
+    },
+    "status": {
+      "enum": [
+        "OK",
+        "BLOCKED",
+        "NOT_RUN",
+        "OUT_OF_DOMAIN",
+        "DEPENDENCY_UNAVAILABLE",
+        "INVALID_INPUT",
+        "EXECUTION_ERROR"
+      ]
+    },
+    "reason_code": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "reason_codes": {
+      "type": "array",
+      "x-canonical": "set",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      }
+    },
+    "artifact_refs": {
+      "type": "array",
+      "x-canonical": "set",
+      "items": {
+        "$ref": "bundle://meta/common.defs.json#/definitions/artifactRef"
+      }
+    },
+    "detail": {
+      "type": "string",
+      "maxLength": 8192
+    },
+    "input_hashes": {
+      "type": "array",
+      "x-canonical": "set",
+      "items": {
+        "$ref": "bundle://meta/common.defs.json#/definitions/sha256Hex"
+      }
+    },
+    "producer": {
+      "type": "string",
+      "maxLength": 256
+    },
+    "generated_by": {
+      "enum": [
+        "ts_wrapper",
+        "python_worker"
+      ]
+    },
+    "stderr_summary": {
+      "type": "string",
+      "maxLength": 4096
+    }
+  }
+}

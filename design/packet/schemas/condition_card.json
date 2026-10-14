@@ -1,0 +1,111 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "bundle://schemas/condition_card.json",
+  "title": "condition_card@1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_type",
+    "medium",
+    "culture_mode",
+    "readout"
+  ],
+  "properties": {
+    "artifact_type": {
+      "const": "condition_card@1"
+    },
+    "medium": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "carbon_sources": {
+          "type": "array",
+          "x-canonical": "set",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "uptake_definition": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "oxygen": {
+          "enum": [
+            "aerobic",
+            "microaerobic",
+            "anaerobic",
+            "unspecified"
+          ]
+        },
+        "temperature_c": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 120
+        },
+        "ph": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 14
+        }
+      },
+      "required": [
+        "carbon_sources",
+        "oxygen"
+      ]
+    },
+    "culture_mode": {
+      "enum": [
+        "batch",
+        "fed_batch",
+        "continuous",
+        "unspecified"
+      ]
+    },
+    "copy_number": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "integration_status": {
+          "enum": [
+            "integrated",
+            "plasmid",
+            "unspecified"
+          ]
+        }
+      },
+      "required": [
+        "integration_status"
+      ]
+    },
+    "readout": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      },
+      "required": [
+        "kind",
+        "unit"
+      ]
+    }
+  }
+}

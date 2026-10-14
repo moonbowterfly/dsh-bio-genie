@@ -1,0 +1,310 @@
+{
+ "side": "node",
+ "results": [
+  {
+   "id": "c001",
+   "status": "accept",
+   "canonical": "{\"a\":2,\"b\":1}"
+  },
+  {
+   "id": "c002",
+   "status": "accept",
+   "canonical": "{\"a\":[3,2],\"z\":{\"y\":1}}"
+  },
+  {
+   "id": "c003",
+   "status": "accept",
+   "canonical": "{\"x\":[\"b\",\"a\"]}"
+  },
+  {
+   "id": "c004",
+   "status": "accept",
+   "canonical": "{\"x\":[\"a\",\"b\"]}"
+  },
+  {
+   "id": "c025",
+   "status": "accept",
+   "canonical": "{\"a\":{},\"b\":[]}"
+  },
+  {
+   "id": "c036",
+   "status": "accept",
+   "canonical": "{\"q\":[\"b\",\"a\"],\"s\":[\"a\",\"b\"]}"
+  },
+  {
+   "id": "c038",
+   "status": "accept",
+   "canonical": "{\"a\":true,\"b\":false,\"c\":null}"
+  },
+  {
+   "id": "c005",
+   "status": "accept",
+   "canonical": "{\"x\":[\"￿\",\"𐀀\"]}"
+  },
+  {
+   "id": "c006",
+   "status": "accept",
+   "canonical": "{\"𐀀\":2,\"￿\":1}"
+  },
+  {
+   "id": "c007",
+   "status": "accept",
+   "canonical": "{\"é\":\"é\"}"
+  },
+  {
+   "id": "c008",
+   "status": "reject",
+   "code": "NFC_KEY_COLLISION",
+   "detail": "$/é"
+  },
+  {
+   "id": "c037",
+   "status": "accept",
+   "canonical": "\"é\""
+  },
+  {
+   "id": "c023",
+   "status": "accept",
+   "canonical": "{\"s\":\"  \"}"
+  },
+  {
+   "id": "c024",
+   "status": "accept",
+   "canonical": "{\"s\":\"\"}"
+  },
+  {
+   "id": "c009",
+   "status": "reject",
+   "code": "LONE_SURROGATE",
+   "detail": "$/s"
+  },
+  {
+   "id": "c010",
+   "status": "reject",
+   "code": "DUP_KEY",
+   "detail": "a"
+  },
+  {
+   "id": "c029",
+   "status": "reject",
+   "code": "INVALID_JSON",
+   "detail": "expected quote at 1"
+  },
+  {
+   "id": "c030",
+   "status": "reject",
+   "code": "INVALID_JSON",
+   "detail": "trailing at 8"
+  },
+  {
+   "id": "c012",
+   "status": "accept",
+   "canonical": "[1,1,0]"
+  },
+  {
+   "id": "c013",
+   "status": "accept",
+   "canonical": "9007199254740991"
+  },
+  {
+   "id": "c014",
+   "status": "reject",
+   "code": "NUMBER_OUT_OF_RANGE",
+   "detail": "$"
+  },
+  {
+   "id": "c015",
+   "status": "reject",
+   "code": "NUMBER_OUT_OF_RANGE",
+   "detail": "$"
+  },
+  {
+   "id": "c016",
+   "status": "accept",
+   "canonical": "1e-7"
+  },
+  {
+   "id": "c017",
+   "status": "accept",
+   "canonical": "0.000001"
+  },
+  {
+   "id": "c018",
+   "status": "accept",
+   "canonical": "0.1"
+  },
+  {
+   "id": "c019",
+   "status": "accept",
+   "canonical": "5e-324"
+  },
+  {
+   "id": "c020",
+   "status": "reject",
+   "code": "NUMBER_OUT_OF_RANGE",
+   "detail": "$"
+  },
+  {
+   "id": "c021",
+   "status": "reject",
+   "code": "NUMBER_OUT_OF_RANGE",
+   "detail": "$"
+  },
+  {
+   "id": "c031",
+   "status": "accept",
+   "canonical": "[100,0.02]"
+  },
+  {
+   "id": "c032",
+   "status": "accept",
+   "canonical": "[0,0,0]"
+  },
+  {
+   "id": "c033",
+   "status": "accept",
+   "canonical": "-1.5e-8"
+  },
+  {
+   "id": "c034",
+   "status": "accept",
+   "canonical": "123456789.12345679"
+  },
+  {
+   "id": "c035",
+   "status": "accept",
+   "canonical": "-9007199254740991"
+  },
+  {
+   "id": "c039",
+   "status": "accept",
+   "canonical": "0"
+  },
+  {
+   "id": "c040",
+   "status": "accept",
+   "canonical": "0"
+  },
+  {
+   "id": "c042",
+   "status": "accept",
+   "canonical": "1e-21"
+  },
+  {
+   "id": "c043",
+   "status": "accept",
+   "canonical": "1.5"
+  },
+  {
+   "id": "c044",
+   "status": "accept",
+   "canonical": "-2"
+  },
+  {
+   "id": "c022",
+   "status": "accept",
+   "canonical": "{\"s\":\"a\\\"b\\\\c\\u0001\\n\\t\"}"
+  },
+  {
+   "id": "c045",
+   "status": "accept",
+   "canonical": "{\"s\":\"a/b\"}"
+  },
+  {
+   "id": "c011",
+   "status": "reject",
+   "code": "UNANNOTATED_ARRAY",
+   "detail": "$/x"
+  },
+  {
+   "id": "c026",
+   "status": "reject",
+   "code": "SET_DUPLICATE",
+   "detail": "$"
+  },
+  {
+   "id": "c027",
+   "status": "reject",
+   "code": "SET_DUPLICATE",
+   "detail": "$"
+  },
+  {
+   "id": "c041",
+   "status": "reject",
+   "code": "SET_DUPLICATE",
+   "detail": "$"
+  },
+  {
+   "id": "c046",
+   "status": "accept",
+   "canonical": "{\"s\":\"😀\"}"
+  },
+  {
+   "id": "c047",
+   "status": "accept",
+   "canonical": "{\"a2\":3,\"z1\":1,\"一\":2}"
+  },
+  {
+   "id": "c048",
+   "status": "accept",
+   "canonical": "[\"a\",\"b\",1,2,null,true]"
+  },
+  {
+   "id": "c049",
+   "status": "reject",
+   "code": "SET_DUPLICATE",
+   "detail": "$"
+  },
+  {
+   "id": "c050",
+   "status": "accept",
+   "canonical": "[{\"a\":1},{\"a\":2,\"b\":1}]"
+  },
+  {
+   "id": "c051",
+   "status": "accept",
+   "canonical": "{\"a10\":2,\"a2\":1}"
+  },
+  {
+   "id": "c052",
+   "status": "accept",
+   "canonical": "{\"\":\"\"}"
+  },
+  {
+   "id": "c053",
+   "status": "accept",
+   "canonical": "{\"s\":\"\\n\"}"
+  },
+  {
+   "id": "c055",
+   "status": "accept",
+   "canonical": "{\"s\":\"A̕\"}"
+  },
+  {
+   "id": "c056",
+   "status": "reject",
+   "code": "UNICODE_OUT_OF_FROZEN_DOMAIN",
+   "detail": "$/s U+1ACF"
+  },
+  {
+   "id": "c057",
+   "status": "accept",
+   "canonical": "{\"s\":\"﷐\"}"
+  },
+  {
+   "id": "c058",
+   "status": "accept",
+   "canonical": "{\"s\":\"\"}"
+  },
+  {
+   "id": "c059",
+   "status": "accept",
+   "canonical": "{\"s\":\"𠀀\"}"
+  },
+  {
+   "id": "c028",
+   "status": "accept",
+   "canonical": "{\"k19\":{\"k18\":{\"k17\":{\"k16\":{\"k15\":{\"k14\":{\"k13\":{\"k12\":{\"k11\":{\"k10\":{\"k9\":{\"k8\":{\"k7\":{\"k6\":{\"k5\":{\"k4\":{\"k3\":{\"k2\":{\"k1\":{\"k0\":1}}}}}}}}}}}}}}}}}}}}"
+  }
+ ]
+}

@@ -1,0 +1,732 @@
+{
+ "corpus": "synbio-schema-corpus",
+ "version": 1,
+ "side": "node",
+ "results": [
+  {
+   "id": "gvr-01",
+   "valid": true,
+   "engine": true,
+   "engine_errors": 0,
+   "sem": []
+  },
+  {
+   "id": "gvr-02",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "gvr-03",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "gvr-04",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "gvr-05",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 2,
+   "sem": [
+    "PATTERN_MAX_LEN@/files/0/sha256"
+   ]
+  },
+  {
+   "id": "gvr-06",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 2,
+   "sem": [
+    "PATTERN_MAX_LEN@/fetched_at"
+   ]
+  },
+  {
+   "id": "gvr-07",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": [
+    "PATTERN_DOMAIN_VIOLATION@/files/0/sha256"
+   ]
+  },
+  {
+   "id": "gvr-08",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 2,
+   "sem": [
+    "PATTERN_DOMAIN_VIOLATION@/files/0/sha256"
+   ]
+  },
+  {
+   "id": "gvr-09",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 2,
+   "sem": [
+    "PATTERN_MAX_LEN@/files/0/sha256"
+   ]
+  },
+  {
+   "id": "ins-01",
+   "valid": true,
+   "engine": true,
+   "engine_errors": 0,
+   "sem": []
+  },
+  {
+   "id": "ins-02",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "ins-03",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "ins-04",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "hpf-01",
+   "valid": true,
+   "engine": true,
+   "engine_errors": 0,
+   "sem": []
+  },
+  {
+   "id": "hpf-02",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "hpf-03",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "hpf-04",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "ccd-01",
+   "valid": true,
+   "engine": true,
+   "engine_errors": 0,
+   "sem": []
+  },
+  {
+   "id": "ccd-02",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "ccd-03",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "ccd-04",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "evi-01",
+   "valid": true,
+   "engine": true,
+   "engine_errors": 0,
+   "sem": []
+  },
+  {
+   "id": "evi-02",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "evi-03",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": [
+    "DECIMAL_STRING_NONCANONICAL@/readout/value"
+   ]
+  },
+  {
+   "id": "evi-04",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": [
+    "DECIMAL_STRING_NONCANONICAL@/readout/value"
+   ]
+  },
+  {
+   "id": "evi-05",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": [
+    "DECIMAL_STRING_NONCANONICAL@/readout/value"
+   ]
+  },
+  {
+   "id": "evi-06",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": [
+    "DECIMAL_STRING_NONCANONICAL@/readout/value"
+   ]
+  },
+  {
+   "id": "cir-01",
+   "valid": true,
+   "engine": true,
+   "engine_errors": 0,
+   "sem": []
+  },
+  {
+   "id": "cir-02",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "cir-03",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "cir-04",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "kcr-01",
+   "valid": true,
+   "engine": true,
+   "engine_errors": 0,
+   "sem": []
+  },
+  {
+   "id": "kcr-02",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "kcr-03",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "itc-01",
+   "valid": true,
+   "engine": true,
+   "engine_errors": 0,
+   "sem": []
+  },
+  {
+   "id": "itc-02",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "itc-03",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "itc-04",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "exs-01",
+   "valid": true,
+   "engine": true,
+   "engine_errors": 0,
+   "sem": []
+  },
+  {
+   "id": "exs-02",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "exs-03",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "exs-04",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "gcr-01",
+   "valid": true,
+   "engine": true,
+   "engine_errors": 0,
+   "sem": []
+  },
+  {
+   "id": "gcr-02",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "gcr-03",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "mmr-01",
+   "valid": true,
+   "engine": true,
+   "engine_errors": 0,
+   "sem": []
+  },
+  {
+   "id": "mmr-02",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": [
+    "DECIMAL_STRING_NONCANONICAL@/baseline/growth"
+   ]
+  },
+  {
+   "id": "mmr-03",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "mmr-04",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "hmb-01",
+   "valid": true,
+   "engine": true,
+   "engine_errors": 0,
+   "sem": []
+  },
+  {
+   "id": "hmb-02",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "hmb-03",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "gpr-01",
+   "valid": true,
+   "engine": true,
+   "engine_errors": 0,
+   "sem": []
+  },
+  {
+   "id": "gpr-02",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "gpr-03",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": [
+    "PATTERN_MISMATCH@/ast_hash"
+   ]
+  },
+  {
+   "id": "cpl-01",
+   "valid": true,
+   "engine": true,
+   "engine_errors": 0,
+   "sem": []
+  },
+  {
+   "id": "cpl-02",
+   "valid": true,
+   "engine": true,
+   "engine_errors": 0,
+   "sem": []
+  },
+  {
+   "id": "cpl-03",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 4,
+   "sem": []
+  },
+  {
+   "id": "cpl-04",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 2,
+   "sem": []
+  },
+  {
+   "id": "cpl-05",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "cpl-06",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": [
+    "DECIMAL_STRING_NONCANONICAL@/rules/0/derived_bound"
+   ]
+  },
+  {
+   "id": "cpl-07",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": [
+    "DECIMAL_STRING_NONCANONICAL@/rules/0/derived_bound"
+   ]
+  },
+  {
+   "id": "cpl-08",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 2,
+   "sem": []
+  },
+  {
+   "id": "cpl-09",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 4,
+   "sem": []
+  },
+  {
+   "id": "cpl-10",
+   "valid": true,
+   "engine": true,
+   "engine_errors": 0,
+   "sem": []
+  },
+  {
+   "id": "csq-01",
+   "valid": true,
+   "engine": true,
+   "engine_errors": 0,
+   "sem": []
+  },
+  {
+   "id": "csq-02",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": [
+    "DECIMAL_STRING_NONCANONICAL@/scenarios/0/fba/value"
+   ]
+  },
+  {
+   "id": "csq-03",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "csq-04",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "csq-05",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": [
+    "DECIMAL_STRING_NONCANONICAL@/scenarios/0/fva/intervals/0/min"
+   ]
+  },
+  {
+   "id": "tcd-01",
+   "valid": true,
+   "engine": true,
+   "engine_errors": 0,
+   "sem": []
+  },
+  {
+   "id": "tcd-02",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "tcd-03",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "npo-01",
+   "valid": true,
+   "engine": true,
+   "engine_errors": 0,
+   "sem": []
+  },
+  {
+   "id": "npo-02",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": [
+    "DECIMAL_STRING_NONCANONICAL@/direction_epsilon"
+   ]
+  },
+  {
+   "id": "npo-03",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "unv-01",
+   "valid": true,
+   "engine": true,
+   "engine_errors": 0,
+   "sem": []
+  },
+  {
+   "id": "unv-02",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "unv-03",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "irs-01",
+   "valid": true,
+   "engine": true,
+   "engine_errors": 0,
+   "sem": []
+  },
+  {
+   "id": "irs-02",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "irs-03",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "pvd-01",
+   "valid": true,
+   "engine": true,
+   "engine_errors": 0,
+   "sem": []
+  },
+  {
+   "id": "pvd-02",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "pvd-03",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "clm-01",
+   "valid": true,
+   "engine": true,
+   "engine_errors": 0,
+   "sem": []
+  },
+  {
+   "id": "clm-02",
+   "valid": true,
+   "engine": true,
+   "engine_errors": 0,
+   "sem": []
+  },
+  {
+   "id": "clm-03",
+   "valid": true,
+   "engine": true,
+   "engine_errors": 0,
+   "sem": []
+  },
+  {
+   "id": "clm-04",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 2,
+   "sem": []
+  },
+  {
+   "id": "clm-05",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "clm-06",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "tsr-01",
+   "valid": true,
+   "engine": true,
+   "engine_errors": 0,
+   "sem": []
+  },
+  {
+   "id": "tsr-02",
+   "valid": true,
+   "engine": true,
+   "engine_errors": 0,
+   "sem": []
+  },
+  {
+   "id": "tsr-03",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "tsr-04",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "cms-01",
+   "valid": true,
+   "engine": true,
+   "engine_errors": 0,
+   "sem": []
+  },
+  {
+   "id": "cms-02",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "cms-03",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  },
+  {
+   "id": "cms-04",
+   "valid": false,
+   "engine": false,
+   "engine_errors": 1,
+   "sem": []
+  }
+ ]
+}

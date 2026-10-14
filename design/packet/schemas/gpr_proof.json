@@ -1,0 +1,67 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "bundle://schemas/gpr_proof.json",
+  "title": "gpr_proof@1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_type",
+    "canonical_gpr_ast",
+    "ast_hash",
+    "source_gene_ids",
+    "gem_gene_ids",
+    "namespace",
+    "reaction_id",
+    "mapping_path"
+  ],
+  "properties": {
+    "artifact_type": {
+      "const": "gpr_proof@1"
+    },
+    "canonical_gpr_ast": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 65536
+    },
+    "ast_hash": {
+      "$ref": "bundle://meta/common.defs.json#/definitions/sha256Hex"
+    },
+    "source_gene_ids": {
+      "type": "array",
+      "x-canonical": "set",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    },
+    "gem_gene_ids": {
+      "type": "array",
+      "x-canonical": "set",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    },
+    "namespace": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "reaction_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "mapping_path": {
+      "type": "array",
+      "x-canonical": "seq",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 512
+      }
+    }
+  }
+}

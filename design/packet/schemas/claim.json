@@ -1,0 +1,143 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "bundle://schemas/claim.json",
+  "title": "claim@1 (embed-only; classification gates mandatory fields)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "claim_id",
+    "classification",
+    "status"
+  ],
+  "properties": {
+    "claim_id": {
+      "$ref": "bundle://meta/common.defs.json#/definitions/sha256Hex"
+    },
+    "classification": {
+      "enum": [
+        "FACT",
+        "ASSUMPTION",
+        "INFERENCE",
+        "BLOCKED"
+      ]
+    },
+    "status": {
+      "enum": [
+        "SUPPORTED",
+        "CONDITIONAL",
+        "INDETERMINATE",
+        "BLOCKED"
+      ]
+    },
+    "evidence_refs": {
+      "type": "array",
+      "x-canonical": "set",
+      "items": {
+        "$ref": "bundle://meta/common.defs.json#/definitions/sha256Hex"
+      }
+    },
+    "assumption_refs": {
+      "type": "array",
+      "x-canonical": "set",
+      "items": {
+        "$ref": "bundle://meta/common.defs.json#/definitions/sha256Hex"
+      }
+    },
+    "method_ref": {
+      "type": "string",
+      "maxLength": 512
+    },
+    "domain_ref": {
+      "type": "string",
+      "maxLength": 512
+    },
+    "uncertainty": {
+      "type": "string",
+      "maxLength": 2048
+    },
+    "limitations": {
+      "type": "array",
+      "x-canonical": "set",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 2048
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "classification": {
+            "const": "FACT"
+          }
+        }
+      },
+      "then": {
+        "type": "object",
+        "required": [
+          "evidence_refs"
+        ],
+        "properties": {
+          "evidence_refs": {
+            "type": "array",
+            "minItems": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "classification": {
+            "const": "ASSUMPTION"
+          }
+        }
+      },
+      "then": {
+        "type": "object",
+        "required": [
+          "assumption_refs"
+        ],
+        "properties": {
+          "assumption_refs": {
+            "type": "array",
+            "minItems": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "classification": {
+            "const": "INFERENCE"
+          }
+        }
+      },
+      "then": {
+        "type": "object",
+        "required": [
+          "method_ref",
+          "domain_ref",
+          "uncertainty"
+        ],
+        "properties": {
+          "method_ref": {
+            "type": "string"
+          },
+          "domain_ref": {
+            "type": "string"
+          },
+          "uncertainty": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  ]
+}

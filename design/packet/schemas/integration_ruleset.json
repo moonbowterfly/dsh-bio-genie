@@ -1,0 +1,69 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "bundle://schemas/integration_ruleset.json",
+  "title": "integration_ruleset@1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_type",
+    "ruleset_id",
+    "version",
+    "rules"
+  ],
+  "properties": {
+    "artifact_type": {
+      "const": "integration_ruleset@1"
+    },
+    "ruleset_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "rules": {
+      "type": "array",
+      "x-canonical": "set",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "kind": {
+            "enum": [
+              "feature_overlap",
+              "repeat",
+              "essentiality",
+              "neighborhood",
+              "motif",
+              "other"
+            ]
+          },
+          "mandatory": {
+            "type": "boolean"
+          },
+          "params": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 1024
+          }
+        },
+        "required": [
+          "rule_id",
+          "kind",
+          "mandatory"
+        ]
+      }
+    }
+  }
+}

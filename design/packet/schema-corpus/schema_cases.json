@@ -1,0 +1,3752 @@
+{
+ "corpus": "synbio-schema-corpus",
+ "version": 1,
+ "note": "expect = intended verdict; dual-side runners must agree with each other AND with expect",
+ "cases": [
+  {
+   "id": "gvr-01",
+   "schema": "genome_ref",
+   "doc": {
+    "artifact_type": "genome_ref@1",
+    "files": [
+     {
+      "path": "genome.fna",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "format": "fasta"
+     }
+    ],
+    "contigs": [
+     {
+      "name": "chr1",
+      "length": 4641652,
+      "topology": "circular"
+     }
+    ],
+    "coord_convention": "0-based-half-open",
+    "source": "NCBI RefSeq GCF_000005845.2",
+    "fetched_at": "2026-10-13T12:00:00Z"
+   },
+   "expect": "valid",
+   "note": "minimal valid",
+   "frozen": {
+    "verdict": "valid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "gvr-02",
+   "schema": "genome_ref",
+   "doc": {
+    "artifact_type": "genome_ref@1",
+    "files": [
+     {
+      "path": "genome.fna",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "format": "fasta"
+     }
+    ],
+    "contigs": [
+     {
+      "name": "chr1",
+      "length": 4641652,
+      "topology": "circular"
+     }
+    ],
+    "coord_convention": "0-based-half-open",
+    "fetched_at": "2026-10-13T12:00:00Z"
+   },
+   "expect": "invalid",
+   "note": "missing required source",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "gvr-03",
+   "schema": "genome_ref",
+   "doc": {
+    "artifact_type": "genome_ref@1",
+    "files": [
+     {
+      "path": "genome.fna",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "format": "fasta"
+     }
+    ],
+    "contigs": [
+     {
+      "name": "chr1",
+      "length": 4641652,
+      "topology": "circular"
+     }
+    ],
+    "coord_convention": "2-based",
+    "source": "NCBI RefSeq GCF_000005845.2",
+    "fetched_at": "2026-10-13T12:00:00Z"
+   },
+   "expect": "invalid",
+   "note": "bad enum",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "gvr-04",
+   "schema": "genome_ref",
+   "doc": {
+    "artifact_type": "genome_ref@1",
+    "files": [
+     {
+      "path": "genome.fna",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "format": "fasta"
+     }
+    ],
+    "contigs": [
+     {
+      "name": "chr1",
+      "length": 4641652,
+      "topology": "circular"
+     }
+    ],
+    "coord_convention": "0-based-half-open",
+    "source": "NCBI RefSeq GCF_000005845.2",
+    "fetched_at": "2026-10-13T12:00:00Z",
+    "zzz_extra": 1
+   },
+   "expect": "invalid",
+   "note": "additionalProperties false",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "gvr-05",
+   "schema": "genome_ref",
+   "doc": {
+    "artifact_type": "genome_ref@1",
+    "files": [
+     {
+      "path": "genome.fna",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n",
+      "format": "fasta"
+     }
+    ],
+    "contigs": [
+     {
+      "name": "chr1",
+      "length": 4641652,
+      "topology": "circular"
+     }
+    ],
+    "coord_convention": "0-based-half-open",
+    "source": "NCBI RefSeq GCF_000005845.2",
+    "fetched_at": "2026-10-13T12:00:00Z"
+   },
+   "expect": "invalid",
+   "note": "sha256 trailing-LF (matcher layer)",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "gvr-06",
+   "schema": "genome_ref",
+   "doc": {
+    "artifact_type": "genome_ref@1",
+    "files": [
+     {
+      "path": "genome.fna",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "format": "fasta"
+     }
+    ],
+    "contigs": [
+     {
+      "name": "chr1",
+      "length": 4641652,
+      "topology": "circular"
+     }
+    ],
+    "coord_convention": "0-based-half-open",
+    "source": "NCBI RefSeq GCF_000005845.2",
+    "fetched_at": "2026-10-13T12:00:00Z\n"
+   },
+   "expect": "invalid",
+   "note": "timestamp trailing-LF (matcher layer)",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "gvr-07",
+   "schema": "genome_ref",
+   "doc": {
+    "artifact_type": "genome_ref@1",
+    "files": [
+     {
+      "path": "genome.fna",
+      "sha256": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+      "format": "fasta"
+     }
+    ],
+    "contigs": [
+     {
+      "name": "chr1",
+      "length": 4641652,
+      "topology": "circular"
+     }
+    ],
+    "coord_convention": "0-based-half-open",
+    "source": "NCBI RefSeq GCF_000005845.2",
+    "fetched_at": "2026-10-13T12:00:00Z"
+   },
+   "expect": "invalid",
+   "note": "astral non-ASCII sha: DOMAIN-first (cross-side exact code)",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "gvr-08",
+   "schema": "genome_ref",
+   "doc": {
+    "artifact_type": "genome_ref@1",
+    "files": [
+     {
+      "path": "genome.fna",
+      "sha256": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+      "format": "fasta"
+     }
+    ],
+    "contigs": [
+     {
+      "name": "chr1",
+      "length": 4641652,
+      "topology": "circular"
+     }
+    ],
+    "coord_convention": "0-based-half-open",
+    "source": "NCBI RefSeq GCF_000005845.2",
+    "fetched_at": "2026-10-13T12:00:00Z"
+   },
+   "expect": "invalid",
+   "note": "astral overlong sha: DOMAIN-first beats MAX_LEN (order oracle)",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "gvr-09",
+   "schema": "genome_ref",
+   "doc": {
+    "artifact_type": "genome_ref@1",
+    "files": [
+     {
+      "path": "genome.fna",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "format": "fasta"
+     }
+    ],
+    "contigs": [
+     {
+      "name": "chr1",
+      "length": 4641652,
+      "topology": "circular"
+     }
+    ],
+    "coord_convention": "0-based-half-open",
+    "source": "NCBI RefSeq GCF_000005845.2",
+    "fetched_at": "2026-10-13T12:00:00Z"
+   },
+   "expect": "invalid",
+   "note": "ascii overlong sha: MAX_LEN",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "ins-01",
+   "schema": "input_snapshot",
+   "doc": {
+    "artifact_type": "input_snapshot@1",
+    "role": "genome_sequence",
+    "media_type": "text/x-fasta",
+    "format": "fasta",
+    "consumer_compatibility": [
+     "bio_chassis_profile"
+    ],
+    "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "byte_size": 4708035,
+    "origin": {
+     "kind": "external",
+     "origin_ref": "upload:genome.fna"
+    }
+   },
+   "expect": "valid",
+   "note": "minimal valid",
+   "frozen": {
+    "verdict": "valid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "ins-02",
+   "schema": "input_snapshot",
+   "doc": {
+    "artifact_type": "input_snapshot@1",
+    "role": "genome_sequence",
+    "media_type": "text/x-fasta",
+    "format": "fasta",
+    "consumer_compatibility": [
+     "bio_chassis_profile"
+    ],
+    "byte_size": 4708035,
+    "origin": {
+     "kind": "external",
+     "origin_ref": "upload:genome.fna"
+    }
+   },
+   "expect": "invalid",
+   "note": "missing required sha256",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "ins-03",
+   "schema": "input_snapshot",
+   "doc": {
+    "artifact_type": "input_snapshot@1",
+    "role": "unknown_role",
+    "media_type": "text/x-fasta",
+    "format": "fasta",
+    "consumer_compatibility": [
+     "bio_chassis_profile"
+    ],
+    "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "byte_size": 4708035,
+    "origin": {
+     "kind": "external",
+     "origin_ref": "upload:genome.fna"
+    }
+   },
+   "expect": "invalid",
+   "note": "bad enum role",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "ins-04",
+   "schema": "input_snapshot",
+   "doc": {
+    "artifact_type": "input_snapshot@1",
+    "role": "genome_sequence",
+    "media_type": "text/x-fasta",
+    "format": "fasta",
+    "consumer_compatibility": [
+     "bio_chassis_profile"
+    ],
+    "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "byte_size": 4708035,
+    "origin": {
+     "kind": "external",
+     "origin_ref": "upload:genome.fna"
+    },
+    "extra": true
+   },
+   "expect": "invalid",
+   "note": "additionalProperties false",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "hpf-01",
+   "schema": "host_profile",
+   "doc": {
+    "artifact_type": "host_profile@1",
+    "genome_ref": {
+     "artifact_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+     "expected_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+     "relative_path": "objects/dddddddddddddddd"
+    },
+    "evidence_state": {
+     "annotation": {
+      "completeness": "full"
+     },
+     "condition": {
+      "completeness": "partial"
+     },
+     "parts_evidence": {
+      "completeness": "missing"
+     }
+    },
+    "derived": {
+     "genome_size": 4641652,
+     "gc_percent": 50.8,
+     "contig_count": 1
+    },
+    "gates": [
+     {
+      "gate": "annotation_parse",
+      "status": "PASS"
+     }
+    ]
+   },
+   "expect": "valid",
+   "note": "minimal valid",
+   "frozen": {
+    "verdict": "valid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "hpf-02",
+   "schema": "host_profile",
+   "doc": {
+    "artifact_type": "host_profile@1",
+    "genome_ref": {
+     "artifact_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+     "expected_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+     "relative_path": "objects/dddddddddddddddd"
+    },
+    "evidence_state": {
+     "annotation": {
+      "completeness": "full"
+     },
+     "condition": {
+      "completeness": "partial"
+     },
+     "parts_evidence": {
+      "completeness": "missing"
+     }
+    },
+    "gates": [
+     {
+      "gate": "annotation_parse",
+      "status": "PASS"
+     }
+    ]
+   },
+   "expect": "invalid",
+   "note": "missing required derived",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "hpf-03",
+   "schema": "host_profile",
+   "doc": {
+    "artifact_type": "host_profile@1",
+    "genome_ref": {
+     "artifact_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+     "expected_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+     "relative_path": "objects/dddddddddddddddd"
+    },
+    "evidence_state": {
+     "annotation": {
+      "completeness": "full"
+     },
+     "condition": {
+      "completeness": "partial"
+     },
+     "parts_evidence": {
+      "completeness": "missing"
+     }
+    },
+    "derived": {
+     "genome_size": 4641652,
+     "gc_percent": 50.8,
+     "contig_count": 1
+    },
+    "gates": [
+     {
+      "gate": "annotation_parse",
+      "status": "OK"
+     }
+    ]
+   },
+   "expect": "invalid",
+   "note": "bad gate status enum",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "hpf-04",
+   "schema": "host_profile",
+   "doc": {
+    "artifact_type": "host_profile@1",
+    "genome_ref": {
+     "artifact_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+     "expected_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+     "relative_path": "objects/dddddddddddddddd"
+    },
+    "evidence_state": {
+     "annotation": {
+      "completeness": "full"
+     },
+     "condition": {
+      "completeness": "partial"
+     },
+     "parts_evidence": {
+      "completeness": "missing"
+     }
+    },
+    "derived": {
+     "genome_size": 4641652,
+     "gc_percent": 50.8,
+     "contig_count": 1
+    },
+    "gates": [
+     {
+      "gate": "annotation_parse",
+      "status": "PASS"
+     }
+    ],
+    "tier": "reference_profile"
+   },
+   "expect": "invalid",
+   "note": "no product tier field on host_profile",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "ccd-01",
+   "schema": "condition_card",
+   "doc": {
+    "artifact_type": "condition_card@1",
+    "medium": {
+     "name": "M9",
+     "carbon_sources": [
+      "glucose"
+     ],
+     "oxygen": "aerobic",
+     "temperature_c": 37,
+     "ph": 7.2
+    },
+    "culture_mode": "batch",
+    "copy_number": {
+     "integration_status": "integrated"
+    },
+    "readout": {
+     "kind": "OD600",
+     "unit": "a.u."
+    }
+   },
+   "expect": "valid",
+   "note": "minimal valid",
+   "frozen": {
+    "verdict": "valid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "ccd-02",
+   "schema": "condition_card",
+   "doc": {
+    "artifact_type": "condition_card@1",
+    "medium": {
+     "name": "M9",
+     "carbon_sources": [
+      "glucose"
+     ],
+     "oxygen": "aerobic",
+     "temperature_c": 37,
+     "ph": 7.2
+    },
+    "culture_mode": "batch",
+    "copy_number": {
+     "integration_status": "integrated"
+    }
+   },
+   "expect": "invalid",
+   "note": "missing required readout",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "ccd-03",
+   "schema": "condition_card",
+   "doc": {
+    "artifact_type": "condition_card@1",
+    "medium": {
+     "name": "M9",
+     "carbon_sources": [
+      "glucose"
+     ],
+     "oxygen": "oxidative",
+     "temperature_c": 37,
+     "ph": 7.2
+    },
+    "culture_mode": "batch",
+    "copy_number": {
+     "integration_status": "integrated"
+    },
+    "readout": {
+     "kind": "OD600",
+     "unit": "a.u."
+    }
+   },
+   "expect": "invalid",
+   "note": "bad enum oxygen",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "ccd-04",
+   "schema": "condition_card",
+   "doc": {
+    "artifact_type": "condition_card@1",
+    "medium": {
+     "name": "M9",
+     "carbon_sources": [
+      "glucose"
+     ],
+     "oxygen": "aerobic",
+     "temperature_c": 37,
+     "ph": 7.2
+    },
+    "culture_mode": "batch",
+    "copy_number": {
+     "integration_status": "integrated"
+    },
+    "readout": {
+     "kind": "OD600",
+     "unit": "a.u."
+    },
+    "ph_note": "drift"
+   },
+   "expect": "invalid",
+   "note": "additionalProperties false",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "evi-01",
+   "schema": "evidence_item",
+   "doc": {
+    "artifact_type": "evidence_item@1",
+    "source_ref": {
+     "kind": "pmid",
+     "id": "12345678"
+    },
+    "host": {
+     "organism": "Escherichia coli",
+     "strain": "K-12 MG1655"
+    },
+    "readout": {
+     "metric": "sfGFP fluorescence",
+     "value": "12.34",
+     "unit": "a.u.",
+     "replicates": 3
+    },
+    "match_grade": "exact",
+    "matching_policy": {
+     "id": "host-condition-match",
+     "version": "1"
+    }
+   },
+   "expect": "valid",
+   "note": "minimal valid (decimal value)",
+   "frozen": {
+    "verdict": "valid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "evi-02",
+   "schema": "evidence_item",
+   "doc": {
+    "artifact_type": "evidence_item@1",
+    "source_ref": {
+     "kind": "pmid",
+     "id": "12345678"
+    },
+    "host": {
+     "organism": "Escherichia coli",
+     "strain": "K-12 MG1655"
+    },
+    "readout": {
+     "metric": "sfGFP fluorescence",
+     "value": "12.34",
+     "unit": "a.u.",
+     "replicates": 3
+    },
+    "matching_policy": {
+     "id": "host-condition-match",
+     "version": "1"
+    }
+   },
+   "expect": "invalid",
+   "note": "missing required match_grade",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "evi-03",
+   "schema": "evidence_item",
+   "doc": {
+    "artifact_type": "evidence_item@1",
+    "source_ref": {
+     "kind": "pmid",
+     "id": "12345678"
+    },
+    "host": {
+     "organism": "Escherichia coli",
+     "strain": "K-12 MG1655"
+    },
+    "readout": {
+     "metric": "sfGFP fluorescence",
+     "value": "-0",
+     "unit": "a.u.",
+     "replicates": 3
+    },
+    "match_grade": "exact",
+    "matching_policy": {
+     "id": "host-condition-match",
+     "version": "1"
+    }
+   },
+   "expect": "invalid",
+   "note": "decimal -0 rejected",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "evi-04",
+   "schema": "evidence_item",
+   "doc": {
+    "artifact_type": "evidence_item@1",
+    "source_ref": {
+     "kind": "pmid",
+     "id": "12345678"
+    },
+    "host": {
+     "organism": "Escherichia coli",
+     "strain": "K-12 MG1655"
+    },
+    "readout": {
+     "metric": "sfGFP fluorescence",
+     "value": "1e3",
+     "unit": "a.u.",
+     "replicates": 3
+    },
+    "match_grade": "exact",
+    "matching_policy": {
+     "id": "host-condition-match",
+     "version": "1"
+    }
+   },
+   "expect": "invalid",
+   "note": "decimal exponent rejected",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "evi-05",
+   "schema": "evidence_item",
+   "doc": {
+    "artifact_type": "evidence_item@1",
+    "source_ref": {
+     "kind": "pmid",
+     "id": "12345678"
+    },
+    "host": {
+     "organism": "Escherichia coli",
+     "strain": "K-12 MG1655"
+    },
+    "readout": {
+     "metric": "sfGFP fluorescence",
+     "value": "0\n",
+     "unit": "a.u.",
+     "replicates": 3
+    },
+    "match_grade": "exact",
+    "matching_policy": {
+     "id": "host-condition-match",
+     "version": "1"
+    }
+   },
+   "expect": "invalid",
+   "note": "decimal trailing-LF (scanner+matcher)",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "evi-06",
+   "schema": "evidence_item",
+   "doc": {
+    "artifact_type": "evidence_item@1",
+    "source_ref": {
+     "kind": "pmid",
+     "id": "12345678"
+    },
+    "host": {
+     "organism": "Escherichia coli",
+     "strain": "K-12 MG1655"
+    },
+    "readout": {
+     "metric": "sfGFP fluorescence",
+     "value": "1.00",
+     "unit": "a.u.",
+     "replicates": 3
+    },
+    "match_grade": "exact",
+    "matching_policy": {
+     "id": "host-condition-match",
+     "version": "1"
+    }
+   },
+   "expect": "invalid",
+   "note": "decimal trailing zero rejected",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "cir-01",
+   "schema": "circuit_design",
+   "doc": {
+    "artifact_type": "circuit_design@1",
+    "source": "components",
+    "components": [
+     {
+      "kind": "promoter",
+      "part_id": "pJ23119"
+     },
+     {
+      "kind": "cds",
+      "part_id": "sfGFP"
+     }
+    ],
+    "template_ref": {
+     "template_id": "expression_balance",
+     "version": "1"
+    },
+    "parameters": {
+     "copy": 15
+    }
+   },
+   "expect": "valid",
+   "note": "minimal valid",
+   "frozen": {
+    "verdict": "valid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "cir-02",
+   "schema": "circuit_design",
+   "doc": {
+    "artifact_type": "circuit_design@1",
+    "source": "components",
+    "components": [
+     {
+      "kind": "promoter",
+      "part_id": "pJ23119"
+     },
+     {
+      "kind": "cds",
+      "part_id": "sfGFP"
+     }
+    ],
+    "parameters": {
+     "copy": 15
+    }
+   },
+   "expect": "invalid",
+   "note": "missing required template_ref",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "cir-03",
+   "schema": "circuit_design",
+   "doc": {
+    "artifact_type": "circuit_design@1",
+    "source": "components",
+    "components": [
+     {
+      "kind": "promoter",
+      "part_id": "pJ23119"
+     },
+     {
+      "kind": "cds",
+      "part_id": "sfGFP"
+     }
+    ],
+    "template_ref": {
+     "template_id": "anything_goes",
+     "version": "1"
+    },
+    "parameters": {
+     "copy": 15
+    }
+   },
+   "expect": "invalid",
+   "note": "template not in two-template set",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "cir-04",
+   "schema": "circuit_design",
+   "doc": {
+    "artifact_type": "circuit_design@1",
+    "source": "components",
+    "components": [
+     {
+      "kind": "enhancer",
+      "part_id": "pJ23119"
+     },
+     {
+      "kind": "cds",
+      "part_id": "sfGFP"
+     }
+    ],
+    "template_ref": {
+     "template_id": "expression_balance",
+     "version": "1"
+    },
+    "parameters": {
+     "copy": 15
+    }
+   },
+   "expect": "invalid",
+   "note": "bad component kind enum",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "kcr-01",
+   "schema": "kinetic_crn_ref",
+   "doc": {
+    "artifact_type": "kinetic_crn_ref@1",
+    "model_kind": "kinetic_crn",
+    "sbml_ref": {
+     "artifact_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+     "expected_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+     "relative_path": "objects/eeeeeeeeeeeeeeee"
+    }
+   },
+   "expect": "valid",
+   "note": "minimal valid",
+   "frozen": {
+    "verdict": "valid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "kcr-02",
+   "schema": "kinetic_crn_ref",
+   "doc": {
+    "artifact_type": "kinetic_crn_ref@1",
+    "model_kind": "constraint_gem",
+    "sbml_ref": {
+     "artifact_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+     "expected_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+     "relative_path": "objects/eeeeeeeeeeeeeeee"
+    }
+   },
+   "expect": "invalid",
+   "note": "model_kind const",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "kcr-03",
+   "schema": "kinetic_crn_ref",
+   "doc": {
+    "artifact_type": "kinetic_crn_ref@1",
+    "model_kind": "kinetic_crn"
+   },
+   "expect": "invalid",
+   "note": "missing required sbml_ref",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "itc-01",
+   "schema": "integration_candidate",
+   "doc": {
+    "artifact_type": "integration_candidate@1",
+    "genome_ref": {
+     "artifact_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+     "expected_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+     "relative_path": "objects/ffffffffffffffff"
+    },
+    "ruleset_ref": {
+     "artifact_id": "0000000000000000000000000000000000000000000000000000000000000000",
+     "expected_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+     "relative_path": "objects/0000000000000000"
+    },
+    "contig": "chr1",
+    "interval": {
+     "start": 1000,
+     "end": 2000,
+     "convention": "0-based-half-open"
+    },
+    "strand": "plus",
+    "cassette": {
+     "payload_length": 1500,
+     "sequence_identity": "unknown"
+    },
+    "classification": "preliminary_candidate",
+    "screening_stage": "preliminary_spatial",
+    "reasons": [
+     {
+      "rule_id": "r1",
+      "detail": "no CDS overlap"
+     }
+    ],
+    "counts": {
+     "searched_space": 3,
+     "excluded": 1,
+     "unknown": 1,
+     "mandatory_rule_coverage": [
+      {
+       "rule_id": "r1",
+       "covered": 3
+      }
+     ]
+    }
+   },
+   "expect": "valid",
+   "note": "minimal valid (length-only cassette)",
+   "frozen": {
+    "verdict": "valid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "itc-02",
+   "schema": "integration_candidate",
+   "doc": {
+    "artifact_type": "integration_candidate@1",
+    "genome_ref": {
+     "artifact_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+     "expected_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+     "relative_path": "objects/ffffffffffffffff"
+    },
+    "ruleset_ref": {
+     "artifact_id": "0000000000000000000000000000000000000000000000000000000000000000",
+     "expected_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+     "relative_path": "objects/0000000000000000"
+    },
+    "contig": "chr1",
+    "interval": {
+     "start": 1000,
+     "end": 2000,
+     "convention": "0-based-half-open"
+    },
+    "strand": "plus",
+    "cassette": {
+     "payload_length": 1500,
+     "sequence_identity": "unknown"
+    },
+    "classification": "safe",
+    "screening_stage": "preliminary_spatial",
+    "reasons": [
+     {
+      "rule_id": "r1",
+      "detail": "no CDS overlap"
+     }
+    ],
+    "counts": {
+     "searched_space": 3,
+     "excluded": 1,
+     "unknown": 1,
+     "mandatory_rule_coverage": [
+      {
+       "rule_id": "r1",
+       "covered": 3
+      }
+     ]
+    }
+   },
+   "expect": "invalid",
+   "note": "no safety vocabulary; bad enum",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "itc-03",
+   "schema": "integration_candidate",
+   "doc": {
+    "artifact_type": "integration_candidate@1",
+    "genome_ref": {
+     "artifact_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+     "expected_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+     "relative_path": "objects/ffffffffffffffff"
+    },
+    "ruleset_ref": {
+     "artifact_id": "0000000000000000000000000000000000000000000000000000000000000000",
+     "expected_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+     "relative_path": "objects/0000000000000000"
+    },
+    "contig": "chr1",
+    "interval": {
+     "start": 1000,
+     "end": 2000,
+     "convention": "0-based-half-open"
+    },
+    "strand": "plus",
+    "cassette": {
+     "payload_length": 1500,
+     "sequence_identity": "unknown"
+    },
+    "classification": "preliminary_candidate",
+    "screening_stage": "preliminary_spatial",
+    "reasons": [
+     {
+      "rule_id": "r1",
+      "detail": "no CDS overlap"
+     }
+    ]
+   },
+   "expect": "invalid",
+   "note": "missing required counts",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "itc-04",
+   "schema": "integration_candidate",
+   "doc": {
+    "artifact_type": "integration_candidate@1",
+    "genome_ref": {
+     "artifact_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+     "expected_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+     "relative_path": "objects/ffffffffffffffff"
+    },
+    "ruleset_ref": {
+     "artifact_id": "0000000000000000000000000000000000000000000000000000000000000000",
+     "expected_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+     "relative_path": "objects/0000000000000000"
+    },
+    "contig": "chr1",
+    "interval": {
+     "start": 1000,
+     "end": 2000,
+     "convention": "1-based"
+    },
+    "strand": "plus",
+    "cassette": {
+     "payload_length": 1500,
+     "sequence_identity": "unknown"
+    },
+    "classification": "preliminary_candidate",
+    "screening_stage": "preliminary_spatial",
+    "reasons": [
+     {
+      "rule_id": "r1",
+      "detail": "no CDS overlap"
+     }
+    ],
+    "counts": {
+     "searched_space": 3,
+     "excluded": 1,
+     "unknown": 1,
+     "mandatory_rule_coverage": [
+      {
+       "rule_id": "r1",
+       "covered": 3
+      }
+     ]
+    }
+   },
+   "expect": "invalid",
+   "note": "convention const",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "exs-01",
+   "schema": "expression_scenario",
+   "doc": {
+    "artifact_type": "expression_scenario@1",
+    "circuit_design": {
+     "artifact_id": "1111111111111111111111111111111111111111111111111111111111111111",
+     "expected_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+     "relative_path": "objects/1111111111111111"
+    },
+    "host_profile": {
+     "artifact_id": "2222222222222222222222222222222222222222222222222222222222222222",
+     "expected_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+     "relative_path": "objects/2222222222222222"
+    },
+    "method": "ostir_proxy",
+    "results": [
+     {
+      "element": "sfGFP",
+      "metric": "translation_init_rate",
+      "value_or_rank": {
+       "kind": "rank",
+       "rank": 1
+      },
+      "evidence_level": "E1"
+     }
+    ],
+    "domain_check": "out_of_domain",
+    "ranking_set_id": "rank-20261013-1",
+    "comparison_scope": "same host, same 5prime context",
+    "metric_definition": "ostir proxy rank",
+    "higher_is": "high"
+   },
+   "expect": "valid",
+   "note": "minimal valid (proxy rank)",
+   "frozen": {
+    "verdict": "valid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "exs-02",
+   "schema": "expression_scenario",
+   "doc": {
+    "artifact_type": "expression_scenario@1",
+    "circuit_design": {
+     "artifact_id": "1111111111111111111111111111111111111111111111111111111111111111",
+     "expected_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+     "relative_path": "objects/1111111111111111"
+    },
+    "host_profile": {
+     "artifact_id": "2222222222222222222222222222222222222222222222222222222222222222",
+     "expected_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+     "relative_path": "objects/2222222222222222"
+    },
+    "method": "ostir_proxy",
+    "results": [
+     {
+      "element": "sfGFP",
+      "metric": "translation_init_rate",
+      "value_or_rank": {
+       "kind": "rank",
+       "rank": 1
+      },
+      "evidence_level": "E1"
+     }
+    ],
+    "ranking_set_id": "rank-20261013-1",
+    "comparison_scope": "same host, same 5prime context",
+    "metric_definition": "ostir proxy rank",
+    "higher_is": "high"
+   },
+   "expect": "invalid",
+   "note": "missing required domain_check",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "exs-03",
+   "schema": "expression_scenario",
+   "doc": {
+    "artifact_type": "expression_scenario@1",
+    "circuit_design": {
+     "artifact_id": "1111111111111111111111111111111111111111111111111111111111111111",
+     "expected_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+     "relative_path": "objects/1111111111111111"
+    },
+    "host_profile": {
+     "artifact_id": "2222222222222222222222222222222222222222222222222222222222222222",
+     "expected_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+     "relative_path": "objects/2222222222222222"
+    },
+    "method": "ostir_proxy",
+    "results": [
+     {
+      "element": "sfGFP",
+      "metric": "translation_init_rate",
+      "value_or_rank": {
+       "kind": "median",
+       "value": "1.5"
+      },
+      "evidence_level": "E1"
+     }
+    ],
+    "domain_check": "out_of_domain",
+    "ranking_set_id": "rank-20261013-1",
+    "comparison_scope": "same host, same 5prime context",
+    "metric_definition": "ostir proxy rank",
+    "higher_is": "high"
+   },
+   "expect": "invalid",
+   "note": "kind enum value|rank",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "exs-04",
+   "schema": "expression_scenario",
+   "doc": {
+    "artifact_type": "expression_scenario@1",
+    "circuit_design": {
+     "artifact_id": "1111111111111111111111111111111111111111111111111111111111111111",
+     "expected_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+     "relative_path": "objects/1111111111111111"
+    },
+    "host_profile": {
+     "artifact_id": "2222222222222222222222222222222222222222222222222222222222222222",
+     "expected_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+     "relative_path": "objects/2222222222222222"
+    },
+    "method": "absolute_expression",
+    "results": [
+     {
+      "element": "sfGFP",
+      "metric": "translation_init_rate",
+      "value_or_rank": {
+       "kind": "rank",
+       "rank": 1
+      },
+      "evidence_level": "E1"
+     }
+    ],
+    "domain_check": "out_of_domain",
+    "ranking_set_id": "rank-20261013-1",
+    "comparison_scope": "same host, same 5prime context",
+    "metric_definition": "ostir proxy rank",
+    "higher_is": "high"
+   },
+   "expect": "invalid",
+   "note": "bad method enum",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "gcr-01",
+   "schema": "gem_card_raw",
+   "doc": {
+    "artifact_type": "gem_card_raw@1",
+    "card_schema": "v2",
+    "raw_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "raw_bytes_ref": {
+     "artifact_id": "3333333333333333333333333333333333333333333333333333333333333333",
+     "expected_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+     "relative_path": "objects/3333333333333333"
+    }
+   },
+   "expect": "valid",
+   "note": "minimal valid",
+   "frozen": {
+    "verdict": "valid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "gcr-02",
+   "schema": "gem_card_raw",
+   "doc": {
+    "artifact_type": "gem_card_raw@1",
+    "card_schema": "v9",
+    "raw_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "raw_bytes_ref": {
+     "artifact_id": "3333333333333333333333333333333333333333333333333333333333333333",
+     "expected_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+     "relative_path": "objects/3333333333333333"
+    }
+   },
+   "expect": "invalid",
+   "note": "bad card_schema enum",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "gcr-03",
+   "schema": "gem_card_raw",
+   "doc": {
+    "artifact_type": "gem_card_raw@1",
+    "card_schema": "v2",
+    "raw_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+   },
+   "expect": "invalid",
+   "note": "missing raw_bytes_ref",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "mmr-01",
+   "schema": "metabolic_model_ref",
+   "doc": {
+    "artifact_type": "metabolic_model_ref@1",
+    "sbml_ref": {
+     "artifact_id": "4444444444444444444444444444444444444444444444444444444444444444",
+     "expected_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+     "relative_path": "objects/4444444444444444"
+    },
+    "card": {
+     "card_schema": "v2",
+     "card_ref": {
+      "artifact_id": "3333333333333333333333333333333333333333333333333333333333333333",
+      "expected_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "relative_path": "objects/3333333333333333"
+     }
+    },
+    "model_id": "iML1515",
+    "genome_link": {
+     "strain": "K-12 MG1655",
+     "genome_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+     "match_status": "exact"
+    },
+    "gpr": {
+     "coverage_pct": 100.0,
+     "namespace": "b3908",
+     "crosswalk_status": "exact"
+    },
+    "objective": "BIOMASS_Ec_iML1515_core_75p37M",
+    "baseline": {
+     "feasible": true,
+     "growth": "0.876997",
+     "solver": {
+      "id": "glpk",
+      "version": "5.0"
+     }
+    }
+   },
+   "expect": "valid",
+   "note": "minimal valid (anchored growth)",
+   "frozen": {
+    "verdict": "valid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "mmr-02",
+   "schema": "metabolic_model_ref",
+   "doc": {
+    "artifact_type": "metabolic_model_ref@1",
+    "sbml_ref": {
+     "artifact_id": "4444444444444444444444444444444444444444444444444444444444444444",
+     "expected_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+     "relative_path": "objects/4444444444444444"
+    },
+    "card": {
+     "card_schema": "v2",
+     "card_ref": {
+      "artifact_id": "3333333333333333333333333333333333333333333333333333333333333333",
+      "expected_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "relative_path": "objects/3333333333333333"
+     }
+    },
+    "model_id": "iML1515",
+    "genome_link": {
+     "strain": "K-12 MG1655",
+     "genome_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+     "match_status": "exact"
+    },
+    "gpr": {
+     "coverage_pct": 100.0,
+     "namespace": "b3908",
+     "crosswalk_status": "exact"
+    },
+    "objective": "BIOMASS_Ec_iML1515_core_75p37M",
+    "baseline": {
+     "feasible": true,
+     "growth": "0.8769970",
+     "solver": {
+      "id": "glpk",
+      "version": "5.0"
+     }
+    }
+   },
+   "expect": "invalid",
+   "note": "decimal trailing zero",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "mmr-03",
+   "schema": "metabolic_model_ref",
+   "doc": {
+    "artifact_type": "metabolic_model_ref@1",
+    "sbml_ref": {
+     "artifact_id": "4444444444444444444444444444444444444444444444444444444444444444",
+     "expected_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+     "relative_path": "objects/4444444444444444"
+    },
+    "card": {
+     "card_schema": "v2",
+     "card_ref": {
+      "artifact_id": "3333333333333333333333333333333333333333333333333333333333333333",
+      "expected_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "relative_path": "objects/3333333333333333"
+     }
+    },
+    "model_id": "iML1515",
+    "genome_link": {
+     "strain": "K-12 MG1655",
+     "genome_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+     "match_status": "fuzzy"
+    },
+    "gpr": {
+     "coverage_pct": 100.0,
+     "namespace": "b3908",
+     "crosswalk_status": "exact"
+    },
+    "objective": "BIOMASS_Ec_iML1515_core_75p37M",
+    "baseline": {
+     "feasible": true,
+     "growth": "0.876997",
+     "solver": {
+      "id": "glpk",
+      "version": "5.0"
+     }
+    }
+   },
+   "expect": "invalid",
+   "note": "bad match_status enum",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "mmr-04",
+   "schema": "metabolic_model_ref",
+   "doc": {
+    "artifact_type": "metabolic_model_ref@1",
+    "sbml_ref": {
+     "artifact_id": "4444444444444444444444444444444444444444444444444444444444444444",
+     "expected_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+     "relative_path": "objects/4444444444444444"
+    },
+    "card": {
+     "card_schema": "v2",
+     "card_ref": {
+      "artifact_id": "3333333333333333333333333333333333333333333333333333333333333333",
+      "expected_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "relative_path": "objects/3333333333333333"
+     }
+    },
+    "model_id": "iML1515",
+    "genome_link": {
+     "strain": "K-12 MG1655",
+     "genome_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+     "match_status": "exact"
+    },
+    "objective": "BIOMASS_Ec_iML1515_core_75p37M",
+    "baseline": {
+     "feasible": true,
+     "growth": "0.876997",
+     "solver": {
+      "id": "glpk",
+      "version": "5.0"
+     }
+    }
+   },
+   "expect": "invalid",
+   "note": "missing required gpr",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "hmb-01",
+   "schema": "host_model_binding",
+   "doc": {
+    "artifact_type": "host_model_binding@1",
+    "genome_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "model_sbml_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+    "binding_method": {
+     "id": "faa-gff-coordinate-pair",
+     "version": "1"
+    },
+    "evidence_source": "gate5 coordinate pairing",
+    "match_result": "exact"
+   },
+   "expect": "valid",
+   "note": "minimal valid",
+   "frozen": {
+    "verdict": "valid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "hmb-02",
+   "schema": "host_model_binding",
+   "doc": {
+    "artifact_type": "host_model_binding@1",
+    "genome_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "model_sbml_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+    "binding_method": {
+     "id": "faa-gff-coordinate-pair",
+     "version": "1"
+    },
+    "evidence_source": "gate5 coordinate pairing",
+    "match_result": "probably"
+   },
+   "expect": "invalid",
+   "note": "bad match_result enum",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "hmb-03",
+   "schema": "host_model_binding",
+   "doc": {
+    "artifact_type": "host_model_binding@1",
+    "model_sbml_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+    "binding_method": {
+     "id": "faa-gff-coordinate-pair",
+     "version": "1"
+    },
+    "evidence_source": "gate5 coordinate pairing",
+    "match_result": "exact"
+   },
+   "expect": "invalid",
+   "note": "missing genome_sha256",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "gpr-01",
+   "schema": "gpr_proof",
+   "doc": {
+    "artifact_type": "gpr_proof@1",
+    "canonical_gpr_ast": "(OR b3908 b3919)",
+    "ast_hash": "5555555555555555555555555555555555555555555555555555555555555555",
+    "source_gene_ids": [
+     "Atu3768"
+    ],
+    "gem_gene_ids": [
+     "b3908",
+     "b3919"
+    ],
+    "namespace": "K-12",
+    "reaction_id": "R_GLUCOSE",
+    "mapping_path": [
+     "Atu3768",
+     "b3908",
+     "R_GLUCOSE"
+    ]
+   },
+   "expect": "valid",
+   "note": "minimal valid",
+   "frozen": {
+    "verdict": "valid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "gpr-02",
+   "schema": "gpr_proof",
+   "doc": {
+    "artifact_type": "gpr_proof@1",
+    "canonical_gpr_ast": "(OR b3908 b3919)",
+    "ast_hash": "5555555555555555555555555555555555555555555555555555555555555555",
+    "source_gene_ids": [
+     "Atu3768"
+    ],
+    "gem_gene_ids": [
+     "b3908",
+     "b3919"
+    ],
+    "namespace": "K-12",
+    "reaction_id": "R_GLUCOSE"
+   },
+   "expect": "invalid",
+   "note": "missing mapping_path",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "gpr-03",
+   "schema": "gpr_proof",
+   "doc": {
+    "artifact_type": "gpr_proof@1",
+    "canonical_gpr_ast": "(OR b3908 b3919)",
+    "ast_hash": "not-a-hash",
+    "source_gene_ids": [
+     "Atu3768"
+    ],
+    "gem_gene_ids": [
+     "b3908",
+     "b3919"
+    ],
+    "namespace": "K-12",
+    "reaction_id": "R_GLUCOSE",
+    "mapping_path": [
+     "Atu3768",
+     "b3908",
+     "R_GLUCOSE"
+    ]
+   },
+   "expect": "invalid",
+   "note": "ast_hash pattern",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "cpl-01",
+   "schema": "coupling_profile",
+   "doc": {
+    "artifact_type": "coupling_profile@1",
+    "mode": "user_calibrated_bound",
+    "rules": [
+     {
+      "rule_id": "rule-1",
+      "model_ref": {
+       "artifact_id": "4444444444444444444444444444444444444444444444444444444444444444",
+       "expected_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+       "relative_path": "objects/4444444444444444"
+      },
+      "host_profile": {
+       "artifact_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+       "expected_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+       "relative_path": "objects/dddddddddddddddd"
+      },
+      "host_model_binding_ref": {
+       "artifact_id": "6666666666666666666666666666666666666666666666666666666666666666",
+       "expected_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+       "relative_path": "objects/6666666666666666"
+      },
+      "gpr_proof_ref": {
+       "artifact_id": "5555555555555555555555555555555555555555555555555555555555555555",
+       "expected_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+       "relative_path": "objects/5555555555555555"
+      },
+      "condition_card_ref": {
+       "artifact_id": "7777777777777777777777777777777777777777777777777777777777777777",
+       "expected_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+       "relative_path": "objects/7777777777777777"
+      },
+      "source_gene": {
+       "namespace": "K-12",
+       "id": "b0001"
+      },
+      "reaction_id": "R_GLUCOSE",
+      "reaction_direction": "forward",
+      "operation": "set_upper_bound",
+      "baseline_bound": "1000",
+      "derived_bound": "12.34",
+      "unit": "mmol/gDW/h",
+      "mapping_function": {
+       "id": "linear",
+       "version": "1",
+       "parameters": {
+        "scale": 0.5
+       }
+      },
+      "condition_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "input_kind": "user_explicit_assumption",
+      "evidence_refs": [
+       "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      ],
+      "assumption_refs": [
+       "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      ],
+      "confidence": "medium"
+     }
+    ]
+   },
+   "expect": "valid",
+   "note": "user_calibrated with full refs",
+   "frozen": {
+    "verdict": "valid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "cpl-02",
+   "schema": "coupling_profile",
+   "doc": {
+    "artifact_type": "coupling_profile@1",
+    "mode": "qualitative_direction",
+    "rules": [
+     {
+      "rule_id": "rule-1",
+      "model_ref": {
+       "artifact_id": "4444444444444444444444444444444444444444444444444444444444444444",
+       "expected_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+       "relative_path": "objects/4444444444444444"
+      },
+      "host_profile": {
+       "artifact_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+       "expected_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+       "relative_path": "objects/dddddddddddddddd"
+      },
+      "host_model_binding_ref": {
+       "artifact_id": "6666666666666666666666666666666666666666666666666666666666666666",
+       "expected_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+       "relative_path": "objects/6666666666666666"
+      },
+      "gpr_proof_ref": {
+       "artifact_id": "5555555555555555555555555555555555555555555555555555555555555555",
+       "expected_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+       "relative_path": "objects/5555555555555555"
+      },
+      "condition_card_ref": {
+       "artifact_id": "7777777777777777777777777777777777777777777777777777777777777777",
+       "expected_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+       "relative_path": "objects/7777777777777777"
+      },
+      "source_gene": {
+       "namespace": "K-12",
+       "id": "b0001"
+      },
+      "reaction_id": "R_GLUCOSE",
+      "reaction_direction": "forward",
+      "operation": "set_upper_bound",
+      "baseline_bound": "1000",
+      "derived_bound": "12.34",
+      "unit": "mmol/gDW/h",
+      "mapping_function": {
+       "id": "linear",
+       "version": "1",
+       "parameters": {
+        "scale": 0.5
+       }
+      },
+      "condition_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "input_kind": "sequence_proxy",
+      "evidence_refs": [
+       "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      ],
+      "assumption_refs": [
+       "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      ],
+      "confidence": "medium"
+     }
+    ]
+   },
+   "expect": "valid",
+   "note": "sequence_proxy in qualitative mode",
+   "frozen": {
+    "verdict": "valid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "cpl-03",
+   "schema": "coupling_profile",
+   "doc": {
+    "artifact_type": "coupling_profile@1",
+    "mode": "evidence_calibrated_bound",
+    "rules": [
+     {
+      "rule_id": "rule-1",
+      "model_ref": {
+       "artifact_id": "4444444444444444444444444444444444444444444444444444444444444444",
+       "expected_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+       "relative_path": "objects/4444444444444444"
+      },
+      "host_profile": {
+       "artifact_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+       "expected_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+       "relative_path": "objects/dddddddddddddddd"
+      },
+      "host_model_binding_ref": {
+       "artifact_id": "6666666666666666666666666666666666666666666666666666666666666666",
+       "expected_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+       "relative_path": "objects/6666666666666666"
+      },
+      "gpr_proof_ref": {
+       "artifact_id": "5555555555555555555555555555555555555555555555555555555555555555",
+       "expected_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+       "relative_path": "objects/5555555555555555"
+      },
+      "condition_card_ref": {
+       "artifact_id": "7777777777777777777777777777777777777777777777777777777777777777",
+       "expected_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+       "relative_path": "objects/7777777777777777"
+      },
+      "source_gene": {
+       "namespace": "K-12",
+       "id": "b0001"
+      },
+      "reaction_id": "R_GLUCOSE",
+      "reaction_direction": "forward",
+      "operation": "set_upper_bound",
+      "baseline_bound": "1000",
+      "derived_bound": "12.34",
+      "unit": "mmol/gDW/h",
+      "mapping_function": {
+       "id": "linear",
+       "version": "1",
+       "parameters": {
+        "scale": 0.5
+       }
+      },
+      "condition_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "input_kind": "manual_override",
+      "evidence_refs": [
+       "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      ],
+      "assumption_refs": [
+       "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      ],
+      "confidence": "medium"
+     }
+    ]
+   },
+   "expect": "invalid",
+   "note": "manual_override not allowed in evidence mode",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "cpl-04",
+   "schema": "coupling_profile",
+   "doc": {
+    "artifact_type": "coupling_profile@1",
+    "mode": "user_calibrated_bound",
+    "rules": [
+     {
+      "rule_id": "rule-1",
+      "model_ref": {
+       "artifact_id": "4444444444444444444444444444444444444444444444444444444444444444",
+       "expected_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+       "relative_path": "objects/4444444444444444"
+      },
+      "host_profile": {
+       "artifact_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+       "expected_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+       "relative_path": "objects/dddddddddddddddd"
+      },
+      "host_model_binding_ref": {
+       "artifact_id": "6666666666666666666666666666666666666666666666666666666666666666",
+       "expected_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+       "relative_path": "objects/6666666666666666"
+      },
+      "gpr_proof_ref": {
+       "artifact_id": "5555555555555555555555555555555555555555555555555555555555555555",
+       "expected_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+       "relative_path": "objects/5555555555555555"
+      },
+      "condition_card_ref": {
+       "artifact_id": "7777777777777777777777777777777777777777777777777777777777777777",
+       "expected_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+       "relative_path": "objects/7777777777777777"
+      },
+      "source_gene": {
+       "namespace": "K-12",
+       "id": "b0001"
+      },
+      "reaction_id": "R_GLUCOSE",
+      "reaction_direction": "forward",
+      "operation": "set_upper_bound",
+      "baseline_bound": "1000",
+      "derived_bound": "12.34",
+      "unit": "mmol/gDW/h",
+      "mapping_function": {
+       "id": "linear",
+       "version": "1",
+       "parameters": {
+        "scale": 0.5
+       }
+      },
+      "condition_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "input_kind": "sequence_proxy",
+      "evidence_refs": [
+       "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      ],
+      "assumption_refs": [
+       "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      ],
+      "confidence": "medium"
+     }
+    ]
+   },
+   "expect": "invalid",
+   "note": "sequence_proxy only drives qualitative",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "cpl-05",
+   "schema": "coupling_profile",
+   "doc": {
+    "artifact_type": "coupling_profile@1",
+    "mode": "user_calibrated_bound",
+    "rules": [
+     {
+      "rule_id": "rule-1",
+      "model_ref": {
+       "artifact_id": "4444444444444444444444444444444444444444444444444444444444444444",
+       "expected_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+       "relative_path": "objects/4444444444444444"
+      },
+      "host_profile": {
+       "artifact_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+       "expected_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+       "relative_path": "objects/dddddddddddddddd"
+      },
+      "host_model_binding_ref": {
+       "artifact_id": "6666666666666666666666666666666666666666666666666666666666666666",
+       "expected_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+       "relative_path": "objects/6666666666666666"
+      },
+      "condition_card_ref": {
+       "artifact_id": "7777777777777777777777777777777777777777777777777777777777777777",
+       "expected_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+       "relative_path": "objects/7777777777777777"
+      },
+      "source_gene": {
+       "namespace": "K-12",
+       "id": "b0001"
+      },
+      "reaction_id": "R_GLUCOSE",
+      "reaction_direction": "forward",
+      "operation": "set_upper_bound",
+      "baseline_bound": "1000",
+      "derived_bound": "12.34",
+      "unit": "mmol/gDW/h",
+      "mapping_function": {
+       "id": "linear",
+       "version": "1",
+       "parameters": {
+        "scale": 0.5
+       }
+      },
+      "condition_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "input_kind": "user_explicit_assumption",
+      "evidence_refs": [
+       "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      ],
+      "assumption_refs": [
+       "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      ],
+      "confidence": "medium"
+     }
+    ]
+   },
+   "expect": "invalid",
+   "note": "missing rule ref",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "cpl-06",
+   "schema": "coupling_profile",
+   "doc": {
+    "artifact_type": "coupling_profile@1",
+    "mode": "user_calibrated_bound",
+    "rules": [
+     {
+      "rule_id": "rule-1",
+      "model_ref": {
+       "artifact_id": "4444444444444444444444444444444444444444444444444444444444444444",
+       "expected_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+       "relative_path": "objects/4444444444444444"
+      },
+      "host_profile": {
+       "artifact_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+       "expected_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+       "relative_path": "objects/dddddddddddddddd"
+      },
+      "host_model_binding_ref": {
+       "artifact_id": "6666666666666666666666666666666666666666666666666666666666666666",
+       "expected_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+       "relative_path": "objects/6666666666666666"
+      },
+      "gpr_proof_ref": {
+       "artifact_id": "5555555555555555555555555555555555555555555555555555555555555555",
+       "expected_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+       "relative_path": "objects/5555555555555555"
+      },
+      "condition_card_ref": {
+       "artifact_id": "7777777777777777777777777777777777777777777777777777777777777777",
+       "expected_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+       "relative_path": "objects/7777777777777777"
+      },
+      "source_gene": {
+       "namespace": "K-12",
+       "id": "b0001"
+      },
+      "reaction_id": "R_GLUCOSE",
+      "reaction_direction": "forward",
+      "operation": "set_upper_bound",
+      "baseline_bound": "1000",
+      "derived_bound": "0.0",
+      "unit": "mmol/gDW/h",
+      "mapping_function": {
+       "id": "linear",
+       "version": "1",
+       "parameters": {
+        "scale": 0.5
+       }
+      },
+      "condition_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "input_kind": "user_explicit_assumption",
+      "evidence_refs": [
+       "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      ],
+      "assumption_refs": [
+       "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      ],
+      "confidence": "medium"
+     }
+    ]
+   },
+   "expect": "invalid",
+   "note": "decimal trailing zero (derived_bound)",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "cpl-07",
+   "schema": "coupling_profile",
+   "doc": {
+    "artifact_type": "coupling_profile@1",
+    "mode": "user_calibrated_bound",
+    "rules": [
+     {
+      "rule_id": "rule-1",
+      "model_ref": {
+       "artifact_id": "4444444444444444444444444444444444444444444444444444444444444444",
+       "expected_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+       "relative_path": "objects/4444444444444444"
+      },
+      "host_profile": {
+       "artifact_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+       "expected_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+       "relative_path": "objects/dddddddddddddddd"
+      },
+      "host_model_binding_ref": {
+       "artifact_id": "6666666666666666666666666666666666666666666666666666666666666666",
+       "expected_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+       "relative_path": "objects/6666666666666666"
+      },
+      "gpr_proof_ref": {
+       "artifact_id": "5555555555555555555555555555555555555555555555555555555555555555",
+       "expected_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+       "relative_path": "objects/5555555555555555"
+      },
+      "condition_card_ref": {
+       "artifact_id": "7777777777777777777777777777777777777777777777777777777777777777",
+       "expected_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+       "relative_path": "objects/7777777777777777"
+      },
+      "source_gene": {
+       "namespace": "K-12",
+       "id": "b0001"
+      },
+      "reaction_id": "R_GLUCOSE",
+      "reaction_direction": "forward",
+      "operation": "set_upper_bound",
+      "baseline_bound": "1000",
+      "derived_bound": "0\n",
+      "unit": "mmol/gDW/h",
+      "mapping_function": {
+       "id": "linear",
+       "version": "1",
+       "parameters": {
+        "scale": 0.5
+       }
+      },
+      "condition_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "input_kind": "user_explicit_assumption",
+      "evidence_refs": [
+       "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      ],
+      "assumption_refs": [
+       "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      ],
+      "confidence": "medium"
+     }
+    ]
+   },
+   "expect": "invalid",
+   "note": "decimal trailing-LF (derived_bound)",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "cpl-08",
+   "schema": "coupling_profile",
+   "doc": {
+    "artifact_type": "coupling_profile@1",
+    "mode": "qualitative_direction",
+    "rules": [
+     {
+      "rule_id": "rule-1",
+      "model_ref": {
+       "artifact_id": "4444444444444444444444444444444444444444444444444444444444444444",
+       "expected_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+       "relative_path": "objects/4444444444444444"
+      },
+      "host_profile": {
+       "artifact_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+       "expected_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+       "relative_path": "objects/dddddddddddddddd"
+      },
+      "host_model_binding_ref": {
+       "artifact_id": "6666666666666666666666666666666666666666666666666666666666666666",
+       "expected_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+       "relative_path": "objects/6666666666666666"
+      },
+      "gpr_proof_ref": {
+       "artifact_id": "5555555555555555555555555555555555555555555555555555555555555555",
+       "expected_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+       "relative_path": "objects/5555555555555555"
+      },
+      "condition_card_ref": {
+       "artifact_id": "7777777777777777777777777777777777777777777777777777777777777777",
+       "expected_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+       "relative_path": "objects/7777777777777777"
+      },
+      "source_gene": {
+       "namespace": "K-12",
+       "id": "b0001"
+      },
+      "reaction_id": "R_GLUCOSE",
+      "reaction_direction": "forward",
+      "operation": "set_upper_bound",
+      "baseline_bound": "1000",
+      "derived_bound": "12.34",
+      "unit": "mmol/gDW/h",
+      "mapping_function": {
+       "id": "linear",
+       "version": "1",
+       "parameters": {
+        "scale": 0.5
+       }
+      },
+      "condition_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "input_kind": "manual_override",
+      "evidence_refs": [
+       "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      ],
+      "assumption_refs": [
+       "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      ],
+      "confidence": "medium"
+     }
+    ]
+   },
+   "expect": "invalid",
+   "note": "manual_override only in user_calibrated_bound",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "cpl-09",
+   "schema": "coupling_profile",
+   "doc": {
+    "artifact_type": "coupling_profile@1",
+    "mode": "qualitative_direction",
+    "rules": [
+     {
+      "rule_id": "rule-1",
+      "model_ref": {
+       "artifact_id": "4444444444444444444444444444444444444444444444444444444444444444",
+       "expected_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+       "relative_path": "objects/4444444444444444"
+      },
+      "host_profile": {
+       "artifact_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+       "expected_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+       "relative_path": "objects/dddddddddddddddd"
+      },
+      "host_model_binding_ref": {
+       "artifact_id": "6666666666666666666666666666666666666666666666666666666666666666",
+       "expected_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+       "relative_path": "objects/6666666666666666"
+      },
+      "gpr_proof_ref": {
+       "artifact_id": "5555555555555555555555555555555555555555555555555555555555555555",
+       "expected_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+       "relative_path": "objects/5555555555555555"
+      },
+      "condition_card_ref": {
+       "artifact_id": "7777777777777777777777777777777777777777777777777777777777777777",
+       "expected_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+       "relative_path": "objects/7777777777777777"
+      },
+      "source_gene": {
+       "namespace": "K-12",
+       "id": "b0001"
+      },
+      "reaction_id": "R_GLUCOSE",
+      "reaction_direction": "forward",
+      "operation": "set_upper_bound",
+      "baseline_bound": "1000",
+      "derived_bound": "12.34",
+      "unit": "mmol/gDW/h",
+      "mapping_function": {
+       "id": "linear",
+       "version": "1",
+       "parameters": {
+        "scale": 0.5
+       }
+      },
+      "condition_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "input_kind": "manual_override",
+      "evidence_refs": [
+       "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      ],
+      "assumption_refs": [],
+      "confidence": "medium"
+     }
+    ]
+   },
+   "expect": "invalid",
+   "note": "manual_override empty assumption_refs",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "cpl-10",
+   "schema": "coupling_profile",
+   "doc": {
+    "artifact_type": "coupling_profile@1",
+    "mode": "user_calibrated_bound",
+    "rules": [
+     {
+      "rule_id": "rule-1",
+      "model_ref": {
+       "artifact_id": "4444444444444444444444444444444444444444444444444444444444444444",
+       "expected_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+       "relative_path": "objects/4444444444444444"
+      },
+      "host_profile": {
+       "artifact_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+       "expected_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+       "relative_path": "objects/dddddddddddddddd"
+      },
+      "host_model_binding_ref": {
+       "artifact_id": "6666666666666666666666666666666666666666666666666666666666666666",
+       "expected_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+       "relative_path": "objects/6666666666666666"
+      },
+      "gpr_proof_ref": {
+       "artifact_id": "5555555555555555555555555555555555555555555555555555555555555555",
+       "expected_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+       "relative_path": "objects/5555555555555555"
+      },
+      "condition_card_ref": {
+       "artifact_id": "7777777777777777777777777777777777777777777777777777777777777777",
+       "expected_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+       "relative_path": "objects/7777777777777777"
+      },
+      "source_gene": {
+       "namespace": "K-12",
+       "id": "b0001"
+      },
+      "reaction_id": "R_GLUCOSE",
+      "reaction_direction": "forward",
+      "operation": "set_upper_bound",
+      "baseline_bound": "1000",
+      "derived_bound": "12.34",
+      "unit": "mmol/gDW/h",
+      "mapping_function": {
+       "id": "linear",
+       "version": "1",
+       "parameters": {
+        "scale": 0.5
+       }
+      },
+      "condition_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "input_kind": "manual_override",
+      "evidence_refs": [
+       "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      ],
+      "assumption_refs": [
+       "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      ],
+      "confidence": "medium"
+     }
+    ]
+   },
+   "expect": "valid",
+   "note": "manual_override in user_calibrated with non-empty assumption_refs",
+   "frozen": {
+    "verdict": "valid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "csq-01",
+   "schema": "consequence_run",
+   "doc": {
+    "artifact_type": "consequence_run@1",
+    "model_ref": {
+     "artifact_id": "4444444444444444444444444444444444444444444444444444444444444444",
+     "expected_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+     "relative_path": "objects/4444444444444444"
+    },
+    "coupling_ref": {
+     "artifact_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "expected_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "relative_path": "objects/aaaaaaaaaaaaaaaa"
+    },
+    "numeric_policy_ref": {
+     "artifact_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+     "expected_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+     "relative_path": "objects/bbbbbbbbbbbbbbbb"
+    },
+    "medium_ref": {
+     "artifact_id": "9999999999999999999999999999999999999999999999999999999999999999",
+     "expected_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+     "relative_path": "objects/9999999999999999"
+    },
+    "objective": "BIOMASS_Ec_iML1515_core_75p37M",
+    "baseline": {
+     "feasible": true,
+     "status": "optimal",
+     "objective_value": "0.876997",
+     "solver": {
+      "id": "glpk",
+      "version": "5.0"
+     }
+    },
+    "scenarios": [
+     {
+      "name": "knockout-glucose",
+      "diffs": [
+       {
+        "rule_id": "rule-1",
+        "reaction_id": "R_GLUCOSE",
+        "old_value": "10",
+        "new_value": "0",
+        "unit": "mmol/gDW/h"
+       }
+      ],
+      "fba": {
+       "status": "optimal",
+       "value": "0.85"
+      },
+      "fva": {
+       "intervals": [
+        {
+         "reaction_id": "R_GLUCOSE",
+         "min": "0",
+         "max": "10"
+        }
+       ]
+      },
+      "pfba": {
+       "status": "optimal",
+       "value": "0.84"
+      },
+      "model_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+      "diff_hash": "8888888888888888888888888888888888888888888888888888888888888888",
+      "medium_artifact_id": "9999999999999999999999999999999999999999999999999999999999999999",
+      "applied_rule_ids": [
+       "rule-1"
+      ],
+      "mapping_proof_ids": [
+       "5555555555555555555555555555555555555555555555555555555555555555"
+      ],
+      "target_metric": "EX_ac_e"
+     }
+    ],
+    "claim_targets": [
+     {
+      "kind": "growth",
+      "direction": "ROBUST_DIRECTION"
+     }
+    ]
+   },
+   "expect": "valid",
+   "note": "minimal valid",
+   "frozen": {
+    "verdict": "valid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "csq-02",
+   "schema": "consequence_run",
+   "doc": {
+    "artifact_type": "consequence_run@1",
+    "model_ref": {
+     "artifact_id": "4444444444444444444444444444444444444444444444444444444444444444",
+     "expected_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+     "relative_path": "objects/4444444444444444"
+    },
+    "coupling_ref": {
+     "artifact_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "expected_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "relative_path": "objects/aaaaaaaaaaaaaaaa"
+    },
+    "numeric_policy_ref": {
+     "artifact_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+     "expected_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+     "relative_path": "objects/bbbbbbbbbbbbbbbb"
+    },
+    "medium_ref": {
+     "artifact_id": "9999999999999999999999999999999999999999999999999999999999999999",
+     "expected_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+     "relative_path": "objects/9999999999999999"
+    },
+    "objective": "BIOMASS_Ec_iML1515_core_75p37M",
+    "baseline": {
+     "feasible": true,
+     "status": "optimal",
+     "objective_value": "0.876997",
+     "solver": {
+      "id": "glpk",
+      "version": "5.0"
+     }
+    },
+    "scenarios": [
+     {
+      "name": "knockout-glucose",
+      "diffs": [
+       {
+        "rule_id": "rule-1",
+        "reaction_id": "R_GLUCOSE",
+        "old_value": "10",
+        "new_value": "0",
+        "unit": "mmol/gDW/h"
+       }
+      ],
+      "fba": {
+       "status": "optimal",
+       "value": "-0.5e1"
+      },
+      "fva": {
+       "intervals": [
+        {
+         "reaction_id": "R_GLUCOSE",
+         "min": "0",
+         "max": "10"
+        }
+       ]
+      },
+      "pfba": {
+       "status": "optimal",
+       "value": "0.84"
+      },
+      "model_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+      "diff_hash": "8888888888888888888888888888888888888888888888888888888888888888",
+      "medium_artifact_id": "9999999999999999999999999999999999999999999999999999999999999999",
+      "applied_rule_ids": [
+       "rule-1"
+      ],
+      "mapping_proof_ids": [
+       "5555555555555555555555555555555555555555555555555555555555555555"
+      ],
+      "target_metric": "EX_ac_e"
+     }
+    ],
+    "claim_targets": [
+     {
+      "kind": "growth",
+      "direction": "ROBUST_DIRECTION"
+     }
+    ]
+   },
+   "expect": "invalid",
+   "note": "decimal exponent form",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "csq-03",
+   "schema": "consequence_run",
+   "doc": {
+    "artifact_type": "consequence_run@1",
+    "model_ref": {
+     "artifact_id": "4444444444444444444444444444444444444444444444444444444444444444",
+     "expected_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+     "relative_path": "objects/4444444444444444"
+    },
+    "coupling_ref": {
+     "artifact_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "expected_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "relative_path": "objects/aaaaaaaaaaaaaaaa"
+    },
+    "numeric_policy_ref": {
+     "artifact_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+     "expected_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+     "relative_path": "objects/bbbbbbbbbbbbbbbb"
+    },
+    "medium_ref": {
+     "artifact_id": "9999999999999999999999999999999999999999999999999999999999999999",
+     "expected_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+     "relative_path": "objects/9999999999999999"
+    },
+    "objective": "BIOMASS_Ec_iML1515_core_75p37M",
+    "baseline": {
+     "feasible": true,
+     "status": "optimal",
+     "objective_value": "0.876997",
+     "solver": {
+      "id": "glpk",
+      "version": "5.0"
+     }
+    },
+    "scenarios": [
+     {
+      "name": "knockout-glucose",
+      "diffs": [
+       {
+        "rule_id": "rule-1",
+        "reaction_id": "R_GLUCOSE",
+        "old_value": "10",
+        "new_value": "0",
+        "unit": "mmol/gDW/h"
+       }
+      ],
+      "fba": {
+       "status": "optimal",
+       "value": "0.85"
+      },
+      "fva": {
+       "intervals": [
+        {
+         "reaction_id": "R_GLUCOSE",
+         "min": "0",
+         "max": "10"
+        }
+       ]
+      },
+      "pfba": {
+       "status": "optimal",
+       "value": "0.84"
+      },
+      "model_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+      "diff_hash": "8888888888888888888888888888888888888888888888888888888888888888",
+      "medium_artifact_id": "9999999999999999999999999999999999999999999999999999999999999999",
+      "applied_rule_ids": [
+       "rule-1"
+      ],
+      "mapping_proof_ids": [
+       "5555555555555555555555555555555555555555555555555555555555555555"
+      ],
+      "target_metric": "EX_ac_e"
+     }
+    ],
+    "claim_targets": [
+     {
+      "kind": "growth",
+      "direction": "UP"
+     }
+    ]
+   },
+   "expect": "invalid",
+   "note": "bad direction enum",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "csq-04",
+   "schema": "consequence_run",
+   "doc": {
+    "artifact_type": "consequence_run@1",
+    "model_ref": {
+     "artifact_id": "4444444444444444444444444444444444444444444444444444444444444444",
+     "expected_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+     "relative_path": "objects/4444444444444444"
+    },
+    "coupling_ref": {
+     "artifact_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "expected_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "relative_path": "objects/aaaaaaaaaaaaaaaa"
+    },
+    "numeric_policy_ref": {
+     "artifact_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+     "expected_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+     "relative_path": "objects/bbbbbbbbbbbbbbbb"
+    },
+    "medium_ref": {
+     "artifact_id": "9999999999999999999999999999999999999999999999999999999999999999",
+     "expected_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+     "relative_path": "objects/9999999999999999"
+    },
+    "objective": "BIOMASS_Ec_iML1515_core_75p37M",
+    "baseline": {
+     "feasible": true,
+     "status": "optimal",
+     "objective_value": "0.876997",
+     "solver": {
+      "id": "glpk",
+      "version": "5.0"
+     }
+    },
+    "scenarios": [
+     {
+      "name": "knockout-glucose",
+      "diffs": [
+       {
+        "rule_id": "rule-1",
+        "reaction_id": "R_GLUCOSE",
+        "old_value": "10",
+        "new_value": "0",
+        "unit": "mmol/gDW/h"
+       }
+      ],
+      "fba": {
+       "status": "optimal",
+       "value": "0.85"
+      },
+      "fva": {
+       "intervals": [
+        {
+         "reaction_id": "R_GLUCOSE",
+         "min": "0",
+         "max": "10"
+        }
+       ]
+      },
+      "pfba": {
+       "status": "optimal",
+       "value": "0.84"
+      },
+      "model_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+      "diff_hash": "8888888888888888888888888888888888888888888888888888888888888888",
+      "medium_artifact_id": "9999999999999999999999999999999999999999999999999999999999999999",
+      "applied_rule_ids": [
+       "rule-1"
+      ],
+      "target_metric": "EX_ac_e"
+     }
+    ],
+    "claim_targets": [
+     {
+      "kind": "growth",
+      "direction": "ROBUST_DIRECTION"
+     }
+    ]
+   },
+   "expect": "invalid",
+   "note": "missing scenario field",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "csq-05",
+   "schema": "consequence_run",
+   "doc": {
+    "artifact_type": "consequence_run@1",
+    "model_ref": {
+     "artifact_id": "4444444444444444444444444444444444444444444444444444444444444444",
+     "expected_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+     "relative_path": "objects/4444444444444444"
+    },
+    "coupling_ref": {
+     "artifact_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "expected_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "relative_path": "objects/aaaaaaaaaaaaaaaa"
+    },
+    "numeric_policy_ref": {
+     "artifact_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+     "expected_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+     "relative_path": "objects/bbbbbbbbbbbbbbbb"
+    },
+    "medium_ref": {
+     "artifact_id": "9999999999999999999999999999999999999999999999999999999999999999",
+     "expected_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+     "relative_path": "objects/9999999999999999"
+    },
+    "objective": "BIOMASS_Ec_iML1515_core_75p37M",
+    "baseline": {
+     "feasible": true,
+     "status": "optimal",
+     "objective_value": "0.876997",
+     "solver": {
+      "id": "glpk",
+      "version": "5.0"
+     }
+    },
+    "scenarios": [
+     {
+      "name": "knockout-glucose",
+      "diffs": [
+       {
+        "rule_id": "rule-1",
+        "reaction_id": "R_GLUCOSE",
+        "old_value": "10",
+        "new_value": "0",
+        "unit": "mmol/gDW/h"
+       }
+      ],
+      "fba": {
+       "status": "optimal",
+       "value": "0.85"
+      },
+      "fva": {
+       "intervals": [
+        {
+         "reaction_id": "R_GLUCOSE",
+         "min": "1.0",
+         "max": "10"
+        }
+       ]
+      },
+      "pfba": {
+       "status": "optimal",
+       "value": "0.84"
+      },
+      "model_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+      "diff_hash": "8888888888888888888888888888888888888888888888888888888888888888",
+      "medium_artifact_id": "9999999999999999999999999999999999999999999999999999999999999999",
+      "applied_rule_ids": [
+       "rule-1"
+      ],
+      "mapping_proof_ids": [
+       "5555555555555555555555555555555555555555555555555555555555555555"
+      ],
+      "target_metric": "EX_ac_e"
+     }
+    ],
+    "claim_targets": [
+     {
+      "kind": "growth",
+      "direction": "ROBUST_DIRECTION"
+     }
+    ]
+   },
+   "expect": "invalid",
+   "note": "decimal trailing zero in FVA",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "tcd-01",
+   "schema": "tier_decision",
+   "doc": {
+    "artifact_type": "tier_decision@1",
+    "policy_id": "capability-policy",
+    "policy_version": "1",
+    "policy_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "input_snapshot_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "per_operation": [
+     {
+      "operation": "bio_design_consequence",
+      "max_tier": "reference_profile",
+      "gates": [
+       {
+        "gate": "exact_binding",
+        "status": "PASS"
+       }
+      ],
+      "decision": "allow",
+      "capabilities": [
+       "quantitative_consequence"
+      ],
+      "reason_codes": []
+     }
+    ]
+   },
+   "expect": "valid",
+   "note": "minimal valid",
+   "frozen": {
+    "verdict": "valid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "tcd-02",
+   "schema": "tier_decision",
+   "doc": {
+    "artifact_type": "tier_decision@1",
+    "policy_id": "capability-policy",
+    "policy_version": "1",
+    "policy_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "input_snapshot_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "per_operation": [
+     {
+      "operation": "bio_design_consequence",
+      "max_tier": "maybe",
+      "gates": [
+       {
+        "gate": "exact_binding",
+        "status": "PASS"
+       }
+      ],
+      "decision": "allow",
+      "capabilities": [
+       "quantitative_consequence"
+      ],
+      "reason_codes": []
+     }
+    ]
+   },
+   "expect": "invalid",
+   "note": "bad tier enum",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "tcd-03",
+   "schema": "tier_decision",
+   "doc": {
+    "artifact_type": "tier_decision@1",
+    "policy_id": "capability-policy",
+    "policy_version": "1",
+    "input_snapshot_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "per_operation": [
+     {
+      "operation": "bio_design_consequence",
+      "max_tier": "reference_profile",
+      "gates": [
+       {
+        "gate": "exact_binding",
+        "status": "PASS"
+       }
+      ],
+      "decision": "allow",
+      "capabilities": [
+       "quantitative_consequence"
+      ],
+      "reason_codes": []
+     }
+    ]
+   },
+   "expect": "invalid",
+   "note": "missing policy_hash",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "npo-01",
+   "schema": "numeric_policy",
+   "doc": {
+    "artifact_type": "numeric_policy@1",
+    "fva_fraction_of_optimum": 0.99,
+    "solver": {
+     "id": "glpk",
+     "version": "5.0"
+    },
+    "tolerance": 1e-06,
+    "direction_epsilon": "0.001",
+    "near_zero_rule": "abs(value) < epsilon flags near-zero",
+    "interval_zero_crossing_rule": "crossing_flags_indeterminate"
+   },
+   "expect": "valid",
+   "note": "minimal valid",
+   "frozen": {
+    "verdict": "valid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "npo-02",
+   "schema": "numeric_policy",
+   "doc": {
+    "artifact_type": "numeric_policy@1",
+    "fva_fraction_of_optimum": 0.99,
+    "solver": {
+     "id": "glpk",
+     "version": "5.0"
+    },
+    "tolerance": 1e-06,
+    "direction_epsilon": "-0",
+    "near_zero_rule": "abs(value) < epsilon flags near-zero",
+    "interval_zero_crossing_rule": "crossing_flags_indeterminate"
+   },
+   "expect": "invalid",
+   "note": "decimal -0",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "npo-03",
+   "schema": "numeric_policy",
+   "doc": {
+    "artifact_type": "numeric_policy@1",
+    "fva_fraction_of_optimum": 0.99,
+    "solver": {
+     "id": "glpk",
+     "version": "5.0"
+    },
+    "tolerance": 1e-06,
+    "direction_epsilon": "0.001",
+    "near_zero_rule": "abs(value) < epsilon flags near-zero",
+    "interval_zero_crossing_rule": "always_ok"
+   },
+   "expect": "invalid",
+   "note": "bad crossing rule enum",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "unv-01",
+   "schema": "unit_vocabulary",
+   "doc": {
+    "artifact_type": "unit_vocabulary@1",
+    "units": [
+     {
+      "unit_id": "mmol_per_gdw_per_h",
+      "symbol": "mmol/gDW/h",
+      "dimension": [
+       {
+        "base": "amount",
+        "exponent": 1
+       },
+       {
+        "base": "mass",
+        "exponent": -1
+       },
+       {
+        "base": "time",
+        "exponent": -1
+       }
+      ]
+     }
+    ],
+    "conversions": [
+     {
+      "from": "mmol_per_gdw_per_h",
+      "to": "mmol_per_gdw_per_h",
+      "factor": "1"
+     }
+    ],
+    "forbidden_mixes": [
+     {
+      "a": "a.u.",
+      "b": "mmol_per_gdw_per_h",
+      "reason": "proxy vs capacity"
+     }
+    ]
+   },
+   "expect": "valid",
+   "note": "minimal valid",
+   "frozen": {
+    "verdict": "valid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "unv-02",
+   "schema": "unit_vocabulary",
+   "doc": {
+    "artifact_type": "unit_vocabulary@1",
+    "units": [
+     {
+      "unit_id": "mmol_per_gdw_per_h",
+      "symbol": "mmol/gDW/h",
+      "dimension": [
+       {
+        "base": "amount",
+        "exponent": 1
+       },
+       {
+        "base": "mass",
+        "exponent": -1
+       },
+       {
+        "base": "time",
+        "exponent": -1
+       }
+      ]
+     }
+    ],
+    "forbidden_mixes": [
+     {
+      "a": "a.u.",
+      "b": "mmol_per_gdw_per_h",
+      "reason": "proxy vs capacity"
+     }
+    ]
+   },
+   "expect": "invalid",
+   "note": "missing conversions",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "unv-03",
+   "schema": "unit_vocabulary",
+   "doc": {
+    "artifact_type": "unit_vocabulary@1",
+    "units": [
+     {
+      "unit_id": "mmol_per_gdw_per_h",
+      "symbol": "mmol/gDW/h",
+      "dimension": [
+       {
+        "base": "currency",
+        "exponent": 1
+       },
+       {
+        "base": "mass",
+        "exponent": -1
+       },
+       {
+        "base": "time",
+        "exponent": -1
+       }
+      ]
+     }
+    ],
+    "conversions": [
+     {
+      "from": "mmol_per_gdw_per_h",
+      "to": "mmol_per_gdw_per_h",
+      "factor": "1"
+     }
+    ],
+    "forbidden_mixes": [
+     {
+      "a": "a.u.",
+      "b": "mmol_per_gdw_per_h",
+      "reason": "proxy vs capacity"
+     }
+    ]
+   },
+   "expect": "invalid",
+   "note": "bad base dimension",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "irs-01",
+   "schema": "integration_ruleset",
+   "doc": {
+    "artifact_type": "integration_ruleset@1",
+    "ruleset_id": "default-integration",
+    "version": "1",
+    "rules": [
+     {
+      "rule_id": "r1",
+      "kind": "feature_overlap",
+      "mandatory": true,
+      "params": {
+       "window": 200
+      }
+     }
+    ]
+   },
+   "expect": "valid",
+   "note": "minimal valid",
+   "frozen": {
+    "verdict": "valid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "irs-02",
+   "schema": "integration_ruleset",
+   "doc": {
+    "artifact_type": "integration_ruleset@1",
+    "ruleset_id": "default-integration",
+    "rules": [
+     {
+      "rule_id": "r1",
+      "kind": "feature_overlap",
+      "mandatory": true,
+      "params": {
+       "window": 200
+      }
+     }
+    ]
+   },
+   "expect": "invalid",
+   "note": "missing version",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "irs-03",
+   "schema": "integration_ruleset",
+   "doc": {
+    "artifact_type": "integration_ruleset@1",
+    "ruleset_id": "default-integration",
+    "version": "1",
+    "rules": [
+     {
+      "rule_id": "r1",
+      "kind": "vibes",
+      "mandatory": true,
+      "params": {
+       "window": 200
+      }
+     }
+    ]
+   },
+   "expect": "invalid",
+   "note": "bad rule kind",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "pvd-01",
+   "schema": "provenance_dag",
+   "doc": {
+    "artifact_type": "provenance_dag@1",
+    "nodes": [
+     {
+      "id": "4444444444444444444444444444444444444444444444444444444444444444",
+      "kind": "artifact",
+      "type": "metabolic_model_ref@1"
+     },
+     {
+      "id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "kind": "claim",
+      "type": "claim"
+     }
+    ],
+    "edges": [
+     {
+      "from": "4444444444444444444444444444444444444444444444444444444444444444",
+      "to": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "kind": "supports"
+     }
+    ],
+    "dag_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+   },
+   "expect": "valid",
+   "note": "minimal valid",
+   "frozen": {
+    "verdict": "valid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "pvd-02",
+   "schema": "provenance_dag",
+   "doc": {
+    "artifact_type": "provenance_dag@1",
+    "nodes": [
+     {
+      "id": "4444444444444444444444444444444444444444444444444444444444444444",
+      "kind": "artifact",
+      "type": "metabolic_model_ref@1"
+     },
+     {
+      "id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "kind": "claim",
+      "type": "claim"
+     }
+    ],
+    "edges": [
+     {
+      "from": "4444444444444444444444444444444444444444444444444444444444444444",
+      "to": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "kind": "causes"
+     }
+    ],
+    "dag_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+   },
+   "expect": "invalid",
+   "note": "bad edge kind",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "pvd-03",
+   "schema": "provenance_dag",
+   "doc": {
+    "artifact_type": "provenance_dag@1",
+    "nodes": [
+     {
+      "id": "4444444444444444444444444444444444444444444444444444444444444444",
+      "kind": "artifact",
+      "type": "metabolic_model_ref@1"
+     },
+     {
+      "id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "kind": "claim",
+      "type": "claim"
+     }
+    ],
+    "edges": [
+     {
+      "from": "4444444444444444444444444444444444444444444444444444444444444444",
+      "to": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "kind": "supports"
+     }
+    ]
+   },
+   "expect": "invalid",
+   "note": "missing dag_hash",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "clm-01",
+   "schema": "claim",
+   "doc": {
+    "claim_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "classification": "FACT",
+    "status": "SUPPORTED",
+    "evidence_refs": [
+     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    ]
+   },
+   "expect": "valid",
+   "note": "FACT with evidence_refs",
+   "frozen": {
+    "verdict": "valid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "clm-02",
+   "schema": "claim",
+   "doc": {
+    "claim_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "classification": "ASSUMPTION",
+    "status": "CONDITIONAL",
+    "assumption_refs": [
+     "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    ]
+   },
+   "expect": "valid",
+   "note": "ASSUMPTION with assumption_refs",
+   "frozen": {
+    "verdict": "valid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "clm-03",
+   "schema": "claim",
+   "doc": {
+    "claim_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "classification": "INFERENCE",
+    "status": "CONDITIONAL",
+    "method_ref": "fba",
+    "domain_ref": "iML1515",
+    "uncertainty": "solver tolerance"
+   },
+   "expect": "valid",
+   "note": "INFERENCE with full fields",
+   "frozen": {
+    "verdict": "valid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "clm-04",
+   "schema": "claim",
+   "doc": {
+    "claim_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "classification": "FACT",
+    "status": "SUPPORTED"
+   },
+   "expect": "invalid",
+   "note": "FACT without evidence_refs",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "clm-05",
+   "schema": "claim",
+   "doc": {
+    "claim_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "classification": "GUESS",
+    "status": "SUPPORTED"
+   },
+   "expect": "invalid",
+   "note": "bad classification enum",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "clm-06",
+   "schema": "claim",
+   "doc": {
+    "claim_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "classification": "FACT",
+    "status": "SUPPORTED",
+    "evidence_refs": [
+     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    ],
+    "limitations": [
+     ""
+    ]
+   },
+   "expect": "invalid",
+   "note": "empty limitation string",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "tsr-01",
+   "schema": "tool_result",
+   "doc": {
+    "artifact_type": "tool_result@1",
+    "audit_only": true,
+    "status": "OK",
+    "generated_by": "ts_wrapper"
+   },
+   "expect": "valid",
+   "note": "minimal valid",
+   "frozen": {
+    "verdict": "valid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "tsr-02",
+   "schema": "tool_result",
+   "doc": {
+    "artifact_type": "tool_result@1",
+    "audit_only": true,
+    "status": "INVALID_INPUT",
+    "generated_by": "python_worker",
+    "reason_code": "bad_input"
+   },
+   "expect": "valid",
+   "note": "error terminal state",
+   "frozen": {
+    "verdict": "valid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "tsr-03",
+   "schema": "tool_result",
+   "doc": {
+    "artifact_type": "tool_result@1",
+    "audit_only": false,
+    "status": "OK",
+    "generated_by": "ts_wrapper"
+   },
+   "expect": "invalid",
+   "note": "audit_only const true",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "tsr-04",
+   "schema": "tool_result",
+   "doc": {
+    "artifact_type": "tool_result@1",
+    "audit_only": true,
+    "status": "MAYBE",
+    "generated_by": "ts_wrapper"
+   },
+   "expect": "invalid",
+   "note": "bad status enum",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "cms-01",
+   "schema": "case_manifest",
+   "doc": {
+    "schema_version": "1.0",
+    "case_content_id": "0000000000000000000000000000000000000000000000000000000000000000",
+    "artifacts": [
+     {
+      "artifact_id": "4444444444444444444444444444444444444444444444444444444444444444",
+      "type": "metabolic_model_ref@1",
+      "inputs": [
+       "3333333333333333333333333333333333333333333333333333333333333333"
+      ],
+      "producer": "bio_design_consequence@0.6.x",
+      "schema_major": "1",
+      "canonical_path": "objects/4444444444444444"
+     }
+    ],
+    "policy": {
+     "policy_id": "capability-policy",
+     "policy_version": "1",
+     "policy_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    }
+   },
+   "expect": "valid",
+   "note": "minimal valid",
+   "frozen": {
+    "verdict": "valid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "cms-02",
+   "schema": "case_manifest",
+   "doc": {
+    "schema_version": "1.0",
+    "case_content_id": "0000000000000000000000000000000000000000000000000000000000000000",
+    "artifacts": [
+     {
+      "artifact_id": "4444444444444444444444444444444444444444444444444444444444444444",
+      "type": "mystery@1",
+      "inputs": [
+       "3333333333333333333333333333333333333333333333333333333333333333"
+      ],
+      "producer": "bio_design_consequence@0.6.x",
+      "schema_major": "1",
+      "canonical_path": "objects/4444444444444444"
+     }
+    ],
+    "policy": {
+     "policy_id": "capability-policy",
+     "policy_version": "1",
+     "policy_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    }
+   },
+   "expect": "invalid",
+   "note": "unknown artifact type",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "cms-03",
+   "schema": "case_manifest",
+   "doc": {
+    "schema_version": "1.0",
+    "case_content_id": "0000000000000000000000000000000000000000000000000000000000000000",
+    "artifacts": [
+     {
+      "artifact_id": "4444444444444444444444444444444444444444444444444444444444444444",
+      "type": "metabolic_model_ref@1",
+      "inputs": [
+       "3333333333333333333333333333333333333333333333333333333333333333"
+      ],
+      "producer": "bio_design_consequence@0.6.x",
+      "schema_major": "1",
+      "canonical_path": "objects/4444444444444444"
+     }
+    ]
+   },
+   "expect": "invalid",
+   "note": "missing policy",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  },
+  {
+   "id": "cms-04",
+   "schema": "case_manifest",
+   "doc": {
+    "schema_version": "1.0",
+    "case_content_id": "0000000000000000000000000000000000000000000000000000000000000000",
+    "artifacts": [
+     {
+      "artifact_id": "4444444444444444444444444444444444444444444444444444444444444444",
+      "type": "metabolic_model_ref@1",
+      "inputs": [
+       "3333333333333333333333333333333333333333333333333333333333333333"
+      ],
+      "producer": "bio_design_consequence@0.6.x",
+      "schema_major": "2",
+      "canonical_path": "objects/4444444444444444"
+     }
+    ],
+    "policy": {
+     "policy_id": "capability-policy",
+     "policy_version": "1",
+     "policy_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    }
+   },
+   "expect": "invalid",
+   "note": "schema_major const",
+   "frozen": {
+    "verdict": "invalid",
+    "python": true,
+    "node": true
+   }
+  }
+ ]
+}

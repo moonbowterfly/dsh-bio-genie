@@ -13,6 +13,7 @@ import { spawn } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { DESIGN_OPS, DESIGN_TOOL_REQUIRED } from './design-ops.js'
 
 const BRIDGE_PATH = join(import.meta.dirname, '..', 'python', 'bridge.py')
 
@@ -28,14 +29,14 @@ function figoriginMode() {
 }
 const OPS_PATH = join(import.meta.dirname, '..', 'python', 'bio_ops.py')
 
-export function spawnPython(exe, script, payload, { cwd, timeoutMs, signal } = {}) {
+export function spawnPython(exe, script, payload, { cwd, timeoutMs, signal, env: extraEnv } = {}) {
   return new Promise((resolvePromise) => {
     const child = spawn(exe, ['-I', script], {
       cwd: cwd || process.cwd(),
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
       // 隔离宿主环境：-I 已忽略 PYTHONPATH，这里再清一次保险
-      env: { ...process.env, PYTHONPATH: '', PYTHONHOME: '', DSH_BIO_FIGORIGIN: figoriginMode() },
+      env: { ...process.env, PYTHONPATH: '', PYTHONHOME: '', DSH_BIO_FIGORIGIN: figoriginMode(), ...(extraEnv || {}) },
     })
     let stdout = ''
     let stderr = ''
@@ -125,5 +126,14 @@ export function runBridge(pythonPath, code, { cwd, timeoutMs = 60_000, signal } 
  * @param {{cwd?: string, timeoutMs?: number, signal?: AbortSignal}} [opts]
  */
 export function callBio(pythonPath, op, args = {}, { cwd, timeoutMs = 60_000, signal } = {}) {
+  // design 六 op：普通 callBio 一律拒绝（须经 designTool 通道；v3 §B0）
+  if (DESIGN_OPS.has(op)) {
+    return Promise.resolve({
+      ok: false,
+      code: DESIGN_TOOL_REQUIRED,
+      error: `design op '${op}' 仅经 designTool 通道（dispatchDesignOp）执行`,
+      stdout: '', stderr: '', exitCode: -1, timedOut: false,
+    })
+  }
   return spawnPython(pythonPath, OPS_PATH, { op, args }, { cwd, timeoutMs, signal })
 }

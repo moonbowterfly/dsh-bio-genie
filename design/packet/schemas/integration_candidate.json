@@ -1,0 +1,248 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "bundle://schemas/integration_candidate.json",
+  "title": "integration_candidate@1 (never emits a safety claim)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_type",
+    "genome_ref",
+    "ruleset_ref",
+    "contig",
+    "interval",
+    "strand",
+    "cassette",
+    "classification",
+    "screening_stage",
+    "reasons",
+    "counts"
+  ],
+  "properties": {
+    "artifact_type": {
+      "const": "integration_candidate@1"
+    },
+    "genome_ref": {
+      "$ref": "bundle://meta/common.defs.json#/definitions/artifactRef"
+    },
+    "ruleset_ref": {
+      "$ref": "bundle://meta/common.defs.json#/definitions/artifactRef"
+    },
+    "contig": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "interval": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "start": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "end": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "convention": {
+          "const": "0-based-half-open"
+        }
+      },
+      "required": [
+        "start",
+        "end",
+        "convention"
+      ]
+    },
+    "strand": {
+      "enum": [
+        "plus",
+        "minus"
+      ]
+    },
+    "cassette": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sequence_sha256": {
+          "$ref": "bundle://meta/common.defs.json#/definitions/sha256Hex"
+        },
+        "payload_length": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sequence_identity": {
+          "enum": [
+            "known",
+            "unknown"
+          ]
+        }
+      },
+      "required": [
+        "sequence_identity"
+      ]
+    },
+    "classification": {
+      "enum": [
+        "excluded",
+        "preliminary_candidate",
+        "screened_candidate",
+        "literature_characterized",
+        "blocked"
+      ]
+    },
+    "screening_stage": {
+      "enum": [
+        "preliminary_spatial",
+        "sequence_verified"
+      ]
+    },
+    "reasons": {
+      "type": "array",
+      "x-canonical": "set",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "code": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "detail": {
+            "type": "string",
+            "maxLength": 2048
+          }
+        },
+        "required": [
+          "rule_id"
+        ]
+      }
+    },
+    "features_hit": {
+      "type": "array",
+      "x-canonical": "set",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    },
+    "flanking": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "left": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "start": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "end": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "start",
+            "end"
+          ]
+        },
+        "right": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "start": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "end": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "start",
+            "end"
+          ]
+        }
+      },
+      "required": [
+        "left",
+        "right"
+      ]
+    },
+    "origin_crossing": {
+      "type": "boolean"
+    },
+    "normalized_flank_hashes": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "left": {
+          "$ref": "bundle://meta/common.defs.json#/definitions/sha256Hex"
+        },
+        "right": {
+          "$ref": "bundle://meta/common.defs.json#/definitions/sha256Hex"
+        }
+      },
+      "required": [
+        "left",
+        "right"
+      ]
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "searched_space": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "excluded": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unknown": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "mandatory_rule_coverage": {
+          "type": "array",
+          "x-canonical": "set",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "rule_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "covered": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "rule_id",
+              "covered"
+            ]
+          }
+        }
+      },
+      "required": [
+        "searched_space",
+        "excluded",
+        "unknown",
+        "mandatory_rule_coverage"
+      ]
+    }
+  }
+}

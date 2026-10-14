@@ -1,0 +1,79 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "bundle://schemas/provenance_dag.json",
+  "title": "provenance_dag@1 (nodes artifact/claim; typed edges; canonical sort + DAG hash)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_type",
+    "nodes",
+    "edges",
+    "dag_hash"
+  ],
+  "properties": {
+    "artifact_type": {
+      "const": "provenance_dag@1"
+    },
+    "nodes": {
+      "type": "array",
+      "x-canonical": "set",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "bundle://meta/common.defs.json#/definitions/sha256Hex"
+          },
+          "kind": {
+            "enum": [
+              "artifact",
+              "claim"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "type"
+        ]
+      }
+    },
+    "edges": {
+      "type": "array",
+      "x-canonical": "set",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "from": {
+            "$ref": "bundle://meta/common.defs.json#/definitions/sha256Hex"
+          },
+          "to": {
+            "$ref": "bundle://meta/common.defs.json#/definitions/sha256Hex"
+          },
+          "kind": {
+            "enum": [
+              "consumes",
+              "derives_from",
+              "supports",
+              "assumes"
+            ]
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "kind"
+        ]
+      }
+    },
+    "dag_hash": {
+      "$ref": "bundle://meta/common.defs.json#/definitions/sha256Hex"
+    }
+  }
+}

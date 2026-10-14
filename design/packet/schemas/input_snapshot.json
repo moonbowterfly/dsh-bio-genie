@@ -1,0 +1,88 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "bundle://schemas/input_snapshot.json",
+  "title": "input_snapshot@1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_type",
+    "role",
+    "media_type",
+    "format",
+    "consumer_compatibility",
+    "sha256",
+    "byte_size",
+    "origin"
+  ],
+  "properties": {
+    "artifact_type": {
+      "const": "input_snapshot@1"
+    },
+    "role": {
+      "enum": [
+        "genome_sequence",
+        "genome_annotation",
+        "condition",
+        "parts_evidence",
+        "sbol",
+        "cassette",
+        "gem_model",
+        "gem_card",
+        "coupling_assumption",
+        "other"
+      ]
+    },
+    "media_type": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "format": {
+      "enum": [
+        "fasta",
+        "gff3",
+        "genbank",
+        "sbml",
+        "json",
+        "zip",
+        "text",
+        "other"
+      ]
+    },
+    "consumer_compatibility": {
+      "type": "array",
+      "x-canonical": "set",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64
+      }
+    },
+    "sha256": {
+      "$ref": "bundle://meta/common.defs.json#/definitions/sha256Hex"
+    },
+    "byte_size": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "origin": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "external",
+            "ingest_produced"
+          ]
+        },
+        "origin_ref": {
+          "type": "string",
+          "maxLength": 512
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    }
+  }
+}

@@ -1,0 +1,114 @@
+{
+  "bundle": "synbio-schemas",
+  "version": 1,
+  "files": [
+    {
+      "path": "meta/common.defs.json",
+      "sha256": "c500b67fcd4588c308eaa9f7ea64e2aa52a8f51156375e11c7925b657b0fd98c"
+    },
+    {
+      "path": "meta/pattern-library.json",
+      "sha256": "a0bf46ccef54a774987af2e58e576eea44bef8f95ab7ea1fa58071155f45349e"
+    },
+    {
+      "path": "meta/unicode-domain-table.json",
+      "sha256": "89c605f4ee45cd60e4037cc2d705af5195a44d5de6a40dbdd2502e68884a3845"
+    },
+    {
+      "path": "meta/x-canonical.meta.json",
+      "sha256": "781c6b0866a7014f5e2ade991e346e9e44a3d1206263ba116759deb0afb1406c"
+    },
+    {
+      "path": "schemas/case_manifest.json",
+      "sha256": "aa0cd3d209c4951e1a7cedf2cc97a32f41abc175c29b58abc5b0320eb86a6ce5"
+    },
+    {
+      "path": "schemas/circuit_design.json",
+      "sha256": "891e747435686f6e7f9c881b3e633b3b7c43632f0eb93f28da5b0d8fe6c4dd69"
+    },
+    {
+      "path": "schemas/claim.json",
+      "sha256": "0f71b5a25479098a54167f9f02eb72b06e6937c9116cd50f9272a16ee83f587c"
+    },
+    {
+      "path": "schemas/condition_card.json",
+      "sha256": "9f9c22e6ebeab06b3406ca79b6e2885970090d4d5e572fc35abef519b69bf2f8"
+    },
+    {
+      "path": "schemas/consequence_run.json",
+      "sha256": "50b772c3899e63c24f762832a336bc6926e181d8262f1c4d5373f557776b5179"
+    },
+    {
+      "path": "schemas/coupling_profile.json",
+      "sha256": "3db9b8e096aff79fd272ab9b1e3007cd0d3a8c4c2a2aabfa74fce343305a0da5"
+    },
+    {
+      "path": "schemas/evidence_item.json",
+      "sha256": "0531d6b4ec3097873779196e9ea9dff69461a7389a51cc37dc3692f6bd0284da"
+    },
+    {
+      "path": "schemas/expression_scenario.json",
+      "sha256": "d38b7e6bc7bc0d9a85cf933452994d47982ee964a2433433f354fd745a37df18"
+    },
+    {
+      "path": "schemas/gem_card_raw.json",
+      "sha256": "c3030a91cde9dccdd2cfd39f357d829396103e09a160e50eee8fda591dd1df7f"
+    },
+    {
+      "path": "schemas/genome_ref.json",
+      "sha256": "cf6dc236e65a40ec5bfe36f78ccef6766971d5a1a901be71d8bf61f6d895eaa5"
+    },
+    {
+      "path": "schemas/gpr_proof.json",
+      "sha256": "123c034bd44330c014b57121bb1dc5e0c48b1ad50629f6465194b9281a6ed903"
+    },
+    {
+      "path": "schemas/host_model_binding.json",
+      "sha256": "448840948465644278027ce0955a08691c993de5a0acb18d52068ee6c810e967"
+    },
+    {
+      "path": "schemas/host_profile.json",
+      "sha256": "dfcdc788c3f7a9b2ee6707e1808ca195009ec061ea28539d3d2c471c02622bea"
+    },
+    {
+      "path": "schemas/input_snapshot.json",
+      "sha256": "6dfb5865412530504d2473497efec866c0c1457e663869e3a8d7c00ce9eeb82e"
+    },
+    {
+      "path": "schemas/integration_candidate.json",
+      "sha256": "1fb866b9572f7810ce2ad84228c97d1dbe5df67dfccfeefe670fee298d4c4012"
+    },
+    {
+      "path": "schemas/integration_ruleset.json",
+      "sha256": "f6465da49fb271089513286e583dad4fc5736d95f48bc4b344db944b7673eb36"
+    },
+    {
+      "path": "schemas/kinetic_crn_ref.json",
+      "sha256": "99937eae12588a59a03890207439cdcce766409349ffeca0715991a9d8bb8e22"
+    },
+    {
+      "path": "schemas/metabolic_model_ref.json",
+      "sha256": "32e46df65b1b488e44d9ed2b95f8fc88d6a2387bc434f7bb97f564d61e68f3c1"
+    },
+    {
+      "path": "schemas/numeric_policy.json",
+      "sha256": "8997ad083a5b09977827249ef43f80335a3f4e5f715d0ac2cff0c7d1b9cdfc01"
+    },
+    {
+      "path": "schemas/provenance_dag.json",
+      "sha256": "505e2ee81423abc92a4e4085a6890ff362b290876ec5102aee81b9c262facec3"
+    },
+    {
+      "path": "schemas/tier_decision.json",
+      "sha256": "a98a93720fb01fc77b5c28d3fab1c8d18dac788aaa38f76ab1707a0ed7ad53f3"
+    },
+    {
+      "path": "schemas/tool_result.json",
+      "sha256": "43f90a0854bbb6a0a1a06de7b7008b0ec21901aecc599e6cb11746883c60e66d"
+    },
+    {
+      "path": "schemas/unit_vocabulary.json",
+      "sha256": "1fe3da4b0bfff6dc4c317cec3e121ef3d8420f2fc82c775562c19e0787b60315"
+    }
+  ]
+}

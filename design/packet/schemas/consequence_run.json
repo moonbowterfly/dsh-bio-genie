@@ -1,0 +1,325 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "bundle://schemas/consequence_run.json",
+  "title": "consequence_run@1 (direction is per claim_target; failed scenarios never yield ROBUST_DIRECTION)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_type",
+    "model_ref",
+    "coupling_ref",
+    "numeric_policy_ref",
+    "medium_ref",
+    "objective",
+    "baseline",
+    "scenarios",
+    "claim_targets"
+  ],
+  "properties": {
+    "artifact_type": {
+      "const": "consequence_run@1"
+    },
+    "model_ref": {
+      "$ref": "bundle://meta/common.defs.json#/definitions/artifactRef"
+    },
+    "coupling_ref": {
+      "$ref": "bundle://meta/common.defs.json#/definitions/artifactRef"
+    },
+    "numeric_policy_ref": {
+      "$ref": "bundle://meta/common.defs.json#/definitions/artifactRef"
+    },
+    "medium_ref": {
+      "$ref": "bundle://meta/common.defs.json#/definitions/artifactRef"
+    },
+    "objective": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "baseline": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "feasible": {
+          "type": "boolean"
+        },
+        "status": {
+          "enum": [
+            "optimal",
+            "infeasible",
+            "unbounded",
+            "non_optimal",
+            "timeout",
+            "not_run"
+          ]
+        },
+        "objective_value": {
+          "type": "string",
+          "x-decimal-string": true,
+          "pattern": "^(0|-?(0\\.[0-9]*[1-9]|[1-9][0-9]*(\\.[0-9]*[1-9])?))$",
+          "maxLength": 320
+        },
+        "solver": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            }
+          },
+          "required": [
+            "id",
+            "version"
+          ]
+        },
+        "options": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "required": [
+        "feasible",
+        "status",
+        "solver"
+      ]
+    },
+    "scenarios": {
+      "type": "array",
+      "x-canonical": "set",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "diffs",
+          "fba",
+          "model_hash",
+          "diff_hash",
+          "medium_artifact_id",
+          "applied_rule_ids",
+          "mapping_proof_ids",
+          "target_metric"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "diffs": {
+            "type": "array",
+            "x-canonical": "set",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "rule_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "reaction_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "old_value": {
+                  "type": "string",
+                  "x-decimal-string": true,
+                  "pattern": "^(0|-?(0\\.[0-9]*[1-9]|[1-9][0-9]*(\\.[0-9]*[1-9])?))$",
+                  "maxLength": 320
+                },
+                "new_value": {
+                  "type": "string",
+                  "x-decimal-string": true,
+                  "pattern": "^(0|-?(0\\.[0-9]*[1-9]|[1-9][0-9]*(\\.[0-9]*[1-9])?))$",
+                  "maxLength": 320
+                },
+                "unit": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                }
+              },
+              "required": [
+                "rule_id",
+                "reaction_id",
+                "old_value",
+                "new_value",
+                "unit"
+              ]
+            }
+          },
+          "fba": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "status": {
+                "enum": [
+                  "optimal",
+                  "infeasible",
+                  "unbounded",
+                  "non_optimal",
+                  "timeout",
+                  "not_run"
+                ]
+              },
+              "value": {
+                "type": "string",
+                "x-decimal-string": true,
+                "pattern": "^(0|-?(0\\.[0-9]*[1-9]|[1-9][0-9]*(\\.[0-9]*[1-9])?))$",
+                "maxLength": 320
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "fva": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "intervals": {
+                "type": "array",
+                "x-canonical": "set",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "reaction_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 256
+                    },
+                    "min": {
+                      "type": "string",
+                      "x-decimal-string": true,
+                      "pattern": "^(0|-?(0\\.[0-9]*[1-9]|[1-9][0-9]*(\\.[0-9]*[1-9])?))$",
+                      "maxLength": 320
+                    },
+                    "max": {
+                      "type": "string",
+                      "x-decimal-string": true,
+                      "pattern": "^(0|-?(0\\.[0-9]*[1-9]|[1-9][0-9]*(\\.[0-9]*[1-9])?))$",
+                      "maxLength": 320
+                    }
+                  },
+                  "required": [
+                    "reaction_id",
+                    "min",
+                    "max"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "intervals"
+            ]
+          },
+          "pfba": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "status": {
+                "enum": [
+                  "optimal",
+                  "infeasible",
+                  "unbounded",
+                  "non_optimal",
+                  "timeout",
+                  "not_run"
+                ]
+              },
+              "value": {
+                "type": "string",
+                "x-decimal-string": true,
+                "pattern": "^(0|-?(0\\.[0-9]*[1-9]|[1-9][0-9]*(\\.[0-9]*[1-9])?))$",
+                "maxLength": 320
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "model_hash": {
+            "$ref": "bundle://meta/common.defs.json#/definitions/sha256Hex"
+          },
+          "diff_hash": {
+            "$ref": "bundle://meta/common.defs.json#/definitions/sha256Hex"
+          },
+          "medium_artifact_id": {
+            "$ref": "bundle://meta/common.defs.json#/definitions/sha256Hex"
+          },
+          "applied_rule_ids": {
+            "type": "array",
+            "x-canonical": "set",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          },
+          "mapping_proof_ids": {
+            "type": "array",
+            "x-canonical": "set",
+            "items": {
+              "$ref": "bundle://meta/common.defs.json#/definitions/sha256Hex"
+            }
+          },
+          "target_metric": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        }
+      }
+    },
+    "claim_targets": {
+      "type": "array",
+      "x-canonical": "set",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "growth",
+              "product",
+              "reaction"
+            ]
+          },
+          "reaction_id": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "direction": {
+            "enum": [
+              "ROBUST_DIRECTION",
+              "MIXED",
+              "INDETERMINATE",
+              "NOT_RUN"
+            ]
+          },
+          "claim_id": {
+            "$ref": "bundle://meta/common.defs.json#/definitions/sha256Hex"
+          }
+        },
+        "required": [
+          "kind",
+          "direction"
+        ]
+      }
+    },
+    "diagnostics": {
+      "type": "string",
+      "maxLength": 4096
+    }
+  }
+}

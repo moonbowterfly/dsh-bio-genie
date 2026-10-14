@@ -1,0 +1,169 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "bundle://schemas/evidence_item.json",
+  "title": "evidence_item@1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_type",
+    "source_ref",
+    "host",
+    "readout",
+    "match_grade",
+    "matching_policy"
+  ],
+  "properties": {
+    "artifact_type": {
+      "const": "evidence_item@1"
+    },
+    "source_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "doi",
+            "pmid",
+            "url",
+            "lab",
+            "other"
+          ]
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ]
+    },
+    "source_hash": {
+      "$ref": "bundle://meta/common.defs.json#/definitions/sha256Hex"
+    },
+    "host": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "organism": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "strain": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "assembly": {
+          "type": "string",
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "organism"
+      ]
+    },
+    "conditions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "medium": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "temperature_c": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 120
+        },
+        "ph": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 14
+        }
+      }
+    },
+    "part_sequence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "sequence": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100000
+        }
+      },
+      "required": [
+        "name",
+        "sequence"
+      ]
+    },
+    "readout": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "metric": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "value": {
+          "type": "string",
+          "x-decimal-string": true,
+          "pattern": "^(0|-?(0\\.[0-9]*[1-9]|[1-9][0-9]*(\\.[0-9]*[1-9])?))$",
+          "maxLength": 320
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "replicates": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "metric",
+        "value",
+        "unit",
+        "replicates"
+      ]
+    },
+    "match_grade": {
+      "enum": [
+        "exact",
+        "condition_transfer",
+        "host_transfer",
+        "unknown"
+      ]
+    },
+    "matching_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      },
+      "required": [
+        "id",
+        "version"
+      ]
+    }
+  }
+}

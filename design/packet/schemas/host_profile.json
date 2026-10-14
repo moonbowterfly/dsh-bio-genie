@@ -1,0 +1,170 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "bundle://schemas/host_profile.json",
+  "title": "host_profile@1 (host-side evidence state; no product tier)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_type",
+    "genome_ref",
+    "evidence_state",
+    "derived",
+    "gates"
+  ],
+  "properties": {
+    "artifact_type": {
+      "const": "host_profile@1"
+    },
+    "genome_ref": {
+      "$ref": "bundle://meta/common.defs.json#/definitions/artifactRef"
+    },
+    "evidence_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "annotation": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "completeness": {
+              "enum": [
+                "full",
+                "partial",
+                "missing"
+              ]
+            },
+            "detail": {
+              "type": "string",
+              "maxLength": 2048
+            }
+          },
+          "required": [
+            "completeness"
+          ]
+        },
+        "condition": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "completeness": {
+              "enum": [
+                "full",
+                "partial",
+                "missing"
+              ]
+            },
+            "detail": {
+              "type": "string",
+              "maxLength": 2048
+            }
+          },
+          "required": [
+            "completeness"
+          ]
+        },
+        "parts_evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "completeness": {
+              "enum": [
+                "full",
+                "partial",
+                "missing"
+              ]
+            },
+            "source_id": {
+              "type": "string",
+              "maxLength": 256
+            },
+            "hash": {
+              "$ref": "bundle://meta/common.defs.json#/definitions/sha256Hex"
+            },
+            "levels": {
+              "type": "array",
+              "x-canonical": "set",
+              "items": {
+                "enum": [
+                  "E0",
+                  "E1",
+                  "E2",
+                  "E3"
+                ]
+              }
+            },
+            "detail": {
+              "type": "string",
+              "maxLength": 2048
+            }
+          },
+          "required": [
+            "completeness"
+          ]
+        }
+      },
+      "required": [
+        "annotation",
+        "condition",
+        "parts_evidence"
+      ]
+    },
+    "derived": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "genome_size": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "gc_percent": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "contig_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "codon_usage_top": {
+          "type": "array",
+          "x-canonical": "seq",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "codon": {
+                "type": "string",
+                "minLength": 3,
+                "maxLength": 3
+              },
+              "fraction": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "required": [
+              "codon",
+              "fraction"
+            ]
+          }
+        }
+      },
+      "required": [
+        "genome_size",
+        "gc_percent",
+        "contig_count"
+      ]
+    },
+    "condition_ref": {
+      "$ref": "bundle://meta/common.defs.json#/definitions/artifactRef"
+    },
+    "gates": {
+      "type": "array",
+      "x-canonical": "set",
+      "items": {
+        "$ref": "bundle://meta/common.defs.json#/definitions/checkResult"
+      }
+    }
+  }
+}

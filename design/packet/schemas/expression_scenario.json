@@ -1,0 +1,209 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "bundle://schemas/expression_scenario.json",
+  "title": "expression_scenario@1 (no absolute-expression claims outside domain)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_type",
+    "circuit_design",
+    "host_profile",
+    "method",
+    "results",
+    "domain_check",
+    "ranking_set_id",
+    "comparison_scope",
+    "metric_definition",
+    "higher_is"
+  ],
+  "properties": {
+    "artifact_type": {
+      "const": "expression_scenario@1"
+    },
+    "circuit_design": {
+      "$ref": "bundle://meta/common.defs.json#/definitions/artifactRef"
+    },
+    "host_profile": {
+      "$ref": "bundle://meta/common.defs.json#/definitions/artifactRef"
+    },
+    "method": {
+      "enum": [
+        "evidence_lookup",
+        "ostir_proxy",
+        "user_parameters"
+      ]
+    },
+    "results": {
+      "type": "array",
+      "x-canonical": "set",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "element": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "metric": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "value_or_rank": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "enum": [
+                  "value",
+                  "rank"
+                ]
+              },
+              "value": {
+                "type": "string",
+                "x-decimal-string": true,
+                "pattern": "^(0|-?(0\\.[0-9]*[1-9]|[1-9][0-9]*(\\.[0-9]*[1-9])?))$",
+                "maxLength": 320
+              },
+              "rank": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "unit": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "conditions": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "evidence_level": {
+            "enum": [
+              "E0",
+              "E1",
+              "E2",
+              "E3"
+            ]
+          }
+        },
+        "required": [
+          "element",
+          "metric",
+          "value_or_rank"
+        ]
+      }
+    },
+    "domain_check": {
+      "enum": [
+        "in_domain",
+        "out_of_domain",
+        "unknown"
+      ]
+    },
+    "assumptions": {
+      "type": "array",
+      "x-canonical": "set",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 2048
+      }
+    },
+    "ranking_set_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "comparison_scope": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "metric_definition": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "higher_is": {
+      "enum": [
+        "high",
+        "low"
+      ]
+    },
+    "sequence_context_ref": {
+      "$ref": "bundle://meta/common.defs.json#/definitions/artifactRef"
+    },
+    "model_or_dataset_ref": {
+      "$ref": "bundle://meta/common.defs.json#/definitions/artifactRef"
+    },
+    "parameter_hash": {
+      "$ref": "bundle://meta/common.defs.json#/definitions/sha256Hex"
+    },
+    "uncertainty": {
+      "type": "string",
+      "maxLength": 2048
+    },
+    "candidate_universe_ref": {
+      "$ref": "bundle://meta/common.defs.json#/definitions/artifactRef"
+    },
+    "rank_algorithm": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "params": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "required": [
+        "id",
+        "version"
+      ]
+    },
+    "tie_null_policy": {
+      "type": "string",
+      "maxLength": 512
+    },
+    "raw_metric_artifact_ref": {
+      "$ref": "bundle://meta/common.defs.json#/definitions/artifactRef"
+    },
+    "filter_records": {
+      "type": "array",
+      "x-canonical": "set",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "filter_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "detail": {
+            "type": "string",
+            "maxLength": 1024
+          }
+        },
+        "required": [
+          "filter_id"
+        ]
+      }
+    }
+  }
+}

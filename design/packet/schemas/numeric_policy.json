@@ -1,0 +1,67 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "bundle://schemas/numeric_policy.json",
+  "title": "numeric_policy@1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_type",
+    "fva_fraction_of_optimum",
+    "solver",
+    "tolerance",
+    "direction_epsilon",
+    "near_zero_rule",
+    "interval_zero_crossing_rule"
+  ],
+  "properties": {
+    "artifact_type": {
+      "const": "numeric_policy@1"
+    },
+    "fva_fraction_of_optimum": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "solver": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      },
+      "required": [
+        "id",
+        "version"
+      ]
+    },
+    "tolerance": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "direction_epsilon": {
+      "type": "string",
+      "x-decimal-string": true,
+      "pattern": "^(0|-?(0\\.[0-9]*[1-9]|[1-9][0-9]*(\\.[0-9]*[1-9])?))$",
+      "maxLength": 320
+    },
+    "near_zero_rule": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024
+    },
+    "interval_zero_crossing_rule": {
+      "enum": [
+        "crossing_flags_indeterminate",
+        "crossing_allowed_with_note"
+      ]
+    }
+  }
+}

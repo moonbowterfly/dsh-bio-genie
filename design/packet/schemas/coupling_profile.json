@@ -1,0 +1,328 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "bundle://schemas/coupling_profile.json",
+  "title": "coupling_profile@1 (the only authorized cross-layer entry)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_type",
+    "mode",
+    "rules"
+  ],
+  "properties": {
+    "artifact_type": {
+      "const": "coupling_profile@1"
+    },
+    "mode": {
+      "enum": [
+        "qualitative_direction",
+        "user_calibrated_bound",
+        "evidence_calibrated_bound"
+      ]
+    },
+    "rules": {
+      "type": "array",
+      "x-canonical": "set",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "rule_id",
+          "model_ref",
+          "host_profile",
+          "host_model_binding_ref",
+          "gpr_proof_ref",
+          "condition_card_ref",
+          "source_gene",
+          "reaction_id",
+          "reaction_direction",
+          "operation",
+          "baseline_bound",
+          "derived_bound",
+          "unit",
+          "mapping_function",
+          "condition_hash",
+          "input_kind",
+          "evidence_refs",
+          "assumption_refs",
+          "confidence"
+        ],
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "model_ref": {
+            "$ref": "bundle://meta/common.defs.json#/definitions/artifactRef"
+          },
+          "host_profile": {
+            "$ref": "bundle://meta/common.defs.json#/definitions/artifactRef"
+          },
+          "host_model_binding_ref": {
+            "$ref": "bundle://meta/common.defs.json#/definitions/artifactRef"
+          },
+          "gpr_proof_ref": {
+            "$ref": "bundle://meta/common.defs.json#/definitions/artifactRef"
+          },
+          "condition_card_ref": {
+            "$ref": "bundle://meta/common.defs.json#/definitions/artifactRef"
+          },
+          "source_gene": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "namespace": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              }
+            },
+            "required": [
+              "namespace",
+              "id"
+            ]
+          },
+          "reaction_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "reaction_direction": {
+            "enum": [
+              "forward",
+              "reverse",
+              "both"
+            ]
+          },
+          "operation": {
+            "enum": [
+              "set_upper_bound",
+              "set_lower_bound",
+              "scale_bound"
+            ]
+          },
+          "baseline_bound": {
+            "type": "string",
+            "x-decimal-string": true,
+            "pattern": "^(0|-?(0\\.[0-9]*[1-9]|[1-9][0-9]*(\\.[0-9]*[1-9])?))$",
+            "maxLength": 320
+          },
+          "derived_bound": {
+            "type": "string",
+            "x-decimal-string": true,
+            "pattern": "^(0|-?(0\\.[0-9]*[1-9]|[1-9][0-9]*(\\.[0-9]*[1-9])?))$",
+            "maxLength": 320
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "mapping_function": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "version": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            },
+            "required": [
+              "id",
+              "version",
+              "parameters"
+            ]
+          },
+          "condition_hash": {
+            "$ref": "bundle://meta/common.defs.json#/definitions/sha256Hex"
+          },
+          "input_kind": {
+            "enum": [
+              "user_explicit_assumption",
+              "measured_expression",
+              "literature_calibration",
+              "sequence_proxy",
+              "manual_override"
+            ]
+          },
+          "evidence_refs": {
+            "type": "array",
+            "x-canonical": "set",
+            "items": {
+              "$ref": "bundle://meta/common.defs.json#/definitions/sha256Hex"
+            }
+          },
+          "assumption_refs": {
+            "type": "array",
+            "x-canonical": "set",
+            "items": {
+              "$ref": "bundle://meta/common.defs.json#/definitions/sha256Hex"
+            }
+          },
+          "confidence": {
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ]
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "type": "object",
+              "properties": {
+                "input_kind": {
+                  "const": "manual_override"
+                }
+              }
+            },
+            "then": {
+              "type": "object",
+              "required": [
+                "assumption_refs"
+              ],
+              "properties": {
+                "assumption_refs": {
+                  "type": "array",
+                  "minItems": 1
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "scope_check": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "authorized": {
+          "type": "boolean"
+        },
+        "detail": {
+          "type": "string",
+          "maxLength": 2048
+        }
+      },
+      "required": [
+        "authorized"
+      ]
+    },
+    "blocked_reasons": {
+      "type": "array",
+      "x-canonical": "set",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1024
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "const": "evidence_calibrated_bound"
+          }
+        }
+      },
+      "then": {
+        "type": "object",
+        "properties": {
+          "rules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "input_kind": {
+                  "not": {
+                    "const": "manual_override"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "not": {
+              "const": "qualitative_direction"
+            }
+          }
+        }
+      },
+      "then": {
+        "type": "object",
+        "properties": {
+          "rules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "input_kind": {
+                  "not": {
+                    "const": "sequence_proxy"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "not": {
+              "const": "user_calibrated_bound"
+            }
+          }
+        }
+      },
+      "then": {
+        "type": "object",
+        "properties": {
+          "rules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "input_kind": {
+                  "not": {
+                    "const": "manual_override"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

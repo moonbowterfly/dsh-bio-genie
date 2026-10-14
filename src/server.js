@@ -30,6 +30,7 @@ import os from 'node:os'
 import { venvPython, resolveEnvDir, bioEnvExists, PYTHON_DIR, manageAddon, addonsStatus } from './runtime.js'
 
 import { listSkillsForPanel } from './skills.js'
+import { DESIGN_OPS, PANEL_OP_NOT_ALLOWED } from './design-ops.js'
 import { handleConfig } from './config_handler.js'
 import { writeJson } from './http-util.js'
 import { ADDON_MODULES } from './extra-deps.js'
@@ -438,6 +439,14 @@ async function handleExecuteTool(req, res, config) {
   }
   const op = body.op
   const args = body.args || {}
+
+  // design 六 op：raw 通道一律拒绝（必须在任何 Python 启动之前；v3 §B0 / spec v0.3 §4.5）
+  if (DESIGN_OPS.has(op)) {
+    return writeJson(res, 403, {
+      ok: false, code: PANEL_OP_NOT_ALLOWED,
+      message: `design 工具 '${op}' 不开放 raw 通道（须经 designTool 提交路径）`,
+    })
+  }
 
   // Python 操作：通过 bio_ops.py 执行
   const envDir = resolveEnvDir(config.pythonEnvDir)
