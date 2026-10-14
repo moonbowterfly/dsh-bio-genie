@@ -1,0 +1,12 @@
+{
+  "artifact_type": "numeric_policy@1",
+  "fva_fraction_of_optimum": 0.9999,
+  "solver": {
+    "id": "glpk",
+    "version": "5.0"
+  },
+  "tolerance": 1e-07,
+  "direction_epsilon": "0.001",
+  "near_zero_rule": "if abs(value) < direction_epsilon then flag the value as near_zero; a near_zero value carries no direction signal and must not be used as positive/negative direction, zero-crossing, or coupling evidence",
+  "interval_zero_crossing_rule": "crossing_flags_indeterminate"
+}
