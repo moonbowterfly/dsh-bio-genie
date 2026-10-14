@@ -43,6 +43,26 @@ function isContained(rootReal, targetReal) {
   return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel))
 }
 
+/** 键序不敏感的 JSON 深比较（canonical 相等语义的最小充分实现）。快照经 c14n
+ *  序列化读回后对象键被重排，直接 JSON.stringify 比较会把同义 policy 误判为
+ *  POLICY_MISMATCH（键序差异是合法输入，不是内容差异）。 */
+function jsonDeepEqual(a, b) {
+  if (a === b) return true
+  if (a === null || b === null || typeof a !== 'object' || typeof b !== 'object') return false
+  if (Array.isArray(a) || Array.isArray(b)) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false
+    for (let i = 0; i < a.length; i += 1) if (!jsonDeepEqual(a[i], b[i])) return false
+    return true
+  }
+  const ka = Object.keys(a)
+  if (ka.length !== Object.keys(b).length) return false
+  for (const k of ka) {
+    if (!Object.hasOwn(b, k)) return false
+    if (!jsonDeepEqual(a[k], b[k])) return false
+  }
+  return true
+}
+
 /** case_instance_id 校验（单段安全名）。返回 {ok, problems}。 */
 export function validateCaseInstanceId(id) {
   const problems = []
@@ -433,7 +453,7 @@ export function commitTransaction(handle, { caseContentId = null, policy = null,
       baseArtifacts = Array.isArray(snap.manifest.artifacts) ? snap.manifest.artifacts : []
       if (contentId && contentId !== snap.manifest.case_content_id) return { ok: false, code: 'CASE_CONTENT_MISMATCH', step: 0, txid: id }
       contentId = snap.manifest.case_content_id
-      if (policyDoc && JSON.stringify(policyDoc) !== JSON.stringify(snap.manifest.policy)) return { ok: false, code: 'POLICY_MISMATCH', step: 0, txid: id }
+      if (policyDoc && !jsonDeepEqual(policyDoc, snap.manifest.policy)) return { ok: false, code: 'POLICY_MISMATCH', step: 0, txid: id }
       policyDoc = snap.manifest.policy
     } else if (!contentId || !policyDoc) {
       return { ok: false, code: 'BASE_REQUIRED', step: 0, txid: id }
