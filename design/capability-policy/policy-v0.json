@@ -1,0 +1,194 @@
+{
+  "policy_id": "design-capability-policy",
+  "policy_version": "0",
+  "title": "Minimal capability policy (A9a) — default-deny over operation x input_state x coupling_mode x claim_target",
+  "notes": [
+    "派生自规格 v0.3 §3.1 真值表（节选）与 v0.4 §C5：对每个 operation × input_state × coupling_mode × claim_target 固定输出 allow/deny、capability、classification ceiling、reason code、required artifact refs；未知组合 fail-closed。",
+    "本 bundle 为最小集（A9a）：语义覆盖真值表五行；完整穷尽表随 P0a 扩充。",
+    "规则按序首匹配（first-match-wins）；任何未匹配组合落入 default（deny / UNKNOWN_COMBINATION）。"
+  ],
+  "dimensions": {
+    "operation": ["sequence_qc", "site_screening", "expression", "consequence_quantitative", "consequence_qualitative"],
+    "input_state": ["reference_complete", "missing_condition", "missing_annotation", "user_calibrated_only", "consequence_only"],
+    "coupling_mode": ["none", "qualitative_direction", "user_calibrated_bound", "evidence_calibrated_bound"],
+    "claim_target": ["none", "growth", "product", "reaction"]
+  },
+  "classification_ceilings": ["FACT", "ASSUMPTION", "INFERENCE"],
+  "tiers": ["reference_profile", "transfer_profile", "structural_only", "blocked"],
+  "default": {
+    "decision": "deny",
+    "max_tier": "blocked",
+    "capabilities": [],
+    "classification_ceiling": "INFERENCE",
+    "reason_codes": ["UNKNOWN_COMBINATION"],
+    "required_artifacts": []
+  },
+  "rules": [
+    {
+      "operation": "sequence_qc", "input_state": "reference_complete", "coupling_mode": "*", "claim_target": "*",
+      "decision": "allow", "max_tier": "reference_profile", "capabilities": ["sequence_qc"],
+      "classification_ceiling": "FACT", "reason_codes": [], "required_artifacts": ["genome_ref@1"]
+    },
+    {
+      "operation": "sequence_qc", "input_state": "missing_condition", "coupling_mode": "*", "claim_target": "*",
+      "decision": "allow", "max_tier": "transfer_profile", "capabilities": ["sequence_qc"],
+      "classification_ceiling": "FACT", "reason_codes": [], "required_artifacts": ["genome_ref@1"]
+    },
+    {
+      "operation": "sequence_qc", "input_state": "user_calibrated_only", "coupling_mode": "*", "claim_target": "*",
+      "decision": "allow", "max_tier": "transfer_profile", "capabilities": ["sequence_qc"],
+      "classification_ceiling": "FACT", "reason_codes": [], "required_artifacts": ["genome_ref@1"]
+    },
+    {
+      "operation": "sequence_qc", "input_state": "missing_annotation", "coupling_mode": "*", "claim_target": "*",
+      "decision": "allow", "max_tier": "structural_only", "capabilities": ["sequence_qc"],
+      "classification_ceiling": "FACT", "reason_codes": ["ANNOTATION_MISSING"], "required_artifacts": ["genome_ref@1"]
+    },
+    {
+      "operation": "sequence_qc", "input_state": "consequence_only", "coupling_mode": "*", "claim_target": "*",
+      "decision": "deny", "max_tier": "blocked", "capabilities": [],
+      "classification_ceiling": "INFERENCE", "reason_codes": ["INPUT_STATE_MISMATCH"], "required_artifacts": []
+    },
+    {
+      "operation": "site_screening", "input_state": "reference_complete", "coupling_mode": "*", "claim_target": "*",
+      "decision": "allow", "max_tier": "reference_profile", "capabilities": ["site_screening"],
+      "classification_ceiling": "INFERENCE", "reason_codes": [], "required_artifacts": ["genome_ref@1", "host_profile@1"]
+    },
+    {
+      "operation": "site_screening", "input_state": "missing_condition", "coupling_mode": "*", "claim_target": "*",
+      "decision": "allow", "max_tier": "structural_only", "capabilities": ["site_screening:structural"],
+      "classification_ceiling": "INFERENCE", "reason_codes": [], "required_artifacts": ["genome_ref@1", "host_profile@1"]
+    },
+    {
+      "operation": "site_screening", "input_state": "user_calibrated_only", "coupling_mode": "*", "claim_target": "*",
+      "decision": "allow", "max_tier": "transfer_profile", "capabilities": ["site_screening"],
+      "classification_ceiling": "INFERENCE", "reason_codes": [], "required_artifacts": ["genome_ref@1", "host_profile@1"]
+    },
+    {
+      "operation": "site_screening", "input_state": "missing_annotation", "coupling_mode": "*", "claim_target": "*",
+      "decision": "deny", "max_tier": "blocked", "capabilities": [],
+      "classification_ceiling": "INFERENCE", "reason_codes": ["ANNOTATION_MISSING"], "required_artifacts": []
+    },
+    {
+      "operation": "site_screening", "input_state": "consequence_only", "coupling_mode": "*", "claim_target": "*",
+      "decision": "deny", "max_tier": "blocked", "capabilities": [],
+      "classification_ceiling": "INFERENCE", "reason_codes": ["INPUT_STATE_MISMATCH"], "required_artifacts": []
+    },
+    {
+      "operation": "expression", "input_state": "reference_complete", "coupling_mode": "*", "claim_target": "*",
+      "decision": "allow", "max_tier": "reference_profile", "capabilities": ["expression"],
+      "classification_ceiling": "INFERENCE", "reason_codes": [], "required_artifacts": ["expression_scenario@1"]
+    },
+    {
+      "operation": "expression", "input_state": "missing_condition", "coupling_mode": "*", "claim_target": "*",
+      "decision": "allow", "max_tier": "transfer_profile", "capabilities": ["expression_proxy"],
+      "classification_ceiling": "ASSUMPTION", "reason_codes": ["PROXY_ONLY"], "required_artifacts": ["expression_scenario@1"]
+    },
+    {
+      "operation": "expression", "input_state": "user_calibrated_only", "coupling_mode": "*", "claim_target": "*",
+      "decision": "allow", "max_tier": "transfer_profile", "capabilities": ["expression"],
+      "classification_ceiling": "ASSUMPTION", "reason_codes": [], "required_artifacts": ["expression_scenario@1"]
+    },
+    {
+      "operation": "expression", "input_state": "missing_annotation", "coupling_mode": "*", "claim_target": "*",
+      "decision": "deny", "max_tier": "blocked", "capabilities": [],
+      "classification_ceiling": "INFERENCE", "reason_codes": ["ANNOTATION_MISSING"], "required_artifacts": []
+    },
+    {
+      "operation": "expression", "input_state": "consequence_only", "coupling_mode": "*", "claim_target": "*",
+      "decision": "deny", "max_tier": "blocked", "capabilities": [],
+      "classification_ceiling": "INFERENCE", "reason_codes": ["INPUT_STATE_MISMATCH"], "required_artifacts": []
+    },
+    {
+      "operation": "consequence_quantitative", "input_state": "*", "coupling_mode": "*", "claim_target": "none",
+      "decision": "deny", "max_tier": "blocked", "capabilities": [],
+      "classification_ceiling": "INFERENCE", "reason_codes": ["CLAIM_TARGET_REQUIRED"], "required_artifacts": []
+    },
+    {
+      "operation": "consequence_quantitative", "input_state": "*", "coupling_mode": "none", "claim_target": "*",
+      "decision": "deny", "max_tier": "blocked", "capabilities": [],
+      "classification_ceiling": "INFERENCE", "reason_codes": ["COUPLING_MODE_REQUIRED"], "required_artifacts": []
+    },
+    {
+      "operation": "consequence_quantitative", "input_state": "*", "coupling_mode": "qualitative_direction", "claim_target": "*",
+      "decision": "deny", "max_tier": "blocked", "capabilities": [],
+      "classification_ceiling": "INFERENCE", "reason_codes": ["COUPLING_MODE_NOT_QUANTITATIVE"], "required_artifacts": []
+    },
+    {
+      "operation": "consequence_quantitative", "input_state": "missing_annotation", "coupling_mode": "*", "claim_target": "*",
+      "decision": "deny", "max_tier": "blocked", "capabilities": [],
+      "classification_ceiling": "INFERENCE", "reason_codes": ["ANNOTATION_MISSING"], "required_artifacts": []
+    },
+    {
+      "operation": "consequence_quantitative", "input_state": "missing_condition", "coupling_mode": "*", "claim_target": "*",
+      "decision": "deny", "max_tier": "blocked", "capabilities": [],
+      "classification_ceiling": "INFERENCE", "reason_codes": ["CONDITION_MISSING"], "required_artifacts": []
+    },
+    {
+      "operation": "consequence_quantitative", "input_state": "user_calibrated_only", "coupling_mode": "user_calibrated_bound", "claim_target": "*",
+      "decision": "allow", "max_tier": "transfer_profile", "capabilities": ["consequence_quantitative:user_calibrated"],
+      "classification_ceiling": "ASSUMPTION",
+      "reason_codes": ["USER_CALIBRATED_ONLY"],
+      "required_artifacts": ["coupling_profile@1", "condition_card@1", "numeric_policy@1", "metabolic_model_ref@1"]
+    },
+    {
+      "operation": "consequence_quantitative", "input_state": "consequence_only", "coupling_mode": "user_calibrated_bound", "claim_target": "*",
+      "decision": "allow", "max_tier": "transfer_profile", "capabilities": ["consequence_quantitative:user_calibrated"],
+      "classification_ceiling": "ASSUMPTION", "reason_codes": ["USER_CALIBRATED_ONLY"],
+      "required_artifacts": ["coupling_profile@1", "condition_card@1", "numeric_policy@1", "metabolic_model_ref@1"]
+    },
+    {
+      "operation": "consequence_quantitative", "input_state": "reference_complete", "coupling_mode": "evidence_calibrated_bound", "claim_target": "*",
+      "decision": "allow", "max_tier": "reference_profile", "capabilities": ["consequence_quantitative:evidence_calibrated"],
+      "classification_ceiling": "INFERENCE", "reason_codes": [],
+      "required_artifacts": ["coupling_profile@1", "condition_card@1", "numeric_policy@1", "metabolic_model_ref@1"]
+    },
+    {
+      "operation": "consequence_quantitative", "input_state": "consequence_only", "coupling_mode": "evidence_calibrated_bound", "claim_target": "*",
+      "decision": "allow", "max_tier": "reference_profile", "capabilities": ["consequence_quantitative:evidence_calibrated"],
+      "classification_ceiling": "INFERENCE", "reason_codes": [],
+      "required_artifacts": ["coupling_profile@1", "condition_card@1", "numeric_policy@1", "metabolic_model_ref@1"]
+    },
+    {
+      "operation": "consequence_quantitative", "input_state": "user_calibrated_only", "coupling_mode": "evidence_calibrated_bound", "claim_target": "*",
+      "decision": "allow", "max_tier": "transfer_profile", "capabilities": ["consequence_quantitative:evidence_calibrated"],
+      "classification_ceiling": "ASSUMPTION", "reason_codes": ["USER_CALIBRATED_ONLY"],
+      "required_artifacts": ["coupling_profile@1", "condition_card@1", "numeric_policy@1", "metabolic_model_ref@1"]
+    },
+    {
+      "operation": "consequence_qualitative", "input_state": "*", "coupling_mode": "*", "claim_target": "none",
+      "decision": "deny", "max_tier": "blocked", "capabilities": [],
+      "classification_ceiling": "INFERENCE", "reason_codes": ["CLAIM_TARGET_REQUIRED"], "required_artifacts": []
+    },
+    {
+      "operation": "consequence_qualitative", "input_state": "*", "coupling_mode": "none", "claim_target": "*",
+      "decision": "deny", "max_tier": "blocked", "capabilities": [],
+      "classification_ceiling": "INFERENCE", "reason_codes": ["COUPLING_MODE_REQUIRED"], "required_artifacts": []
+    },
+    {
+      "operation": "consequence_qualitative", "input_state": "missing_annotation", "coupling_mode": "*", "claim_target": "*",
+      "decision": "deny", "max_tier": "blocked", "capabilities": [],
+      "classification_ceiling": "INFERENCE", "reason_codes": ["ANNOTATION_MISSING"], "required_artifacts": []
+    },
+    {
+      "operation": "consequence_qualitative", "input_state": "reference_complete", "coupling_mode": "*", "claim_target": "*",
+      "decision": "allow", "max_tier": "reference_profile", "capabilities": ["consequence_qualitative"],
+      "classification_ceiling": "INFERENCE", "reason_codes": [], "required_artifacts": ["coupling_profile@1"]
+    },
+    {
+      "operation": "consequence_qualitative", "input_state": "missing_condition", "coupling_mode": "*", "claim_target": "*",
+      "decision": "allow", "max_tier": "transfer_profile", "capabilities": ["consequence_qualitative"],
+      "classification_ceiling": "INFERENCE", "reason_codes": [], "required_artifacts": ["coupling_profile@1"]
+    },
+    {
+      "operation": "consequence_qualitative", "input_state": "user_calibrated_only", "coupling_mode": "*", "claim_target": "*",
+      "decision": "allow", "max_tier": "transfer_profile", "capabilities": ["consequence_qualitative"],
+      "classification_ceiling": "INFERENCE", "reason_codes": [], "required_artifacts": ["coupling_profile@1"]
+    },
+    {
+      "operation": "consequence_qualitative", "input_state": "consequence_only", "coupling_mode": "*", "claim_target": "*",
+      "decision": "allow", "max_tier": "transfer_profile", "capabilities": ["consequence_qualitative"],
+      "classification_ceiling": "INFERENCE", "reason_codes": [], "required_artifacts": ["coupling_profile@1"]
+    }
+  ]
+}

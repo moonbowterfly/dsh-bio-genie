@@ -1,0 +1,7 @@
+{
+  "policy_id": "design-capability-policy",
+  "policy_version": "0",
+  "policy_file": "policy-v0.json",
+  "policy_sha256": "9f448e65b626d32b1a93be808aa3abd99c4d739652c0d045dcf1bd885f0e0d27",
+  "note": "hash-frozen bundle 冻结记录（A9a）；loader 每次全量核验（无缓存），不符即 fail-closed。"
+}

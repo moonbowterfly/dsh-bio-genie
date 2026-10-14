@@ -2,3 +2,4 @@
 design/packet/** -text
 design/provenance/** -text
 design/acceptance*.json -text
+design/capability-policy/** -text
