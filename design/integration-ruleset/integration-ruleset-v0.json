@@ -1,0 +1,83 @@
+{
+  "artifact_type": "integration_ruleset@1",
+  "ruleset_id": "default-integration",
+  "version": "0",
+  "rules": [
+    {
+      "rule_id": "feature_overlap",
+      "kind": "feature_overlap",
+      "mandatory": true,
+      "params": {
+        "window": 200,
+        "feature_classes": ["CDS", "rRNA", "tRNA", "ncRNA", "regulatory"],
+        "unknown_policy": "block"
+      },
+      "description": "Exclude any candidate interval whose window-expanded locus intersects an annotated feature of the listed classes. Incomplete or unreliable annotation of the locus must not default to pass: the rule verdict is unknown and blocks screened-candidate classification."
+    },
+    {
+      "rule_id": "repeat",
+      "kind": "repeat",
+      "mandatory": true,
+      "params": {
+        "min_repeat_length_bp": 20,
+        "window_bp": 200,
+        "annotated_repeat_classes": ["repeat_region", "insertion_sequence", "transposon", "mobile_element"],
+        "unknown_policy": "block"
+      },
+      "description": "Exclude candidate loci that contain, or lie within window_bp of, ab-initio repeats (unit length >= min_repeat_length_bp) or annotated repeat/mobile-element classes; homology blocks drive recombination-mediated excision, duplication and rearrangement instability."
+    },
+    {
+      "rule_id": "essentiality",
+      "kind": "essentiality",
+      "mandatory": true,
+      "params": {
+        "essentiality_sources": ["DEG", "Keio", "iML1515_in_silico"],
+        "union_semantics": "any_source_essential",
+        "proximity_window_bp": 200,
+        "unknown_policy": "block"
+      },
+      "description": "Exclude any candidate locus that overlaps, or lies within proximity_window_bp of, a gene essential per any listed source (union semantics). If essentiality status is unknown for an overlapping gene, the verdict is unknown and blocks screened-candidate classification."
+    },
+    {
+      "rule_id": "neighborhood",
+      "kind": "neighborhood",
+      "mandatory": true,
+      "params": {
+        "origin_exclusion_window_bp": 2000,
+        "high_expression_exclude_percentile": 90,
+        "expression_evidence_required": true,
+        "unknown_policy": "block"
+      },
+      "description": "Exclude candidate loci within origin_exclusion_window_bp of the replication origin. When expression evidence is present, also exclude loci flanking genes in the top high_expression_exclude_percentile of expression; when evidence is absent the sub-check stays unknown and blocks screened-candidate classification."
+    },
+    {
+      "rule_id": "motif",
+      "kind": "motif",
+      "mandatory": true,
+      "params": {
+        "annotated_regulatory_classes": ["promoter", "terminator", "ribosome_binding_site", "operator", "attenuator"],
+        "sequence_motif_table": [
+          {
+            "id": "chi_site",
+            "sequence": "GCTGGTGG",
+            "strand_sensitive": false
+          }
+        ],
+        "window_bp": 200,
+        "unknown_policy": "block"
+      },
+      "description": "Exclude candidate loci whose window_bp-expanded locus intersects annotated regulatory elements or contains any sequence motif of sequence_motif_table; short functional motifs are disruption and interference hazards (v0 table: E. coli Chi site, a RecBCD recombination hotspot)."
+    },
+    {
+      "rule_id": "contextual_stability",
+      "kind": "other",
+      "mandatory": false,
+      "params": {
+        "flag_features": ["prophage", "genomic_island", "integron", "CRISPR_array"],
+        "flag_window_bp": 2000,
+        "action": "flag_for_review"
+      },
+      "description": "Advisory, non-excluding: flag candidate loci within flag_window_bp of annotated mobile/island features (prophage, genomic island, integron, CRISPR array) for manual review of context-dependent instability. Never overrides the verdict of any mandatory rule."
+    }
+  ]
+}
