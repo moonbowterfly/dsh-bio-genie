@@ -1,0 +1,437 @@
+{
+  "candidates": [
+    {
+      "candidate_id": "C01",
+      "classification": "excluded",
+      "features_hit": [
+        {
+          "feature_id": "geneA",
+          "overlap_nt": 40,
+          "strand": "+",
+          "type": "CDS"
+        }
+      ],
+      "flank_left_60": {
+        "seq": "GTTCCTTTGGATGCTTGCTGACTTAAGAACTGGTCATAGCTGCCTACTCTACAACCGAGC",
+        "sha256": "bf083c48cf17273877002ba526b47ccb0af6092f5e7b5185dce455b9097c8f79"
+      },
+      "flank_right_60": {
+        "seq": "TGCAGTCAGCTAAGGAAAGCTCCTGACACGGAGTTGGGGCGCTCAGTGCACGGGGGATAA",
+        "sha256": "140bd0de5d6e67af6ff18ec135d08858783f1776beb99fdbb43918cf8eb9e684"
+      },
+      "note": "inside_geneA",
+      "rule_id": "R0-1",
+      "segments": [
+        [
+          250,
+          290
+        ]
+      ]
+    },
+    {
+      "candidate_id": "C02",
+      "classification": "screened_candidate",
+      "features_hit": [],
+      "flank_left_60": {
+        "seq": "TAGTCGATAATAGTCAGGTTTGCTGAGCGCTGTTTCGCTTCACGACTAGATCAGCTTAGG",
+        "sha256": "8c9da198940e9fbac008396ce413f58ea017a5c813272a925c320ce9a3c86bea"
+      },
+      "flank_right_60": {
+        "seq": "AAGGTCCGGGTTAGGAATCAAAAATAGACTTTAGAGCGACCTCGTCTCAAGGGATCGAAT",
+        "sha256": "fcc093fd22a3ebcc94d2fab553ddb78fff6e829994b343c06bc3ccb70a446b95"
+      },
+      "note": "clean_intergenic",
+      "rule_id": "R0-4",
+      "segments": [
+        [
+          1150,
+          1190
+        ]
+      ]
+    },
+    {
+      "candidate_id": "C03",
+      "classification": "excluded",
+      "features_hit": [
+        {
+          "feature_id": "trnX",
+          "overlap_nt": 26,
+          "strand": "-",
+          "type": "tRNA"
+        }
+      ],
+      "flank_left_60": {
+        "seq": "ACTCAATGGGACTAGGAGAACCATGATACACCGAGCTTGTATCACCATTTGTTAGGCAAT",
+        "sha256": "e4ea3b8bfbae273b2c5d6875e3654fb0f7287d8d32032955a6c4332a5f374966"
+      },
+      "flank_right_60": {
+        "seq": "TAGTGTACCAGCTACGGATAGTCATGTTAAGTAATTTATAAGTAACGTCTTCCTACCGAG",
+        "sha256": "e2e32180af789c254d349e47f587934754da25da4017cab96fd80674af7316ee"
+      },
+      "note": "partial_tRNA_overlap_26nt",
+      "rule_id": "R0-2b",
+      "segments": [
+        [
+          2650,
+          2690
+        ]
+      ]
+    },
+    {
+      "candidate_id": "C04",
+      "classification": "excluded",
+      "features_hit": [
+        {
+          "feature_id": "rep1",
+          "overlap_nt": 40,
+          "strand": "+",
+          "type": "repeat"
+        }
+      ],
+      "flank_left_60": {
+        "seq": "CTTACCTAATGATACACTGCGCGATTATAGAAAGTCCCGTAGTTGAATCATGAGGATGTG",
+        "sha256": "8853fc6335b79c9e4fd8e424748d5ce138ad5074d758ddf39ffc950c345f735e"
+      },
+      "flank_right_60": {
+        "seq": "GCCCGACTAATTTGACGTGAGAGCCACCTTCTACGGCCGAAACCTTAGCCATCTCTGCTA",
+        "sha256": "a77c07e389401d60eab6c7b591d4b2a4b525682409b5d0b155e4811693a69512"
+      },
+      "note": "inside_rep1",
+      "rule_id": "R0-3",
+      "segments": [
+        [
+          2940,
+          2980
+        ]
+      ]
+    },
+    {
+      "candidate_id": "C05",
+      "classification": "excluded",
+      "features_hit": [
+        {
+          "feature_id": "rep1",
+          "overlap_nt": 20,
+          "strand": "+",
+          "type": "repeat"
+        }
+      ],
+      "flank_left_60": {
+        "seq": "GCGATTATAGAAAGTCCCGTAGTTGAATCATGAGGATGTGTCCAGATGAGTGACTGACAC",
+        "sha256": "5ed99488658755f07a2c72b3abc93597e2802932a4ad56859fab773f69272816"
+      },
+      "flank_right_60": {
+        "seq": "CTACGGCCGAAACCTTAGCCATCTCTGCTACAACCATTTAGCGATTATAGAAAGTCCCGT",
+        "sha256": "fd401759513eb50f8fbe18be0178ecbcbc19a8fa2bd9081937aff4213c442559"
+      },
+      "note": "partial_rep1_overlap_20nt",
+      "rule_id": "R0-3",
+      "segments": [
+        [
+          2960,
+          3010
+        ]
+      ]
+    },
+    {
+      "candidate_id": "C06",
+      "classification": "excluded",
+      "features_hit": [
+        {
+          "feature_id": "oriCDS",
+          "overlap_nt": 70,
+          "strand": "-",
+          "type": "CDS"
+        }
+      ],
+      "flank_left_60": {
+        "seq": "AATGGGGCAGCCAATCGCATGTATATCCCTGCATAAGACAGACTAATGGGGGCCCATCCT",
+        "sha256": "2d3f832b8ca8492ceb84fe7754d168ec43d3c467a1e9d228e2f878ad52648b1c"
+      },
+      "flank_right_60": {
+        "seq": "CCCACATCGAACCCTCTAAGTTTTTAATTATGTGGGCACTTTTGCAACTAATGCTAAGGA",
+        "sha256": "d136c9bccf2b45ac95f123d35b53b5eb98d3cca33b367651561649d79a339432"
+      },
+      "note": "crosses_origin_window; overlaps_oriCDS_both_segments",
+      "rule_id": "R0-1",
+      "segments": [
+        [
+          4160,
+          4200
+        ],
+        [
+          0,
+          30
+        ]
+      ]
+    },
+    {
+      "candidate_id": "C07",
+      "classification": "excluded",
+      "features_hit": [
+        {
+          "feature_id": "oriCDS",
+          "overlap_nt": 40,
+          "strand": "-",
+          "type": "CDS"
+        }
+      ],
+      "flank_left_60": {
+        "seq": "ACACTTTCCCTCAGTTTACAAGGCACTTAGCCACCTCTCACCGGCTTGACTCGATCTCGA",
+        "sha256": "8acd95ac2fcf724b9cae93950f1d4e9c6412f1fe7c841d5237696f71fe21f824"
+      },
+      "flank_right_60": {
+        "seq": "GACTAATGGGGGCCCATCCTACCAAACGTGGGTTAGAGGGTCTGGACAGCATGATATTGT",
+        "sha256": "cad8d9bde01c6c69e37b4d3fa19fe405d6b5db1353518664c22f67e2de643c2f"
+      },
+      "note": "inside_oriCDS_seg1",
+      "rule_id": "R0-1",
+      "segments": [
+        [
+          4100,
+          4140
+        ]
+      ]
+    },
+    {
+      "candidate_id": "C08",
+      "classification": "excluded",
+      "features_hit": [
+        {
+          "feature_id": "oriCDS",
+          "overlap_nt": 40,
+          "strand": "-",
+          "type": "CDS"
+        }
+      ],
+      "flank_left_60": {
+        "seq": "ATGATATTGTCATTACAGTTGCTGCCCGTGTCCTGATACACCCACATCGAACCCTCTAAG",
+        "sha256": "d027ac78ac043c096802816f374fa1bf7bbcfb34730a825c37c9944663008886"
+      },
+      "flank_right_60": {
+        "seq": "CCTGCGCCATCGAACACTTCGTTTGTAGCATCCTAATATCAACACACTGTAGCAGTAGTA",
+        "sha256": "500d906a97235a45be5dd6dfca51c5e5c7aa8c42517d7f6f989a12a12868337a"
+      },
+      "note": "inside_oriCDS_seg2",
+      "rule_id": "R0-1",
+      "segments": [
+        [
+          50,
+          90
+        ]
+      ]
+    },
+    {
+      "candidate_id": "C09",
+      "classification": "excluded",
+      "features_hit": [
+        {
+          "feature_id": "rrnX",
+          "overlap_nt": 40,
+          "strand": "+",
+          "type": "rRNA"
+        }
+      ],
+      "flank_left_60": {
+        "seq": "TCTATGTAATATCGTGCTACATAATATTTCAAGTAGTCTGTTCACAGCCACGACCAGTGG",
+        "sha256": "cca913b80735a9153f2106b5440e3ff7ae769307c0d52b157a26fe84fff25328"
+      },
+      "flank_right_60": {
+        "seq": "GAATGTGGATTTGTACTCAGTAATGTCCTCATAAAAAGGGGTAGCATACTGACTAGTGAT",
+        "sha256": "9af4c52179f401c2f128b7b8a966504671470c4f1bf795ba04e92a2ba3e0809c"
+      },
+      "note": "inside_rrnX",
+      "rule_id": "R0-2a",
+      "segments": [
+        [
+          2050,
+          2090
+        ]
+      ]
+    },
+    {
+      "candidate_id": "C10",
+      "classification": "excluded",
+      "features_hit": [
+        {
+          "feature_id": "geneC",
+          "overlap_nt": 40,
+          "strand": "+",
+          "type": "CDS"
+        }
+      ],
+      "flank_left_60": {
+        "seq": "TCGCGAAAAGAGGGCGGGCGGACATCACAACTGTTAAGGTGTATGCAGCGGGGTAGCCGT",
+        "sha256": "a4e6c0ed76a5a79221ea18ed346a11c2c1a3f2799733bc06d9f5942bf50cba0f"
+      },
+      "flank_right_60": {
+        "seq": "CTTAATCTTGTTAAACGGCGGGGGACGGCCCTACACGGGAGGTAGGTCCAAATAAATTAA",
+        "sha256": "1c72fee7b430545d7d6f05c62c7d0c2e391c1bb6f77c9c35d0d7d64faad3c13b"
+      },
+      "note": "inside_geneC",
+      "rule_id": "R0-1",
+      "segments": [
+        [
+          3600,
+          3640
+        ]
+      ]
+    },
+    {
+      "candidate_id": "C11",
+      "classification": "screened_candidate",
+      "features_hit": [],
+      "flank_left_60": {
+        "seq": "TCGCAGCTTTTACTTTGACGACTCGGAGACCATTTTGGCGTAACCTGACGGTCCAATTAT",
+        "sha256": "c229df2b76164966cfb38091c5a4881d2cafd53f4662eb83c23e677fdcc98a96"
+      },
+      "flank_right_60": {
+        "seq": "CTTACGTTACGGGTTTCATGAAATTTATCAGCGCGAAAATGAGCACCATTTCTATGTAAT",
+        "sha256": "d456242d1e416dcaacb6dedaf5e068381c0ab12abe56cc0f4853abd72b00a954"
+      },
+      "note": "clean_intergenic",
+      "rule_id": "R0-4",
+      "segments": [
+        [
+          1900,
+          1940
+        ]
+      ]
+    },
+    {
+      "candidate_id": "C12",
+      "classification": "excluded",
+      "features_hit": [
+        {
+          "feature_id": "rep2",
+          "overlap_nt": 20,
+          "strand": "+",
+          "type": "repeat"
+        }
+      ],
+      "flank_left_60": {
+        "seq": "GATCACACAGGCCCGACTAATTTGACGTGAGAGCCACCTTCTACGGCCGAAACCTTAGCC",
+        "sha256": "b7b1da188c7e22a86d4037194109046748ccb81592f6723fb6848862143d4ba4"
+      },
+      "flank_right_60": {
+        "seq": "AGTTGAATCATGAGGATGTGTCCAGATGAGTGACTGACACGATGGTGAGAGATCACACAG",
+        "sha256": "c1f3cab8439e24ea8ec19bd9d3e80c343a46917c70978e8d0b39f41a79d8a42a"
+      },
+      "note": "partial_rep2_overlap_20nt",
+      "rule_id": "R0-3",
+      "segments": [
+        [
+          3030,
+          3070
+        ]
+      ]
+    },
+    {
+      "candidate_id": "C13",
+      "classification": "screened_candidate",
+      "features_hit": [],
+      "flank_left_60": {
+        "seq": "ACCCTCTAAGTTTTTAATTATGTGGGCACTTTTGCAACTAATGCTAAGGACCTGCGCCAT",
+        "sha256": "bcb7d50d14734776238d5622622eb20bb328a97b4faec6d8b2fcb8bd69af4832"
+      },
+      "flank_right_60": {
+        "seq": "AGCAGTAGTAGCGCACAGCGTCCAGGGAGGACAAATCGTGGATGTTTCGTGTTCCTTTGG",
+        "sha256": "e62aa867a9146d190a7466f4c96ce2cdca4235c6f975778bf71f368e3a666602"
+      },
+      "note": "clean_intergenic_near_origin",
+      "rule_id": "R0-4",
+      "segments": [
+        [
+          100,
+          140
+        ]
+      ]
+    },
+    {
+      "candidate_id": "C14",
+      "classification": "excluded",
+      "features_hit": [
+        {
+          "feature_id": "rep2",
+          "overlap_nt": 40,
+          "strand": "+",
+          "type": "repeat"
+        }
+      ],
+      "flank_left_60": {
+        "seq": "AACCTTAGCCATCTCTGCTACAACCATTTAGCGATTATAGAAAGTCCCGTAGTTGAATCA",
+        "sha256": "422699653597aa07f62f32a48520f002dd2f473381db09b1928341412409190d"
+      },
+      "flank_right_60": {
+        "seq": "GATCACACAGGAACGTATCGAGCCCACGCCTATGTAACATTCCACAGACATGGACTTATT",
+        "sha256": "d17c98c847b95bbcef5f4b25d9ca03760272561c683d78aae2265c330ea8ddf6"
+      },
+      "note": "inside_rep2",
+      "rule_id": "R0-3",
+      "segments": [
+        [
+          3080,
+          3120
+        ]
+      ]
+    },
+    {
+      "candidate_id": "C15",
+      "classification": "excluded",
+      "features_hit": [
+        {
+          "feature_id": "oriCDS",
+          "overlap_nt": 10,
+          "strand": "-",
+          "type": "CDS"
+        }
+      ],
+      "flank_left_60": {
+        "seq": "CCCACATCGAACCCTCTAAGTTTTTAATTATGTGGGCACTTTTGCAACTAATGCTAAGGA",
+        "sha256": "d136c9bccf2b45ac95f123d35b53b5eb98d3cca33b367651561649d79a339432"
+      },
+      "flank_right_60": {
+        "seq": "AACACACTGTAGCAGTAGTAGCGCACAGCGTCCAGGGAGGACAAATCGTGGATGTTTCGT",
+        "sha256": "1b1656002d4dd277d11dc5fc49559bddb17a99a3cf11ec51a72ad82bfdf0f247"
+      },
+      "note": "tiny_oriCDS_overlap_10nt",
+      "rule_id": "R0-1",
+      "segments": [
+        [
+          90,
+          130
+        ]
+      ]
+    }
+  ],
+  "coord_convention": "0-based-half-open",
+  "fasta_sha256": "0d6c7fa7d450ef056bc6a677c5cc2970f58d453b7ecb51811fea3135c8c8dfc8",
+  "fixture": "synth_circ_4200",
+  "generator": "make_circular_fixture.py",
+  "length": 4200,
+  "rules": [
+    {
+      "desc": "overlap CDS -> excluded",
+      "id": "R0-1"
+    },
+    {
+      "desc": "overlap rRNA -> excluded",
+      "id": "R0-2a"
+    },
+    {
+      "desc": "overlap tRNA -> excluded",
+      "id": "R0-2b"
+    },
+    {
+      "desc": "overlap repeat -> excluded",
+      "id": "R0-3"
+    },
+    {
+      "desc": "no overlap with CDS/rRNA/tRNA/repeat -> screened_candidate",
+      "id": "R0-4"
+    }
+  ],
+  "ruleset": "R0-draft",
+  "seed": 20261012,
+  "topology": "circular"
+}

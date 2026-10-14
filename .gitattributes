@@ -3,3 +3,5 @@ design/packet/** -text
 design/provenance/** -text
 design/acceptance*.json -text
 design/capability-policy/** -text
+# fixtures 字节级保真（SHA 清单绑定；autocrlf 下防 LF→CRLF 破坏哈希）
+test/fixtures/design/** -text

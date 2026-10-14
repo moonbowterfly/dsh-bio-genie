@@ -1,0 +1,9 @@
+feature_id	type	strand	segments	length	note
+oriCDS	CDS	-	3950-4200;0-100	350	crosses_origin; minus-strand synthetic ORF
+geneA	CDS	+	200-1100	900	essential_candidate=true; synthetic ORF
+geneB	CDS	-	1200-1800	600	minus-strand synthetic ORF
+rrnX	rRNA	+	1950-2450	500	synthetic rRNA-like
+trnX	tRNA	-	2600-2676	76	synthetic tRNA-like (76 nt)
+rep1	repeat	+	2900-2980	80	direct_repeat_copy_1 (R)
+rep2	repeat	+	3050-3130	80	direct_repeat_copy_2 (R, identical to rep1)
+geneC	CDS	+	3300-3900	600	synthetic ORF

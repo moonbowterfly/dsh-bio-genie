@@ -1,0 +1,16 @@
+candidate_id	segments	payload_length	note
+C01	250-290	40	inside_geneA
+C02	1150-1190	40	clean_intergenic
+C03	2650-2690	40	partial_tRNA_overlap_26nt
+C04	2940-2980	40	inside_rep1
+C05	2960-3010	50	partial_rep1_overlap_20nt
+C06	4160-4200;0-30	70	crosses_origin_window; overlaps_oriCDS_both_segments
+C07	4100-4140	40	inside_oriCDS_seg1
+C08	50-90	40	inside_oriCDS_seg2
+C09	2050-2090	40	inside_rrnX
+C10	3600-3640	40	inside_geneC
+C11	1900-1940	40	clean_intergenic
+C12	3030-3070	40	partial_rep2_overlap_20nt
+C13	100-140	40	clean_intergenic_near_origin
+C14	3080-3120	40	inside_rep2
+C15	90-130	40	tiny_oriCDS_overlap_10nt
