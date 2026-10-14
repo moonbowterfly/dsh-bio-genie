@@ -12,12 +12,14 @@
  * ticket/HMAC）随 A3/B1 落地。
  * @module dsh-bio-genie/design-dispatch
  */
+import { spawnSync } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { DESIGN_OPS } from './design-ops.js'
-import { verifyDesignPacket } from './design-gate.js'
-import { validateDesignArtifact } from './design-validate.js'
+import { verifyDesignPacket, PACKET_DIR } from './design-gate.js'
+import { deriveAnnotationsForArtifact, validateDesignArtifact } from './design-validate.js'
 import { spawnPython } from './python.js'
 
 const OPS_PATH = join(import.meta.dirname, '..', 'python', 'bio_ops.py')
@@ -30,8 +32,35 @@ function writeDispatchState(stagingDir, payload) {
   }
 }
 
-/** stage②（v4 §A0.3）：读取 staged candidate → 重新哈希（对 Python 报告的 sha）→
- *  重新验证（TS 同一 gate）→ 仅全部 OK 才写 content-addressed object（<sha256>.json）。 */
+/** stage② 前置：把 staged 文本经**冻结 c14n**（packet impl CLI，子进程）复核——
+ *  必须 lossless 通过且 canonical serialization 与磁盘 bytes 逐字节一致。 */
+function canonicalCheckViaPacket(artifactType, text) {
+  let value
+  try {
+    value = JSON.parse(text)
+  } catch (e) {
+    return { ok: false, code: 'STAGED_UNREADABLE', detail: String(e.message).slice(0, 120) }
+  }
+  const ann = deriveAnnotationsForArtifact(artifactType, value)
+  if (ann === null) return { ok: false, code: 'PACKET_UNVERIFIED', detail: 'annotations derivation failed' }
+  const work = mkdtempSync(join(tmpdir(), 'design-c14n-'))
+  const casePath = join(work, 'case.json')
+  const outPath = join(work, 'out.json')
+  writeFileSync(casePath, JSON.stringify({ cases: [{ id: 'staged', input: text, annotations: ann }] }), 'utf8')
+  const r = spawnSync(process.execPath, [join(PACKET_DIR, 'impl', 'c14n.mjs'), '--batch', casePath, '--out', outPath], { encoding: 'utf8', timeout: 120000 })
+  if (r.status !== 0) return { ok: false, code: 'C14N_RUNNER_FAILED', detail: String(r.stderr || '').slice(0, 160) }
+  let res
+  try {
+    res = JSON.parse(readFileSync(outPath, 'utf8')).results[0]
+  } catch (e) {
+    return { ok: false, code: 'C14N_OUTPUT_UNREADABLE', detail: String(e.message).slice(0, 120) }
+  }
+  if (res.status !== 'accept') return { ok: false, code: res.code || 'C14N_REJECT', detail: String(res.detail || '').slice(0, 160) }
+  return { ok: true, canonical: res.canonical }
+}
+
+/** stage②（v5）：staged 文本 → 冻结 c14n 复核（lossless + canonical==磁盘 bytes）→
+ *  值层重验 → 仅全部 OK 才写 content-addressed object（<sha256>.json）。 */
 export function verifyStagedCandidate({ stagingFile, expectedSha256, artifactType, objectsDir } = {}) {
   if (!stagingFile || !existsSync(stagingFile)) {
     return { ok: false, errors: [{ code: 'STAGED_MISSING', path: String(stagingFile) }] }
@@ -41,9 +70,17 @@ export function verifyStagedCandidate({ stagingFile, expectedSha256, artifactTyp
   if (expectedSha256 && sha !== expectedSha256) {
     return { ok: false, errors: [{ code: 'STAGED_HASH_MISMATCH', path: String(stagingFile), detail: 'disk=' + sha.slice(0, 16) + ' expected=' + String(expectedSha256).slice(0, 16) }] }
   }
+  const text = bytes.toString('utf8')
+  const canon = canonicalCheckViaPacket(artifactType, text)
+  if (!canon.ok) {
+    return { ok: false, errors: [{ code: canon.code, path: String(stagingFile), detail: canon.detail }] }
+  }
+  if (canon.canonical !== text) {
+    return { ok: false, errors: [{ code: 'NONCANONICAL_BYTES', path: String(stagingFile), detail: 'staged bytes != canonical serialization' }] }
+  }
   let value
   try {
-    value = JSON.parse(bytes.toString('utf8'))
+    value = JSON.parse(text)
   } catch (e) {
     return { ok: false, errors: [{ code: 'STAGED_UNREADABLE', path: String(stagingFile), detail: String(e.message).slice(0, 120) }] }
   }
@@ -73,7 +110,16 @@ export async function dispatchDesignOp(pythonPath, op, args = {}, { cwd, timeout
   })
   const res = await spawnPython(pythonPath, OPS_PATH, { op, args }, {
     cwd, timeoutMs, signal,
-    env: { DSH_DESIGN_STAGING: stagingDir, DSH_DESIGN_DISPATCH_ID: dispatchId },
+    env: {
+      DSH_DESIGN_STAGING: stagingDir,
+      DSH_DESIGN_DISPATCH_ID: dispatchId,
+      // 身份绑定（v5）：清除调用方继承的 packet 根，只传递 TS 约束的绝对身份（split-packet 防线）
+      DSH_DESIGN_PACKET: '',
+      DSH_DESIGN_PACKET_FIXED: PACKET_DIR,
+      DSH_DESIGN_EXPECT_INDEX_SHA: gate.index_sha256 || '',
+      DSH_DESIGN_EXPECT_MANIFEST_SHA: gate.manifest_sha256 || '',
+      DSH_DESIGN_ACCEPTANCE_ID: gate.acceptance_id || '',
+    },
   })
   // stage②：TS 复核 staged candidate（重新哈希 + 重新验证）→ 仅 OK 才写 content-addressed object
   let committed = null

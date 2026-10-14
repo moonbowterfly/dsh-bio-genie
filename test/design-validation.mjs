@@ -70,7 +70,7 @@ const work = mkdtempSync(join(tmpdir(), 'design-val-'))
   const c1 = findCase('gvr-01')
   const dir1 = join(work, 'stage-ok')
   mkdirSync(dir1, { recursive: true })
-  const res = await dispatchDesignOp(VENV, 'design_stage_artifact', { artifact_type: c1.schema, value: c1.doc }, { cwd: dir1, timeoutMs: 180000 })
+  const res = await dispatchDesignOp(VENV, 'design_stage_artifact', { artifact_type: c1.schema, raw_json: JSON.stringify(c1.doc) }, { cwd: dir1, timeoutMs: 180000 })
   check('stage① 有效工件 -> staged + sha256', res.ok === true && !!res.result?.staged && !!res.result?.sha256, JSON.stringify(res).slice(0, 260))
   check('stage② committed（object content-addressed）',
     res.committed?.ok === true && existsSync(res.committed.object_path) && res.committed.object_path.endsWith(res.result.sha256 + '.json'),
@@ -85,7 +85,7 @@ const work = mkdtempSync(join(tmpdir(), 'design-val-'))
   const c2 = findCase('gvr-02')
   const dir2 = join(work, 'stage-bad')
   mkdirSync(dir2, { recursive: true })
-  const res2 = await dispatchDesignOp(VENV, 'design_stage_artifact', { artifact_type: c2.schema, value: c2.doc }, { cwd: dir2, timeoutMs: 180000 })
+  const res2 = await dispatchDesignOp(VENV, 'design_stage_artifact', { artifact_type: c2.schema, raw_json: JSON.stringify(c2.doc) }, { cwd: dir2, timeoutMs: 180000 })
   check('stage① 无效工件 -> VALIDATION_FAILED', res2.ok === false && res2.code === 'VALIDATION_FAILED', JSON.stringify(res2).slice(0, 260))
   const badFiles = []
   const badStageRoot = join(dir2, 'staging')
@@ -130,6 +130,91 @@ const work = mkdtempSync(join(tmpdir(), 'design-val-'))
   writeFileSync(badObj, badValBytes)
   const r3b = await dispatchDesignOp(VENV, 'design_casefile_validate', { object_path: badObj, artifact_type: 'genome_ref' }, { cwd: dir1, timeoutMs: 180000 })
   check('stage③ 内容无效 -> verdict FAIL', r3b.ok === true && r3b.result?.verdict === 'FAIL', JSON.stringify(r3b).slice(0, 260))
+  // ── 3) canonical-byte 定向变异（v5）─────────────────────────────────
+  const dirE = join(work, 'stage-canon')
+  mkdirSync(dirE, { recursive: true })
+  const pretty = JSON.stringify(c1.doc, null, 2)
+  const compact = JSON.stringify(c1.doc)
+  const rP = await dispatchDesignOp(VENV, 'design_stage_artifact', { artifact_type: c1.schema, raw_json: pretty }, { cwd: dirE, timeoutMs: 180000 })
+  const rC = await dispatchDesignOp(VENV, 'design_stage_artifact', { artifact_type: c1.schema, raw_json: compact }, { cwd: dirE, timeoutMs: 180000 })
+  check('E1 pretty 输入 -> 落盘为 canonical（与 compact 输入同 sha）',
+    rP.ok === true && rC.ok === true && rP.result?.sha256 === rC.result?.sha256, JSON.stringify({ p: rP.result?.sha256, c: rC.result?.sha256 }))
+  if (rP.ok) {
+    const stagedText = readFileSync(rP.result.staged, 'utf8')
+    check('E1b staged bytes 无空白/无尾换行（canonical 形态）', !stagedText.includes('\n') && stagedText === stagedText.trim(), stagedText.slice(0, 60))
+  }
+  // E2 raw duplicate key -> DUP_KEY（在任何普通 JSON parse 之前）
+  const dupRaw = '{"artifact_type":"genome_ref@1","artifact_type":"genome_ref@1","files":[],"source":"s"}'
+  const rD = await dispatchDesignOp(VENV, 'design_stage_artifact', { artifact_type: 'genome_ref', raw_json: dupRaw }, { cwd: dirE, timeoutMs: 180000 })
+  check('E2 raw duplicate key -> DUP_KEY 拒', rD.ok === false && String(rD.error || '').includes('DUP_KEY'), JSON.stringify(rD).slice(0, 220))
+  // E3/E4 set 语义（claim.evidence_refs: x-canonical set）
+  const clm = findCase('clm-01')
+  const H1 = 'a'.repeat(64)
+  const H2 = 'b'.repeat(64)
+  const mkClaim = (refs) => {
+    const d = JSON.parse(JSON.stringify(clm.doc))
+    d.evidence_refs = refs
+    return JSON.stringify(d)
+  }
+  const rSet = await dispatchDesignOp(VENV, 'design_stage_artifact', { artifact_type: 'claim', raw_json: mkClaim([H2, H1]) }, { cwd: dirE, timeoutMs: 180000 })
+  check('E3 未排序 set -> canonical 排序后接受', rSet.ok === true, JSON.stringify(rSet).slice(0, 200))
+  if (rSet.ok) {
+    const st = readFileSync(rSet.result.staged, 'utf8')
+    check('E3b staged 中 set 已排序（H1 在 H2 前）', st.includes(H1) && st.indexOf(H1) < st.indexOf(H2))
+  }
+  const rDup = await dispatchDesignOp(VENV, 'design_stage_artifact', { artifact_type: 'claim', raw_json: mkClaim([H1, H1]) }, { cwd: dirE, timeoutMs: 180000 })
+  check('E4 重复 set 元素 -> SET_DUPLICATE 拒', rDup.ok === false && String(rDup.error || '').includes('SET_DUPLICATE'), JSON.stringify(rDup).slice(0, 220))
+  // E5 NFD 字符串 -> NFC 归一（bytes 变化；method_ref 为无 pattern 自由文本字段）
+  const nfdRaw = (() => {
+    const d = JSON.parse(JSON.stringify(clm.doc))
+    d.method_ref = 'cafe' + '\u0301'
+    return JSON.stringify(d)
+  })()
+  const rNfd = await dispatchDesignOp(VENV, 'design_stage_artifact', { artifact_type: 'claim', raw_json: nfdRaw }, { cwd: dirE, timeoutMs: 180000 })
+  check('E5 NFD 字符串 -> NFC 归一接受', rNfd.ok === true, JSON.stringify(rNfd).slice(0, 200))
+  if (rNfd.ok) {
+    const st = readFileSync(rNfd.result.staged, 'utf8')
+    check('E5b staged 为 NFC 形态', st.includes('caf\u00e9') && !st.includes('cafe\u0301'))
+  }
+  // E6 数值边界（>2^53 整数）
+  const bigRaw = (() => {
+    const d = JSON.parse(JSON.stringify(clm.doc))
+    d.extra_big = 9007199254740992
+    return JSON.stringify(d)
+  })()
+  const rBig = await dispatchDesignOp(VENV, 'design_stage_artifact', { artifact_type: 'claim', raw_json: bigRaw }, { cwd: dirE, timeoutMs: 180000 })
+  check('E6 数值边界（>2^53）-> NUMBER_OUT_OF_RANGE 拒', rBig.ok === false && String(rBig.error || '').includes('NUMBER_OUT_OF_RANGE'), JSON.stringify(rBig).slice(0, 220))
+  // E7 split-packet 防线
+  const savedEnv = process.env.DSH_DESIGN_PACKET
+  process.env.DSH_DESIGN_PACKET = 'D:/nonexistent-packet'
+  const rEnv = await dispatchDesignOp(VENV, 'design_stage_artifact', { artifact_type: c1.schema, raw_json: compact }, { cwd: dirE, timeoutMs: 180000 })
+  if (savedEnv === undefined) delete process.env.DSH_DESIGN_PACKET
+  else process.env.DSH_DESIGN_PACKET = savedEnv
+  check('E7a 继承的 DSH_DESIGN_PACKET 被清除（仍走 TS 固定身份）', rEnv.ok === true, JSON.stringify(rEnv).slice(0, 200))
+  const idScript = join(work, 'id_probe.py')
+  writeFileSync(idScript, [
+    'import json, os, sys',
+    "sys.path.insert(0, r'" + join(ROOT, 'python') + "')",
+    'import design_ops as ops',
+    "os.environ['DSH_DESIGN_STAGING'] = r'" + join(dirE, 'idprobe-staging') + "'",
+    "os.makedirs(os.environ['DSH_DESIGN_STAGING'], exist_ok=True)",
+    "os.environ['DSH_DESIGN_PACKET_FIXED'] = r'" + join(ROOT, 'design', 'packet') + "'",
+    "os.environ['DSH_DESIGN_EXPECT_INDEX_SHA'] = '0' * 64",
+    "print(json.dumps(ops.op_design_stage_artifact({'artifact_type': 'genome_ref', 'raw_json': '{}'})))",
+  ].join('\n'), 'utf8')
+  const idr = spawnSync(VENV, [idScript], { encoding: 'utf8', timeout: 120000 })
+  check('E7b 期望身份不符 -> PACKET_IDENTITY_MISMATCH（split-packet 防线）',
+    String(idr.stdout || '').includes('PACKET_IDENTITY_MISMATCH'), (idr.stdout || idr.stderr || '').slice(0, 220))
+  // E8 非 canonical staged bytes（stage② 层直接复核）。
+  // 注：冻结 c14n.mjs 扫描器不接受 `": "` 与数组 `[1, 2]` 内空格（58 例语料未覆盖的
+  // 潜在不对称：PY 侧 json.loads 接受、JS 侧手写扫描器拒 INVALID_JSON）——stage②
+  // 以冻结行为为准 fail-closed；生产管线中 stage① 已 canonicalize，正常路径不触此分支。
+  const noncanon = join(work, 'noncanon.json')
+  const prettyBytes = Buffer.from(JSON.stringify(c1.doc, null, 2), 'utf8')
+  writeFileSync(noncanon, prettyBytes)
+  const ncSha = createHash('sha256').update(prettyBytes).digest('hex')
+  const rNc = verifyStagedCandidate({ stagingFile: noncanon, expectedSha256: ncSha, artifactType: c1.schema })
+  check('E8 非 canonical bytes -> 拒绝（冻结 c14n：INVALID_JSON）', rNc.ok === false && rNc.errors[0].code === 'INVALID_JSON', JSON.stringify(rNc.errors).slice(0, 200))
 }
 
 console.log('design-validation: %d passed, %d failed', pass, fail)

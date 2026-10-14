@@ -13,7 +13,9 @@
  *    （内容哈希身份下环不可构造；检测保留为纵深防御。superseded 记录必须保留在注册表中。）
  * 3) **packet 磁盘核验**：index 全量集合逐文件重算 + 多余文件扫描。
  * 4) **候选**：packet_index_sha256 / bundle_manifest_sha256 与当前磁盘精确匹配、
- *    approved、blocker=0、全部绑定（含 provenance）逐项相符的记录。
+ *    **严格契约（v5）**：完整审阅身份（policy/report/reviewer/decision）+ exact-key 绑定集
+ *    （profile/spec_chain/corpora/pattern/unicode/common defs/两份 lock）+ 逐字段对照
+ *    BINDINGS.json；随后全部绑定文件字节核验（含 provenance）。
  * 5) **active 判定**：候选 ∩ 未被 supersedes ∩ 未被 revokes → **恰一条**；
  *    0 条 / ≥2 条 / 被 successor 替代 / 被撤销 → fail-closed。
  * 6) **bundle loader**：经 packet 自带 loader（manifest 驱动）结构核验（「loader 全过」为字面真）。
@@ -110,6 +112,54 @@ function verifyBindings(acc, packetDir, designDir) {
       if (sha256File(p) !== want) problems.push('binding drift spec_chain.' + v)
     }
   }
+  return problems
+}
+
+/** 严格 acceptance 契约（v5）：完整审阅身份 + exact-key 绑定集 + 逐字段对照 BINDINGS.json。 */
+function strictAcceptanceProblems(acc, bindingsDoc) {
+  const problems = []
+  const p = acc.packet || {}
+  if (!H64.test(String(p.packet_index_sha256 || ''))) problems.push('packet_index_sha256 missing/malformed')
+  if (!H64.test(String(p.bundle_manifest_sha256 || ''))) problems.push('bundle_manifest_sha256 missing/malformed')
+  const r = acc.review || {}
+  if (typeof r.policy_id !== 'string' || !r.policy_id) problems.push('review.policy_id missing')
+  if (!H64.test(String(r.policy_sha256 || ''))) problems.push('review.policy_sha256 missing/malformed')
+  if (typeof r.report_path !== 'string' || !r.report_path) problems.push('review.report_path missing')
+  if (!H64.test(String(r.report_sha256 || ''))) problems.push('review.report_sha256 missing/malformed')
+  if (typeof r.reviewer !== 'string' || !r.reviewer) problems.push('review.reviewer missing')
+  if (r.decision !== 'approved') problems.push('review.decision != approved')
+  if ((r.blocker_count ?? 1) !== 0) problems.push('review.blocker_count != 0')
+  const b = acc.bindings || {}
+  const allowed = new Set(['profile_id', 'profile_rev', 'profile_sha256', 'spec_chain', 'pattern_library_sha256', 'unicode_domain_table_sha256', 'common_defs_sha256', 'corpora', 'locks'])
+  for (const k of Object.keys(b)) {
+    if (!allowed.has(k)) problems.push('unknown binding key: ' + k)
+  }
+  for (const k of allowed) {
+    if (!(k in b)) problems.push('binding missing: ' + k)
+  }
+  if (!bindingsDoc || typeof bindingsDoc !== 'object') {
+    problems.push('BINDINGS.json unavailable')
+    return problems
+  }
+  const eq = (a, c, label) => {
+    if (String(a) !== String(c)) problems.push('binding mismatch vs BINDINGS: ' + label)
+  }
+  eq(b.profile_id, bindingsDoc.profile?.id, 'profile_id')
+  eq(b.profile_rev, bindingsDoc.profile?.rev, 'profile_rev')
+  eq(b.profile_sha256, bindingsDoc.profile?.sha256, 'profile_sha256')
+  {
+    const bs = b.spec_chain || {}
+    const Bs = bindingsDoc.spec_chain || {}
+    if (Object.keys(bs).sort().join(',') !== Object.keys(Bs).sort().join(',')) problems.push('spec_chain key set mismatch vs BINDINGS')
+    for (const k of Object.keys(Bs)) eq(bs[k], Bs[k], 'spec_chain.' + k)
+  }
+  eq(b.pattern_library_sha256, bindingsDoc.pattern_library?.sha256, 'pattern_library_sha256')
+  eq(b.unicode_domain_table_sha256, bindingsDoc.unicode_domain_table?.sha256, 'unicode_domain_table_sha256')
+  eq(b.common_defs_sha256, bindingsDoc.common_defs?.sha256, 'common_defs_sha256')
+  eq(b.corpora?.c14n, bindingsDoc.corpora?.c14n, 'corpora.c14n')
+  eq(b.corpora?.schema, bindingsDoc.corpora?.schema, 'corpora.schema')
+  eq(b.locks?.npm_package_lock_sha256, bindingsDoc.locks?.npm_package_lock_sha256, 'locks.npm_package_lock_sha256')
+  eq(b.locks?.python_requirements_lock_sha256, bindingsDoc.locks?.python_requirements_lock_sha256, 'locks.python_requirements_lock_sha256')
   return problems
 }
 
@@ -214,6 +264,12 @@ export function verifyDesignPacket({ packetDir = PACKET_DIR, designDir = DESIGN_
   const manifestPath = join(packetDir, 'bundle.manifest.json')
   if (!existsSync(manifestPath)) return fail('bundle manifest missing')
   const manifestSha = sha256File(manifestPath)
+  let bindingsDoc = null
+  try {
+    bindingsDoc = JSON.parse(readFileSync(join(packetDir, 'BINDINGS.json'), 'utf8'))
+  } catch {
+    bindingsDoc = null
+  }
 
   // ── 4) 候选：与当前 packet 精确匹配 + approved + 绑定全过 ─────────────
   const candidates = []
@@ -222,8 +278,8 @@ export function verifyDesignPacket({ packetDir = PACKET_DIR, designDir = DESIGN_
     const acc = r.doc
     if (String(acc.packet?.packet_index_sha256 || '') !== indexSha) continue
     if (String(acc.packet?.bundle_manifest_sha256 || '') !== manifestSha) continue
-    if (acc.review?.decision !== 'approved') { candidateProblems.push(r.name + ': decision=' + String(acc.review?.decision)); continue }
-    if ((acc.review?.blocker_count ?? 1) !== 0) { candidateProblems.push(r.name + ': blocker_count=' + String(acc.review?.blocker_count)); continue }
+    const sp = strictAcceptanceProblems(acc, bindingsDoc)
+    if (sp.length) { candidateProblems.push(r.name + ': ' + sp[0]); continue }
     const bp = verifyBindings(acc, packetDir, designDir)
     if (bp.length) { candidateProblems.push(r.name + ': ' + bp[0]); continue }
     candidates.push(r)

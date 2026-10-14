@@ -40,7 +40,10 @@
       "c14n": "6f2f473e0f893575cd6e1d12f2c2b0d3f55dd958faaf561cf80f8efb1fa97719",
       "schema": "e5732db900423bc364680696e06efdc328d37564c171f227b9269fd090065309"
     },
-    "note": "绑定集与 packet/BINDINGS.json 完全一致（均为 packet 内文件哈希）。"
+    "locks": {
+      "npm_package_lock_sha256": "faba1972fc69f6854d46ca5bf58210342b94d1817761e4fe374b8d00a1c6a273",
+      "python_requirements_lock_sha256": "1944f54fa5c7ec3c11e92211e26f42d7188979bbce2afa8d0724967733947fc4"
+    }
   },
   "carried_to_implementation": {
     "note": "P0a-实现清单（审阅方标注『不阻断升级』）——实现期处理，勿计为未解决阻断。",
@@ -55,8 +58,8 @@
     "packet_mirror": "D:/Program/sharespace/synbio-design-packet-rev4-2026-10-14/",
     "working_copy": "D:/Program/dsh-plug-develop/genie-synbio-design-20261012/packet-rev2/"
   },
-  "effective_from": "2026-10-14T01:24:47+08:00",
-  "supersedes": null,
+  "effective_from": "2026-10-14T16:02:00+08:00",
+  "supersedes": "e861329d5d9f96a163d9f89eb174e33f692a08258dfba37ce6daf38802a80801",
   "revocation": {
     "triggers": [
       "manifest 清单内任一文件字节变化（或 packet_index_sha256 不匹配）",

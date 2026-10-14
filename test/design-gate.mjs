@@ -184,6 +184,7 @@ const curId = (c) => sha(join(c.design, 'acceptance.json'))
 {
   const c = freshCase()
   const doc = JSON.parse(readFileSync(join(c.design, 'acceptance.json'), 'utf8'))
+  doc.supersedes = null
   writeFileSync(join(c.design, 'acceptance-second.json'), JSON.stringify(doc, null, 2) + '\n')
   const r = run(c)
   check('C8 multiple active -> fail-closed', fails(r) && String(r.detail).includes('multiple active'), JSON.stringify(r))
@@ -202,6 +203,29 @@ const curId = (c) => sha(join(c.design, 'acceptance.json'))
     JSON.stringify({ record_type: 'packet_acceptance@1', supersedes: 'not-a-hash' }) + '\n')
   const r = run(c)
   check('C10 malformed supersedes -> fail-closed', fails(r) && String(r.detail).includes('malformed supersedes'), JSON.stringify(r))
+}
+
+// ── D. successor 削减矩阵（v5 严格契约；全部应无 active）──────────────
+{
+  const reductions = [
+    ['D1 successor 缺 locks', (d) => { delete d.bindings.locks }],
+    ['D2 successor 空 spec_chain', (d) => { d.bindings.spec_chain = {} }],
+    ['D3 successor 缺 report_sha256', (d) => { delete d.review.report_sha256 }],
+    ['D4 successor 缺 policy_id', (d) => { delete d.review.policy_id }],
+    ['D5 successor profile_rev 不符', (d) => { d.bindings.profile_rev = 'mismatch' }],
+    ['D6 successor 未知 binding key', (d) => { d.bindings.extra_key = 'x' }],
+    ['D7 successor 缺 reviewer', (d) => { delete d.review.reviewer }],
+    ['D8 successor locks 值不符', (d) => { d.bindings.locks.npm_package_lock_sha256 = '0'.repeat(64) }],
+  ]
+  for (const [name, reduce] of reductions) {
+    const c = freshCase()
+    const doc = JSON.parse(readFileSync(join(c.design, 'acceptance.json'), 'utf8'))
+    doc.supersedes = curId(c)
+    reduce(doc)
+    writeFileSync(join(c.design, 'acceptance-successor.json'), JSON.stringify(doc, null, 2) + '\n')
+    const r = run(c)
+    check(name + ' -> fail-closed（no active）', fails(r) && String(r.detail).includes('no active'), JSON.stringify(r))
+  }
 }
 
 console.log('design-gate: %d passed, %d failed', pass, fail)

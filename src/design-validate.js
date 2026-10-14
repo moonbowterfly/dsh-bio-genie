@@ -322,6 +322,47 @@ export function validateDesignArtifact(artifactType, value, { packetDir = PACKET
   }
 }
 
+/** 从 schema+value 推导 c14n 注解表（path -> set|seq；base 优先，allOf/if-then-else 分支补缺）。
+ *  stage② 用（把注解传给冻结 c14n CLI 做 canonical 复核）。失败返回 null（fail-closed）。 */
+export function deriveAnnotationsForArtifact(artifactType, value, { packetDir = PACKET_DIR } = {}) {
+  const ctx = loadPacketContext(packetDir)
+  if (!ctx.ok) return null
+  const ann = {}
+  const resolveRef = makeResolveRef(ctx)
+  function walk(s, v, path) {
+    s = resolveRef(s)
+    if (!s || typeof s !== 'object') return
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
+      const props = s.properties || {}
+      for (const k of Object.keys(v)) {
+        if (Object.prototype.hasOwnProperty.call(props, k)) walk(props[k], v[k], path + '/' + k)
+      }
+      const ap = s.additionalProperties
+      if (ap && typeof ap === 'object') {
+        for (const k of Object.keys(v)) {
+          if (!Object.prototype.hasOwnProperty.call(props, k)) walk(ap, v[k], path + '/' + k)
+        }
+      }
+    } else if (Array.isArray(v)) {
+      const kind = s['x-canonical']
+      if (typeof kind === 'string' && !(path in ann)) ann[path] = kind
+      const it = s.items
+      if (it && typeof it === 'object') {
+        for (let i = 0; i < v.length; i += 1) walk(it, v[i], path + '/' + i)
+      }
+    }
+    for (const bk of ['allOf', 'anyOf', 'oneOf']) {
+      for (const br of (s[bk] || [])) walk(br, v, path)
+    }
+    for (const bk of ['then', 'else', 'if']) {
+      const br = s[bk]
+      if (br && typeof br === 'object') walk(br, v, path)
+    }
+  }
+  walk(ctx.SCHEMAS[artifactType], value, '$')
+  return ann
+}
+
 // ── CLI ──────────────────────────────────────────────────────────────
 function main() {
   const args = process.argv.slice(2)

@@ -50,6 +50,9 @@ def load_packet_context(packet_dir=None):
     index_path = os.path.join(root, INDEX_NAME)
     if not os.path.exists(index_path):
         return None, [{"code": "PACKET_UNVERIFIED", "path": "$", "detail": "packet index missing"}]
+    got_index = _sha256_file(index_path)
+    _mp = os.path.join(root, "bundle.manifest.json")
+    got_manifest = _sha256_file(_mp) if os.path.exists(_mp) else ""
     listed = {}
     with open(index_path, encoding="utf-8") as fh:
         for ln in fh.read().split("\n"):
@@ -96,7 +99,8 @@ def load_packet_context(packet_dir=None):
     library = docs["meta/pattern-library.json"]["patterns"]
     by_literal = {entry["pattern"]: (name, entry) for name, entry in library.items()}
     ranges = [tuple(r) for r in docs["meta/unicode-domain-table.json"]["ranges"]]
-    return {"docs": docs, "schemas": schemas, "validators": validators, "by_literal": by_literal, "ranges": ranges}, []
+    return {"docs": docs, "schemas": schemas, "validators": validators, "by_literal": by_literal, "ranges": ranges,
+            "index_sha256": got_index, "manifest_sha256": got_manifest}, []
 
 
 # ── 语义层（与 packet 语料运行器逐字一致；I1/K3 冻结语义）──────────────
@@ -291,11 +295,8 @@ def c14n_layer(ranges, value):
     return errs
 
 
-def validate_artifact(artifact_type, value, packet_dir=None):
-    """校验一个 design 工件。返回 dict（ok/engine/engine_errors/sem/c14n/errors）。"""
-    ctx, errs0 = load_packet_context(packet_dir)
-    if ctx is None:
-        return {"ok": False, "artifact_type": artifact_type, "engine": False, "engine_errors": 0, "sem": [], "c14n": [], "errors": errs0}
+def validate_with_ctx(ctx, artifact_type, value):
+    """值层校验（ctx 由调用方提供；CLI / design ops / 三阶段共用）。"""
     v = ctx["validators"].get(artifact_type)
     if v is None:
         return {"ok": False, "artifact_type": artifact_type, "engine": False, "engine_errors": 0, "sem": [], "c14n": [],
@@ -319,6 +320,114 @@ def validate_artifact(artifact_type, value, packet_dir=None):
         "c14n": [c + "@" + p for c, p in c14n],
         "errors": engine_errors + [{"code": c, "path": p} for c, p in sem] + [{"code": c, "path": p} for c, p in c14n],
     }
+
+
+def validate_artifact(artifact_type, value, packet_dir=None):
+    """校验一个 design 工件（load + validate_with_ctx）。"""
+    ctx, errs0 = load_packet_context(packet_dir)
+    if ctx is None:
+        return {"ok": False, "artifact_type": artifact_type, "engine": False, "engine_errors": 0, "sem": [], "c14n": [], "errors": errs0}
+    return validate_with_ctx(ctx, artifact_type, value)
+
+
+def derive_annotations(ctx, stem, value):
+    """从 schema+value 推导 c14n 注解表（path -> set|seq；base 优先，allOf/if-then-else 分支补缺）。"""
+    ann = {}
+
+    def walk(s, v, path):
+        s = resolve_ref(ctx["docs"], ctx["schemas"], s)
+        if not isinstance(s, dict):
+            return
+        if isinstance(v, dict):
+            props = s.get("properties") or {}
+            for k, val in v.items():
+                if k in props:
+                    walk(props[k], val, path + "/" + k)
+            ap = s.get("additionalProperties")
+            if isinstance(ap, dict):
+                for k, val in v.items():
+                    if k not in props:
+                        walk(ap, val, path + "/" + k)
+        elif isinstance(v, list):
+            kind = s.get("x-canonical")
+            if isinstance(kind, str) and path not in ann:
+                ann[path] = kind
+            it = s.get("items")
+            if isinstance(it, dict):
+                for i, val in enumerate(v):
+                    walk(it, val, path + "/" + str(i))
+        for branch_key in ("allOf", "anyOf", "oneOf"):
+            for br in s.get(branch_key) or []:
+                walk(br, v, path)
+        for br_key in ("then", "else", "if"):
+            br = s.get(br_key)
+            if isinstance(br, dict):
+                walk(br, v, path)
+
+    walk(ctx["schemas"][stem], value, "$")
+    return ann
+
+
+def canonicalize_bytes(ctx, stem, raw_text, packet_root):
+    """profile 顺序：lossless parse → 归一（lone surrogate/冻结域/NFC/键碰撞/数值域）→
+    注解推导 → canonical serialize（set 排序去重 / seq 保序 / 键 UTF-16 排序）。
+    返回 (canonical_bytes, normalized_tree)；C14nError 等异常向上抛（fail-closed）。"""
+    import importlib.util
+    impl_path = os.path.join(packet_root, "impl", "c14n.py")
+    spec = importlib.util.spec_from_file_location("dsh_packet_c14n", impl_path)
+    c14n = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(c14n)
+    c14n.set_domain_ranges(ctx["ranges"])
+    tree = c14n._parse(raw_text)
+    tree = c14n._normalize(tree, "$")
+    ann = derive_annotations(ctx, stem, tree)
+    text = c14n._serialize(tree, "$", ann)
+    return text.encode("utf-8"), tree
+
+
+def verify_dispatch_identity(packet_dir, expect_index_sha=None, expect_manifest_sha=None, expect_acceptance_id=None):
+    """校验被传递的 packet/acceptance 身份（v5 §A0.3 身份绑定；split-packet 防线）。"""
+    problems = []
+    root = packet_dir
+    ip = os.path.join(root, INDEX_NAME)
+    if not os.path.exists(ip):
+        return ["packet index missing"]
+    got_index = _sha256_file(ip)
+    if expect_index_sha and got_index != expect_index_sha:
+        problems.append("index sha mismatch (disk=%s expect=%s)" % (got_index[:16], str(expect_index_sha)[:16]))
+    mp = os.path.join(root, "bundle.manifest.json")
+    got_manifest = _sha256_file(mp) if os.path.exists(mp) else ""
+    if expect_manifest_sha and got_manifest != expect_manifest_sha:
+        problems.append("manifest sha mismatch (disk=%s expect=%s)" % (got_manifest[:16], str(expect_manifest_sha)[:16]))
+    if expect_acceptance_id:
+        design_dir = os.path.dirname(os.path.abspath(root))
+        records = []
+        revocations = []
+        if os.path.isdir(design_dir):
+            for name in sorted(os.listdir(design_dir)):
+                if not (name.startswith("acceptance") and name.endswith(".json")):
+                    continue
+                p = os.path.join(design_dir, name)
+                try:
+                    doc = json.load(open(p, encoding="utf-8"))
+                except Exception:
+                    continue
+                fid = _sha256_file(p)
+                if name == "acceptance-revoked.json" or name.startswith("acceptance-revocation"):
+                    if isinstance(doc, dict) and isinstance(doc.get("revokes"), str):
+                        revocations.append(doc["revokes"])
+                elif isinstance(doc, dict) and doc.get("record_type") == "packet_acceptance@1":
+                    records.append((name, fid, doc.get("supersedes")))
+        ids = {r[1] for r in records}
+        if expect_acceptance_id not in ids:
+            problems.append("acceptance id not present in registry")
+        else:
+            for name, fid, sup in records:
+                if sup == expect_acceptance_id:
+                    problems.append("acceptance id superseded by " + name)
+            if expect_acceptance_id in revocations:
+                problems.append("acceptance id revoked")
+    return problems
 
 
 def main():
