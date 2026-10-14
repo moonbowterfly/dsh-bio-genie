@@ -1,13 +1,17 @@
-// dsh-bio-genie — casefile 目录与身份测试（A1）
+// dsh-bio-genie — casefile 目录与身份测试（A1）+ 库测试（A2）
 // 运行：node test/design-casefile.mjs
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
-  appendReceipt, computeSnapshotSha, deriveCaseContentId, ensureCaseDir, readHead,
-  validateCaseInstanceId, writeHeadAtomic, writeSnapshot,
+  acquireCaseLock, appendReceipt, canonicalizeViaPacket, commitTransaction, computeSnapshotSha,
+  deriveCaseContentId, ensureCaseDir, gcOrphans, loadSnapshot,
+  readHead, releaseCaseLock, resolveCaseContext, resolveCaseOperations, validateCaseInstanceId,
+  withCaseLock, writeHeadAtomic, writeSnapshot,
 } from '../src/design-casefile.js'
-import { validateDesignArtifact } from '../src/design-validate.js'
+import { deriveAnnotationsForArtifact, validateDesignArtifact } from '../src/design-validate.js'
 
 let pass = 0
 let fail = 0
@@ -24,8 +28,15 @@ function check(name, cond, detail = '') {
 const A = 'a'.repeat(64)
 const B = 'b'.repeat(64)
 const C = 'c'.repeat(64)
+const H64 = /^[0-9a-f]{64}$/
 const GOLDEN_CONTENT_ID = 'bdfb54d1459ac5d3b1f96c9562a9872e13835cde919f06422c44202fc9ac41bd'
 const GOLDEN_SNAPSHOT_SHA = '3f0c2185291dc2f38d5242ca6a878ac4bd5a97a48c14da4a73ee24c1cd0386df'
+const CORPUS = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'design', 'packet', 'schema-corpus', 'schema_cases.json'), 'utf8'))
+function findCase(id) {
+  const c = CORPUS.cases.find((x) => x.id === id)
+  if (!c) throw new Error('corpus case not found: ' + id)
+  return c
+}
 
 const roots = []
 function mkRoot() {
@@ -147,6 +158,163 @@ const params = { capability_policy: 'design-capability-policy@0', design_tier: '
   appendReceipt(cs.caseDir, { event: 'commit', run_uuid: 'u2', snapshot_sha: B })
   const lines = readFileSync(rc1.path, 'utf8').trim().split('\n')
   check('receipt 两行且可解析', lines.length === 2 && JSON.parse(lines[0]).event === 'case_created' && JSON.parse(lines[1]).snapshot_sha === B)
+}
+
+// ── 7) 每-case 锁（A2）──────────────────────────────────────────────
+{
+  const wd = mkRoot()
+  const cs = ensureCaseDir(wd, 'lock-case')
+  const l1 = acquireCaseLock(cs.caseDir, { op: 'test' })
+  check('锁获取 ok', l1.ok === true)
+  const l2 = acquireCaseLock(cs.caseDir, { op: 'test' })
+  check('同进程二次获取 → LOCK_HELD', l2.ok === false && l2.code === 'LOCK_HELD', JSON.stringify(l2))
+  releaseCaseLock(cs.caseDir)
+  const dead = spawnSync(process.execPath, ['-e', 'process.exit(0)'], { encoding: 'utf8' }).pid
+  writeFileSync(join(cs.caseDir, 'case.lock'), JSON.stringify({ pid: dead, op: 'x', at: 'x' }))
+  const l3 = acquireCaseLock(cs.caseDir, { op: 'test' })
+  check('死 pid 陈旧锁被抢占', l3.ok === true, JSON.stringify(l3))
+  releaseCaseLock(cs.caseDir)
+  const r = withCaseLock(cs.caseDir, () => 42, { op: 'test' })
+  check('withCaseLock 返回值 + 释放', r === 42 && !existsSync(join(cs.caseDir, 'case.lock')))
+}
+
+// ── 8) 单事务提交（六步 / all-or-none / CAS / 上限）─────────────────
+{
+  const wd = mkRoot()
+  const cs = ensureCaseDir(wd, 'tx-case')
+  const hp = findCase('hpf-01').doc
+  const policy = { policy_id: 'design-capability-policy', policy_version: '0', policy_hash: B }
+  const tx1 = commitTransaction(cs, {
+    caseContentId: GOLDEN_CONTENT_ID,
+    policy,
+    newArtifacts: [
+      { type: 'genome_ref', value: findCase('gvr-01').doc, producer: 'test', canonical_path: 'genome.json' },
+      { type: 'host_profile', value: hp, producer: 'test', canonical_path: 'host.json' },
+    ],
+  })
+  check('tx1 提交 ok', tx1.ok === true && H64.test(tx1.snapshot_sha || ''), JSON.stringify(tx1).slice(0, 200))
+  check('tx1 HEAD 推进 + objects=2', readHead(cs.caseDir).snapshot_sha === tx1.snapshot_sha && readdirSync(cs.objectsDir).filter((f) => H64.test(f)).length === 2)
+  const rc1 = readFileSync(join(cs.caseDir, 'run_receipt.jsonl'), 'utf8').trim().split('\n')
+  check('tx1 receipt committed + parent=null', rc1.length === 1 && JSON.parse(rc1[0]).event === 'committed' && JSON.parse(rc1[0]).parent_snapshot_sha === null)
+  const tx2 = commitTransaction(cs, { newArtifacts: [{ type: 'evidence_item', value: findCase('evi-01').doc, producer: 'test' }] })
+  check('tx2 增量 + parent=tx1', tx2.ok === true && tx2.parent === tx1.snapshot_sha, JSON.stringify(tx2).slice(0, 200))
+  const snap2 = loadSnapshot(cs.snapshotsDir, tx2.snapshot_sha)
+  check('tx2 manifest 3 artifacts', snap2.ok === true && snap2.manifest.artifacts.length === 3)
+  const badHp = JSON.parse(JSON.stringify(hp))
+  badHp.artifact_type = 'bogus_type@1'
+  const objsBefore = readdirSync(cs.objectsDir).length
+  const tx3 = commitTransaction(cs, {
+    newArtifacts: [
+      { type: 'condition_card', value: findCase('ccd-01').doc, producer: 'test' },
+      { type: 'host_profile', value: badHp, producer: 'test' },
+    ],
+  })
+  check('tx3 无效工件 → ARTIFACT_INVALID(step2)', tx3.ok === false && tx3.code === 'ARTIFACT_INVALID' && tx3.step === 2, JSON.stringify(tx3).slice(0, 220))
+  check('tx3 all-or-none：objects/HEAD 未变', readdirSync(cs.objectsDir).length === objsBefore && readHead(cs.caseDir).snapshot_sha === tx2.snapshot_sha)
+  check('tx3 staging 留痕（待 GC）', existsSync(join(cs.caseDir, 'staging', tx3.txid)))
+  const tx4 = commitTransaction(cs, { expectHead: 'f'.repeat(64), newArtifacts: [{ type: 'host_profile', value: hp, producer: 'test' }] })
+  check('tx4 CAS 不符 → HEAD_CAS_MISMATCH', tx4.ok === false && tx4.code === 'HEAD_CAS_MISMATCH', JSON.stringify(tx4))
+  const tx5 = commitTransaction(cs, { limits: { maxObjectBytes: 100 }, newArtifacts: [{ type: 'host_profile', value: hp, producer: 'test' }] })
+  check('tx5 超对象上限 → OBJECT_TOO_LARGE', tx5.ok === false && tx5.code === 'OBJECT_TOO_LARGE')
+  const snapsBefore = readdirSync(cs.snapshotsDir).length
+  const objs6Before = readdirSync(cs.objectsDir).length
+  const tx6 = commitTransaction(cs, { limits: { maxManifestBytes: 10 }, newArtifacts: [{ type: 'coupling_profile', value: findCase('cpl-01').doc, producer: 'test' }] })
+  check('tx6 超 manifest 上限 → MANIFEST_TOO_LARGE(step4)', tx6.ok === false && tx6.code === 'MANIFEST_TOO_LARGE' && tx6.step === 4, JSON.stringify(tx6))
+  check('tx6 快照文件未留 + HEAD 不变 + 对象成孤儿（已发布）', readdirSync(cs.snapshotsDir).length === snapsBefore && readHead(cs.caseDir).snapshot_sha === tx2.snapshot_sha && readdirSync(cs.objectsDir).length === objs6Before + 1)
+  const cs2 = ensureCaseDir(mkRoot(), 'tx-case2')
+  const tx7 = commitTransaction(cs2, { newArtifacts: [{ type: 'host_profile', value: hp, producer: 'test' }] })
+  check('tx7 缺 base → BASE_REQUIRED', tx7.ok === false && tx7.code === 'BASE_REQUIRED')
+  const tx8 = commitTransaction(cs, { newArtifacts: [{ type: 'host_profile', value: hp, producer: 'test' }] })
+  check('tx8 全重复 → no_change', tx8.ok === true && tx8.no_change === true && tx8.snapshot_sha === tx2.snapshot_sha, JSON.stringify(tx8).slice(0, 200))
+}
+
+// ── 9) 孤儿 GC（根=全部不可变快照）─────────────────────────────────
+{
+  const wd = mkRoot()
+  const cs = ensureCaseDir(wd, 'gc-case')
+  const policy = { policy_id: 'design-capability-policy', policy_version: '0', policy_hash: B }
+  const t1 = commitTransaction(cs, { caseContentId: GOLDEN_CONTENT_ID, policy, newArtifacts: [{ type: 'host_profile', value: findCase('hpf-01').doc, producer: 'test' }] })
+  const t2 = commitTransaction(cs, { newArtifacts: [{ type: 'genome_ref', value: findCase('gvr-01').doc, producer: 'test' }] })
+  check('GC 基座（两快照）', t1.ok === true && t2.ok === true)
+  const orphanBytes = Buffer.from('{"orphan":true}', 'utf8')
+  const orphanSha = createHash('sha256').update(orphanBytes).digest('hex')
+  writeFileSync(join(cs.objectsDir, orphanSha), orphanBytes)
+  writeFileSync(join(cs.objectsDir, 'dead.tmp-123-abcd'), 'x')
+  mkdirSync(join(cs.caseDir, 'staging', 'dead-tx'), { recursive: true })
+  const solo = JSON.parse(JSON.stringify(findCase('hpf-01').doc))
+  solo.derived.gc_percent = 51.2
+  const soloAnn = deriveAnnotationsForArtifact('host_profile', solo)
+  const soloCanon = canonicalizeViaPacket(JSON.stringify(solo), soloAnn)
+  const soloBytes = Buffer.from(soloCanon.canonical, 'utf8')
+  const soloSha = createHash('sha256').update(soloBytes).digest('hex')
+  writeFileSync(join(cs.objectsDir, soloSha), soloBytes)
+  const soloSnap = writeSnapshot({
+    snapshotsDir: cs.snapshotsDir,
+    manifest: {
+      schema_version: '1.0', case_content_id: GOLDEN_CONTENT_ID,
+      artifacts: [{ artifact_id: soloSha, type: 'host_profile@1', inputs: [], producer: 'test', schema_major: '1', canonical_path: 'solo.json' }],
+      policy,
+    },
+    validate: (m) => validateDesignArtifact('case_manifest', m),
+  })
+  check('手工第三快照（非 HEAD）ok', soloSnap.ok === true && readHead(cs.caseDir).snapshot_sha !== soloSnap.snapshot_sha)
+  const gc1 = gcOrphans(cs)
+  check('GC：孤儿 object 移除', gc1.ok === true && gc1.removed.some((x) => x === 'object:' + orphanSha), JSON.stringify(gc1).slice(0, 240))
+  check('GC：tmp 残片移除', gc1.removed.some((x) => x.startsWith('tmp:')))
+  check('GC：staging 残留移除', gc1.removed.some((x) => x === 'staging:dead-tx'))
+  check('GC：非 HEAD 快照引用的 object 保留（根=全部快照）', existsSync(join(cs.objectsDir, soloSha)) === true)
+  check('GC：被引用 objects 全保留（仅孤儿被删）', gc1.removed.filter((x) => x.startsWith('object:')).length === 1 && gc1.kept === 3, 'kept=' + gc1.kept)
+  const gc2 = gcOrphans(cs)
+  check('GC 幂等（二次零移除）', gc2.ok === true && gc2.removed.length === 0, JSON.stringify(gc2))
+  writeFileSync(join(cs.objectsDir, orphanSha), orphanBytes)
+  const gc3 = gcOrphans(cs, { dryRun: true })
+  check('GC dryRun：报告但不动', gc3.removed.some((x) => x === 'object:' + orphanSha) && existsSync(join(cs.objectsDir, orphanSha)))
+  gcOrphans(cs)
+}
+
+// ── 10) resolve_case_context（含 A9a 接线）───────────────────────────
+{
+  const wd = mkRoot()
+  const cs = ensureCaseDir(wd, 'ctx-case')
+  const policy = { policy_id: 'design-capability-policy', policy_version: '0', policy_hash: B }
+  const ctx0 = resolveCaseContext(cs)
+  check('空 case → missing_annotation', ctx0.ok === true && ctx0.input_state === 'missing_annotation' && ctx0.snapshot_sha === null)
+  const annotated = JSON.parse(JSON.stringify(findCase('gvr-01').doc))
+  annotated.files.push({ path: 'genes.gff3', sha256: C, format: 'gff3' })
+  const t1 = commitTransaction(cs, {
+    caseContentId: GOLDEN_CONTENT_ID,
+    policy,
+    newArtifacts: [
+      { type: 'genome_ref', value: annotated, producer: 'test' },
+      { type: 'metabolic_model_ref', value: findCase('mmr-01').doc, producer: 'test' },
+      { type: 'evidence_item', value: findCase('evi-01').doc, producer: 'test' },
+    ],
+  })
+  check('ctx 基座 ok', t1.ok === true, JSON.stringify(t1).slice(0, 200))
+  const ctx1 = resolveCaseContext(cs)
+  check('genome(annotated)+gem+evidence 缺 condition → missing_condition', ctx1.ok === true && ctx1.input_state === 'missing_condition' && ctx1.flags.annotated === true, JSON.stringify(ctx1).slice(0, 240))
+  const t2 = commitTransaction(cs, { newArtifacts: [{ type: 'condition_card', value: findCase('ccd-01').doc, producer: 'test' }] })
+  check('+condition 提交 ok', t2.ok === true)
+  const ctx2 = resolveCaseContext(cs)
+  check('→ reference_complete', ctx2.input_state === 'reference_complete', JSON.stringify(ctx2).slice(0, 240))
+  const ro = resolveCaseOperations(cs, [{ operation: 'sequence_qc' }, { operation: 'consequence_quantitative', claim_target: 'growth' }])
+  check('resolveCaseOperations 接线（qc allow / consequence deny 缺 coupling）', ro.ok === true && ro.results[0].decision === 'allow' && ro.results[1].decision === 'deny', JSON.stringify(ro.results?.map((r) => [r.operation, r.decision])))
+  const cs2 = ensureCaseDir(mkRoot(), 'ctx-case2')
+  const t3 = commitTransaction(cs2, {
+    caseContentId: GOLDEN_CONTENT_ID,
+    policy,
+    newArtifacts: [
+      { type: 'genome_ref', value: annotated, producer: 'test' },
+      { type: 'metabolic_model_ref', value: findCase('mmr-01').doc, producer: 'test' },
+      { type: 'condition_card', value: findCase('ccd-01').doc, producer: 'test' },
+      { type: 'coupling_profile', value: findCase('cpl-01').doc, producer: 'test' },
+    ],
+  })
+  check('ctx2 基座 ok', t3.ok === true, JSON.stringify(t3).slice(0, 200))
+  const ctx3 = resolveCaseContext(cs2)
+  check('user_calibrated coupling → user_calibrated_only', ctx3.ok === true && ctx3.input_state === 'user_calibrated_only' && ctx3.coupling_mode === 'user_calibrated_bound', JSON.stringify(ctx3).slice(0, 240))
+  const ro2 = resolveCaseOperations(cs2, [{ operation: 'consequence_quantitative', claim_target: 'growth' }])
+  check('user_calibrated 下 quantitative → allow（ceiling ASSUMPTION）', ro2.ok === true && ro2.results[0].decision === 'allow' && ro2.results[0].classification_ceiling === 'ASSUMPTION', JSON.stringify(ro2.results?.[0]?.decision))
 }
 
 // ── cleanup（junction 先解链再删树）─────────────────────────────────

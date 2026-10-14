@@ -15,15 +15,16 @@
  * @module dsh-bio-genie/design-casefile
  */
 import { spawnSync } from 'node:child_process'
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import {
   closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, mkdtempSync, openSync, readFileSync,
-  readdirSync, realpathSync, renameSync, rmSync, writeFileSync, writeSync,
+  readdirSync, realpathSync, renameSync, rmSync, unlinkSync, writeFileSync, writeSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { isAbsolute, join, relative, resolve } from 'node:path'
 import { PACKET_DIR } from './design-gate.js'
-import { deriveAnnotationsForArtifact } from './design-validate.js'
+import { deriveAnnotationsForArtifact, validateDesignArtifact } from './design-validate.js'
+import { loadCapabilityPolicy, resolveOperation } from './design-capability.js'
 
 const C14N_IMPL = join(PACKET_DIR, 'impl', 'c14n.mjs')
 const MAX_INSTANCE_ID = 128
@@ -195,10 +196,14 @@ export function writeHeadAtomic(caseDir, snapshotSha, { expect } = {}) {
   return { ok: true, snapshot_sha: snapshotSha }
 }
 
-/** append-only receipt（JSONL + fsync）。 */
-export function appendReceipt(caseDir, event) {
-  const p = join(caseDir, 'run_receipt.jsonl')
+/** append-only receipt（JSONL + fsync；单行上限 = maxReceiptLineBytes）。 */
+export function appendReceipt(caseDir, event, { limits = null } = {}) {
+  const L = { ...CASE_LIMITS, ...(limits || {}) }
   const line = Buffer.from(JSON.stringify(event) + '\n', 'utf8')
+  if (line.length > L.maxReceiptLineBytes) {
+    return { ok: false, code: 'RECEIPT_TOO_LARGE', size: line.length }
+  }
+  const p = join(caseDir, 'run_receipt.jsonl')
   const fd = openSync(p, 'a')
   try {
     writeSync(fd, line)
@@ -281,4 +286,401 @@ export function ensureCaseDir(workdir, caseInstanceId, { create = true } = {}) {
     headPath: join(caseDir, 'HEAD.json'),
     receiptPath: join(caseDir, 'run_receipt.jsonl'),
   }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// A2：casefile 库 — 每-case 锁 / 单事务六步（v0.4 §C2）/ 孤儿 GC / case 上下文
+// ════════════════════════════════════════════════════════════════════
+
+/** 大小/性能上限 v1（复核4 要求「定义 manifest / object / receipt 的上限」；可被调用方覆盖）。 */
+export const CASE_LIMITS = {
+  maxObjectBytes: 256 * 1024 * 1024,
+  maxManifestBytes: 16 * 1024 * 1024,
+  maxReceiptLineBytes: 64 * 1024,
+  maxArtifactsPerSnapshot: 10000,
+}
+
+const STEM_RE = /@1$/
+function stemOf(type) {
+  return String(type).replace(STEM_RE, '')
+}
+function typeOf(type) {
+  const s = stemOf(type)
+  return s + '@1'
+}
+
+/** 读快照 manifest（内容寻址 <snapshotsDir>/<sha>.json）。 */
+export function loadSnapshot(snapshotsDir, sha) {
+  if (typeof sha !== 'string' || !H64.test(sha)) return { ok: false, detail: 'bad snapshot sha' }
+  const p = join(snapshotsDir, sha + '.json')
+  if (!existsSync(p)) return { ok: false, detail: 'snapshot missing' }
+  try {
+    const doc = JSON.parse(readFileSync(p, 'utf8'))
+    return { ok: true, manifest: doc, path: p }
+  } catch (e) {
+    return { ok: false, detail: String(e.message).slice(0, 120) }
+  }
+}
+
+/** 读工件对象（内容寻址 <objectsDir>/<sha256>）。 */
+export function loadArtifact(handle, artifactId) {
+  if (typeof artifactId !== 'string' || !H64.test(artifactId)) return { ok: false, code: 'BAD_ARTIFACT_ID' }
+  const p = join(handle.objectsDir, artifactId)
+  if (!existsSync(p)) return { ok: false, code: 'OBJECT_NOT_FOUND' }
+  try {
+    const bytes = readFileSync(p)
+    return { ok: true, value: JSON.parse(bytes.toString('utf8')), sha256: artifactId, bytes: bytes.length }
+  } catch (e) {
+    return { ok: false, code: 'OBJECT_UNREADABLE', detail: String(e.message).slice(0, 120) }
+  }
+}
+
+/** 获取每-case 写锁（原子创建 case.lock；持锁进程已死 → 陈旧可抢占）。 */
+export function acquireCaseLock(caseDir, { op = 'commit' } = {}) {
+  const lockPath = join(caseDir, 'case.lock')
+  const payload = JSON.stringify({ pid: process.pid, op, at: new Date().toISOString() })
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const fd = openSync(lockPath, 'wx')
+      try {
+        writeSync(fd, payload)
+        fsyncSync(fd)
+      } finally {
+        closeSync(fd)
+      }
+      return { ok: true, lockPath }
+    } catch (e) {
+      if (e.code !== 'EEXIST') return { ok: false, code: 'LOCK_IO_ERROR', detail: String(e.message).slice(0, 160) }
+      let holder = null
+      try {
+        holder = JSON.parse(readFileSync(lockPath, 'utf8'))
+      } catch {
+        holder = null
+      }
+      const pid = holder && Number(holder.pid)
+      let alive = false
+      if (pid && pid !== process.pid) {
+        try {
+          process.kill(pid, 0)
+          alive = true
+        } catch (err) {
+          alive = err.code === 'EPERM' // 存在但无权限 → 视为存活
+        }
+      } else if (pid === process.pid) {
+        alive = true
+      }
+      if (alive) return { ok: false, code: 'LOCK_HELD', holder: holder || null }
+      try {
+        unlinkSync(lockPath) // 陈旧：抢占后重试
+      } catch { /* 竞争下可能已被他人处理 */ }
+    }
+  }
+  return { ok: false, code: 'LOCK_CONTENDED' }
+}
+
+export function releaseCaseLock(caseDir) {
+  const lockPath = join(caseDir, 'case.lock')
+  let holder = null
+  try {
+    holder = JSON.parse(readFileSync(lockPath, 'utf8'))
+  } catch {
+    return { ok: true, missing: true }
+  }
+  if (holder && Number(holder.pid) !== process.pid) return { ok: false, code: 'LOCK_NOT_OWNER' }
+  try {
+    unlinkSync(lockPath)
+  } catch (e) {
+    return { ok: false, code: 'LOCK_RELEASE_FAILED', detail: String(e.message).slice(0, 120) }
+  }
+  return { ok: true }
+}
+
+/** 持锁执行 fn；获取失败 → {ok:false, code:'LOCK_HELD'}；无论成败必释放。 */
+export function withCaseLock(caseDir, fn, { op } = {}) {
+  const acq = acquireCaseLock(caseDir, { op })
+  if (!acq.ok) return { ok: false, code: acq.code, holder: acq.holder }
+  try {
+    return fn()
+  } finally {
+    releaseCaseLock(caseDir)
+  }
+}
+
+/**
+ * 单事务提交（v0.4 §C2 六步；all-or-none）：
+ *   ① stage 全部新对象（写 <caseDir>/staging/<txid>/）→ ② canonical/schema 校验 →
+ *   ③ 发布 objects（内容寻址）→ ④ 写 + fsync 快照 → ⑤ CAS 原子替换 HEAD → ⑥ committed receipt。
+ * 任一步失败 → HEAD 不变、无 committed receipt；已发布对象/暂存文件 = 孤儿（GC 清理）。
+ * 已存在的同名快照（existed=true）失败时不删除；本事务新建的快照在 ④/⑤ 失败时删除（从未被引用）。
+ */
+export function commitTransaction(handle, { caseContentId = null, policy = null, newArtifacts = [], txid = null, expectHead, limits = null } = {}) {
+  const L = { ...CASE_LIMITS, ...(limits || {}) }
+  const { caseDir, objectsDir, snapshotsDir } = handle
+  const id = txid || randomUUID()
+  return withCaseLock(caseDir, () => {
+    const head = readHead(caseDir)
+    if (!head.ok) return { ok: false, code: 'HEAD_UNREADABLE', step: 0, txid: id }
+    const headSha = head.snapshot_sha
+    if (expectHead !== undefined && headSha !== expectHead) {
+      return { ok: false, code: 'HEAD_CAS_MISMATCH', step: 0, txid: id, current: headSha, expected: expectHead }
+    }
+    let baseArtifacts = []
+    let contentId = caseContentId
+    let policyDoc = policy
+    if (headSha) {
+      const snap = loadSnapshot(snapshotsDir, headSha)
+      if (!snap.ok) return { ok: false, code: 'SNAPSHOT_UNREADABLE', step: 0, txid: id, detail: snap.detail }
+      baseArtifacts = Array.isArray(snap.manifest.artifacts) ? snap.manifest.artifacts : []
+      if (contentId && contentId !== snap.manifest.case_content_id) return { ok: false, code: 'CASE_CONTENT_MISMATCH', step: 0, txid: id }
+      contentId = snap.manifest.case_content_id
+      if (policyDoc && JSON.stringify(policyDoc) !== JSON.stringify(snap.manifest.policy)) return { ok: false, code: 'POLICY_MISMATCH', step: 0, txid: id }
+      policyDoc = snap.manifest.policy
+    } else if (!contentId || !policyDoc) {
+      return { ok: false, code: 'BASE_REQUIRED', step: 0, txid: id }
+    }
+    if (baseArtifacts.length + newArtifacts.length > L.maxArtifactsPerSnapshot) {
+      return { ok: false, code: 'MANIFEST_TOO_MANY_ARTIFACTS', step: 0, txid: id }
+    }
+    // ① stage（canonicalize + 写 staging/<txid>/<sha>）
+    const stagingDir = join(caseDir, 'staging', id)
+    mkdirSync(stagingDir, { recursive: true })
+    const staged = []
+    for (const a of newArtifacts) {
+      if (!a || typeof a.type !== 'string' || !a.value || typeof a.value !== 'object' || Array.isArray(a.value)) {
+        return { ok: false, code: 'ARTIFACT_SHAPE_INVALID', step: 1, txid: id }
+      }
+      const stem = stemOf(a.type)
+      const ann = deriveAnnotationsForArtifact(stem, a.value)
+      if (ann === null) return { ok: false, code: 'PACKET_UNVERIFIED', step: 1, txid: id }
+      const canon = canonicalizeViaPacket(JSON.stringify(a.value), ann)
+      if (!canon.ok) return { ok: false, code: 'ARTIFACT_CANON_FAILED', step: 1, txid: id, detail: canon.code }
+      const bytes = Buffer.from(canon.canonical, 'utf8')
+      if (bytes.length > L.maxObjectBytes) return { ok: false, code: 'OBJECT_TOO_LARGE', step: 1, txid: id, size: bytes.length }
+      const sha = sha256hex(bytes)
+      writeFileSync(join(stagingDir, sha), bytes)
+      staged.push({
+        sha, bytes, stem,
+        producer: typeof a.producer === 'string' && a.producer ? a.producer : 'bsp',
+        inputs: Array.isArray(a.inputs) ? a.inputs : [],
+        canonical_path: typeof a.canonical_path === 'string' && a.canonical_path ? a.canonical_path : stem + '.json',
+        value: a.value,
+      })
+    }
+    // ② schema/sem 校验（全过才继续）
+    for (const s of staged) {
+      const v = validateDesignArtifact(s.stem, s.value)
+      if (!v.ok) {
+        const first = (v.errors || [{}])[0]
+        return { ok: false, code: 'ARTIFACT_INVALID', step: 2, txid: id, detail: s.stem + ':' + String(first.code) + '@' + String(first.path) }
+      }
+    }
+    // 去重（同 artifact_id 已存在 → 首现优先；全部重复 → no_change）
+    const existingIds = new Set(baseArtifacts.map((a) => a && a.artifact_id))
+    const fresh = staged.filter((s) => !existingIds.has(s.sha))
+    if (fresh.length === 0) {
+      return { ok: true, no_change: true, txid: id, snapshot_sha: headSha }
+    }
+    // ③ 发布 objects（已存在必须逐字节相同）
+    for (const s of fresh) {
+      const target = join(objectsDir, s.sha)
+      if (existsSync(target)) {
+        const existing = readFileSync(target)
+        if (!existing.equals(s.bytes)) return { ok: false, code: 'OBJECT_HASH_COLLISION', step: 3, txid: id, sha: s.sha }
+      } else {
+        atomicWriteBytes(target, s.bytes)
+      }
+    }
+    // ④ 写 + fsync 快照
+    const newEntries = fresh.map((s) => ({
+      artifact_id: s.sha,
+      type: typeOf(s.stem),
+      inputs: s.inputs,
+      producer: s.producer,
+      schema_major: '1',
+      canonical_path: s.canonical_path,
+    }))
+    const manifest = {
+      schema_version: '1.0',
+      case_content_id: contentId,
+      artifacts: [...baseArtifacts, ...newEntries],
+      policy: policyDoc,
+    }
+    const ws = writeSnapshot({ snapshotsDir, manifest, validate: (m) => validateDesignArtifact('case_manifest', m) })
+    if (!ws.ok) return { ok: false, code: ws.code, step: 4, txid: id, problems: ws.problems }
+    const manifestBytes = readFileSync(ws.path)
+    if (manifestBytes.length > L.maxManifestBytes) {
+      if (!ws.existed) {
+        try { unlinkSync(ws.path) } catch { /* best effort */ }
+      }
+      return { ok: false, code: 'MANIFEST_TOO_LARGE', step: 4, txid: id, size: manifestBytes.length }
+    }
+    // ⑤ CAS 原子替换 HEAD
+    const wh = writeHeadAtomic(caseDir, ws.snapshot_sha, { expect: headSha })
+    if (!wh.ok) {
+      if (!ws.existed) {
+        try { unlinkSync(ws.path) } catch { /* best effort */ }
+      }
+      return { ok: false, code: wh.code, step: 5, txid: id }
+    }
+    // ⑥ committed receipt
+    const rc = appendReceipt(caseDir, {
+      event: 'committed',
+      txid: id,
+      snapshot_sha: ws.snapshot_sha,
+      parent_snapshot_sha: headSha,
+      at: new Date().toISOString(),
+      artifacts: fresh.map((s) => ({ artifact_id: s.sha, type: typeOf(s.stem) })),
+    }, { limits: L })
+    if (!rc.ok) return { ok: false, code: rc.code, step: 6, txid: id }
+    return { ok: true, snapshot_sha: ws.snapshot_sha, parent: headSha, txid: id, published: fresh.map((s) => s.sha) }
+  }, { op: 'commit' })
+}
+
+/**
+ * 孤儿 GC：**根 = 全部不可变快照**（非仅 HEAD，复核4 要求）——清理未被任何快照引用的
+ * objects + 全部 staging 残留（持锁下任何 staging 均非在飞）+ 原子写残片（*.tmp-*）。
+ * 不删除任何快照文件（不可变追加）。dryRun=true 仅报告。
+ */
+export function gcOrphans(handle, { dryRun = false } = {}) {
+  const { caseDir, objectsDir, snapshotsDir } = handle
+  return withCaseLock(caseDir, () => {
+    const referenced = new Set()
+    const snapFiles = existsSync(snapshotsDir) ? readdirSync(snapshotsDir) : []
+    for (const f of snapFiles) {
+      if (!f.endsWith('.json')) continue
+      const sha = f.slice(0, -5)
+      if (!H64.test(sha)) continue
+      const snap = loadSnapshot(snapshotsDir, sha)
+      if (!snap.ok) continue
+      for (const a of (snap.manifest.artifacts || [])) {
+        if (a && typeof a.artifact_id === 'string') referenced.add(a.artifact_id)
+      }
+    }
+    const removed = []
+    const failures = []
+    const objectFiles = existsSync(objectsDir) ? readdirSync(objectsDir) : []
+    for (const f of objectFiles) {
+      if (f.includes('.tmp-')) {
+        if (!dryRun) {
+          try { unlinkSync(join(objectsDir, f)) } catch (e) { failures.push('tmp:' + f + ':' + String(e.code)) ; continue }
+        }
+        removed.push('tmp:' + f)
+        continue
+      }
+      if (!H64.test(f)) continue
+      if (referenced.has(f)) continue
+      if (!dryRun) {
+        try {
+          unlinkSync(join(objectsDir, f))
+        } catch (e) {
+          failures.push('object:' + f + ':' + String(e.code))
+          continue
+        }
+      }
+      removed.push('object:' + f)
+    }
+    const stagingRoot = join(caseDir, 'staging')
+    if (existsSync(stagingRoot)) {
+      for (const d of readdirSync(stagingRoot)) {
+        const p = join(stagingRoot, d)
+        try {
+          const st = lstatSync(p)
+          if (st.isDirectory() && !st.isSymbolicLink()) {
+            if (!dryRun) rmSync(p, { recursive: true, force: true })
+            removed.push('staging:' + d)
+          }
+        } catch { /* best effort */ }
+      }
+    }
+    return { ok: true, removed, failures, kept: referenced.size, dryRun }
+  }, { op: 'gc' })
+}
+
+const GENOME = 'genome_ref@1'
+const GEM = 'metabolic_model_ref@1'
+const EVIDENCE = 'evidence_item@1'
+const CONDITION = 'condition_card@1'
+const COUPLING = 'coupling_profile@1'
+
+/**
+ * 从当前快照重算 case 上下文（不信调用方任何 tier 字段；v0.3 §3.1）。
+ * input_state 推导 v1（保守；精化随 B1）：reference_complete / missing_condition /
+ * user_calibrated_only / consequence_only / missing_annotation（兜底，含空 case）。
+ */
+export function resolveCaseContext(handle) {
+  const head = readHead(handle.caseDir)
+  if (!head.ok) return { ok: false, code: 'HEAD_UNREADABLE' }
+  if (!head.snapshot_sha) {
+    return {
+      ok: true, snapshot_sha: null, case_content_id: null, artifacts_by_type: {},
+      flags: { genome: false, annotated: false, gem: false, evidence: false, condition: false, coupling: false },
+      coupling_mode: null, input_state: 'missing_annotation',
+    }
+  }
+  const snap = loadSnapshot(handle.snapshotsDir, head.snapshot_sha)
+  if (!snap.ok) return { ok: false, code: 'SNAPSHOT_UNREADABLE', detail: snap.detail }
+  const byType = {}
+  for (const a of (snap.manifest.artifacts || [])) {
+    if (!a || typeof a.type !== 'string') continue
+    ;(byType[a.type] = byType[a.type] || []).push(a.artifact_id)
+  }
+  const flags = {
+    genome: (byType[GENOME] || []).length > 0,
+    annotated: false,
+    gem: (byType[GEM] || []).length > 0,
+    evidence: (byType[EVIDENCE] || []).length > 0,
+    condition: (byType[CONDITION] || []).length > 0,
+    coupling: (byType[COUPLING] || []).length > 0,
+  }
+  if (flags.genome) {
+    for (const id of byType[GENOME]) {
+      const art = loadArtifact(handle, id)
+      if (art.ok && Array.isArray(art.value.files) && art.value.files.some((f) => f && (f.format === 'gff3' || f.format === 'genbank'))) {
+        flags.annotated = true
+        break
+      }
+    }
+  }
+  let couplingMode = null
+  if (flags.coupling) {
+    for (const id of byType[COUPLING]) {
+      const art = loadArtifact(handle, id)
+      if (art.ok && typeof art.value.mode === 'string') {
+        couplingMode = art.value.mode
+        break
+      }
+    }
+  }
+  let inputState = 'missing_annotation'
+  if (flags.genome && flags.annotated && flags.gem && flags.evidence && flags.condition) inputState = 'reference_complete'
+  else if (flags.genome && flags.annotated && flags.gem && flags.evidence && !flags.condition) inputState = 'missing_condition'
+  else if (flags.genome && flags.annotated && flags.gem && flags.condition && couplingMode === 'user_calibrated_bound') inputState = 'user_calibrated_only'
+  else if (flags.genome && flags.annotated && flags.gem && flags.condition && flags.coupling) inputState = 'consequence_only'
+  return {
+    ok: true,
+    snapshot_sha: head.snapshot_sha,
+    case_content_id: snap.manifest.case_content_id,
+    artifacts_by_type: byType,
+    flags,
+    coupling_mode: couplingMode,
+    input_state: inputState,
+  }
+}
+
+/** 上下文 + A9a policy → 逐 operation 判档（input_state/coupling_mode 缺省取自上下文）。 */
+export function resolveCaseOperations(handle, queries, { policyDir } = {}) {
+  const ctx = resolveCaseContext(handle)
+  if (!ctx.ok) return ctx
+  const loaded = policyDir ? loadCapabilityPolicy({ policyDir }) : loadCapabilityPolicy()
+  if (!loaded.ok) return { ok: false, code: 'POLICY_UNVERIFIED', problems: loaded.problems }
+  const results = []
+  for (const q of queries) {
+    results.push(resolveOperation(loaded.policy, {
+      operation: q.operation,
+      input_state: q.input_state || ctx.input_state,
+      coupling_mode: q.coupling_mode || (ctx.coupling_mode || 'none'),
+      claim_target: q.claim_target || 'none',
+    }))
+  }
+  return { ok: true, context: ctx, policy_sha256: loaded.policy_sha256, results }
 }
