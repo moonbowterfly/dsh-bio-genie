@@ -1,4 +1,4 @@
 # 哈希绑定区：字节级保真（禁 eol 转换 / 自动规范化）——改动即破坏 packet index / acceptance 绑定
 design/packet/** -text
 design/provenance/** -text
-design/acceptance.json -text
+design/acceptance*.json -text
