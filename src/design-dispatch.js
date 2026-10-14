@@ -12,11 +12,12 @@
  * ticket/HMAC）随 A3/B1 落地。
  * @module dsh-bio-genie/design-dispatch
  */
-import { randomUUID } from 'node:crypto'
-import { mkdirSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { createHash, randomUUID } from 'node:crypto'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { DESIGN_OPS } from './design-ops.js'
 import { verifyDesignPacket } from './design-gate.js'
+import { validateDesignArtifact } from './design-validate.js'
 import { spawnPython } from './python.js'
 
 const OPS_PATH = join(import.meta.dirname, '..', 'python', 'bio_ops.py')
@@ -27,6 +28,32 @@ function writeDispatchState(stagingDir, payload) {
   } catch {
     /* staging 状态写入失败不阻断主流程；状态机完整版在 A3 收口 */
   }
+}
+
+/** stage②（v4 §A0.3）：读取 staged candidate → 重新哈希（对 Python 报告的 sha）→
+ *  重新验证（TS 同一 gate）→ 仅全部 OK 才写 content-addressed object（<sha256>.json）。 */
+export function verifyStagedCandidate({ stagingFile, expectedSha256, artifactType, objectsDir } = {}) {
+  if (!stagingFile || !existsSync(stagingFile)) {
+    return { ok: false, errors: [{ code: 'STAGED_MISSING', path: String(stagingFile) }] }
+  }
+  const bytes = readFileSync(stagingFile)
+  const sha = createHash('sha256').update(bytes).digest('hex')
+  if (expectedSha256 && sha !== expectedSha256) {
+    return { ok: false, errors: [{ code: 'STAGED_HASH_MISMATCH', path: String(stagingFile), detail: 'disk=' + sha.slice(0, 16) + ' expected=' + String(expectedSha256).slice(0, 16) }] }
+  }
+  let value
+  try {
+    value = JSON.parse(bytes.toString('utf8'))
+  } catch (e) {
+    return { ok: false, errors: [{ code: 'STAGED_UNREADABLE', path: String(stagingFile), detail: String(e.message).slice(0, 120) }] }
+  }
+  const v = validateDesignArtifact(artifactType, value)
+  if (!v.ok) return { ok: false, errors: v.errors }
+  const dir = objectsDir || join(dirname(stagingFile), '..', '..', 'objects')
+  mkdirSync(dir, { recursive: true })
+  const objPath = join(dir, sha + '.json')
+  writeFileSync(objPath, bytes)
+  return { ok: true, object_path: objPath, sha256: sha }
 }
 
 export async function dispatchDesignOp(pythonPath, op, args = {}, { cwd, timeoutMs = 300_000, signal } = {}) {
@@ -48,10 +75,29 @@ export async function dispatchDesignOp(pythonPath, op, args = {}, { cwd, timeout
     cwd, timeoutMs, signal,
     env: { DSH_DESIGN_STAGING: stagingDir, DSH_DESIGN_DISPATCH_ID: dispatchId },
   })
-  writeDispatchState(stagingDir, {
-    dispatch_id: dispatchId, op,
-    state: res.ok ? 'CANDIDATE_RETURNED' : 'FAILED',
-    created_at: new Date().toISOString(),
-  })
-  return { ...res, dispatch_id: dispatchId, staging_dir: stagingDir }
+  // stage②：TS 复核 staged candidate（重新哈希 + 重新验证）→ 仅 OK 才写 content-addressed object
+  let committed = null
+  const stagedInfo = res.ok && res.result && res.result.staged ? res.result : null
+  if (stagedInfo) {
+    committed = verifyStagedCandidate({
+      stagingFile: stagedInfo.staged,
+      expectedSha256: stagedInfo.sha256,
+      artifactType: stagedInfo.artifact_type,
+    })
+    writeDispatchState(stagingDir, {
+      dispatch_id: dispatchId, op,
+      state: committed.ok ? 'CANDIDATE_COMMITTED' : 'CANDIDATE_REJECTED',
+      object: committed.ok ? committed.object_path : null,
+      sha256: committed.ok ? committed.sha256 : null,
+      errors: committed.ok ? null : committed.errors.slice(0, 5),
+      created_at: new Date().toISOString(),
+    })
+  } else {
+    writeDispatchState(stagingDir, {
+      dispatch_id: dispatchId, op,
+      state: res.ok ? 'CANDIDATE_RETURNED' : 'FAILED',
+      created_at: new Date().toISOString(),
+    })
+  }
+  return { ...res, dispatch_id: dispatchId, staging_dir: stagingDir, committed }
 }

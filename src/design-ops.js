@@ -16,6 +16,8 @@ export const DESIGN_OPS = new Set([
   'design_consequence',
   'design_casefile_validate',
   'design_casefile_export',
+  // v4：staging 原语（非六工具；design 通道专用——raw 通道同样一律拒绝）
+  'design_stage_artifact',
 ])
 
 /** raw HTTP 通道拒绝码（spec 指定稳定码）。 */

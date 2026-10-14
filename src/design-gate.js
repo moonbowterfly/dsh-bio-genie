@@ -1,22 +1,31 @@
 /**
- * dsh-bio-genie — design packet enable gate（acceptance 绑定核验；fail-closed）
+ * dsh-bio-genie — design packet enable gate（acceptance 注册表 + 链解析；fail-closed）
  *
- * 在任何 Python spawn / cache 命中 / registry mutation 之前执行（v3 §A0.2）：
- *   1. acceptance 记录：packet_acceptance@1 + approved + blocker_count=0；
- *      未被撤销（存在指向本记录的 revocation 记录 → fail-closed）
- *   2. packet index 全量集合：逐条目重算 sha256 + 多余/缺失文件扫描 +
- *      index 自身 sha256 == acceptance.packet.packet_index_sha256
- *   3. bundle manifest 哈希 == acceptance.packet.bundle_manifest_sha256
- *   4. 全部绑定逐项核验：pattern-library / unicode-domain / common.defs /
- *      corpora / locks（packet 内）+ profile / spec chain（design/provenance/）
+ * 在任何 Python spawn / cache 命中 / registry mutation 之前执行（v3 §A0.2；v4 链模型）：
+ *
+ * 1) **acceptance 注册表（内容 hash 身份）**：扫描 design/ 下全部 `acceptance*.json`：
+ *    - 记录：record_type=packet_acceptance@1；id = sha256(文件字节)；supersedes = 64hex|null
+ *    - 撤销：`acceptance-revoked.json` / `acceptance-revocation*.json`；record_type=
+ *      packet_acceptance_revocation@1；revokes = 64hex
+ *    未知/损坏记录 → fail-closed。
+ * 2) **链结构校验**：fork（同一 target 多个 successor）/ dangling supersedes /
+ *    dangling revocation target / 防御性 cycle 检测 → 全部 fail-closed。
+ *    （内容哈希身份下环不可构造；检测保留为纵深防御。superseded 记录必须保留在注册表中。）
+ * 3) **packet 磁盘核验**：index 全量集合逐文件重算 + 多余文件扫描。
+ * 4) **候选**：packet_index_sha256 / bundle_manifest_sha256 与当前磁盘精确匹配、
+ *    approved、blocker=0、全部绑定（含 provenance）逐项相符的记录。
+ * 5) **active 判定**：候选 ∩ 未被 supersedes ∩ 未被 revokes → **恰一条**；
+ *    0 条 / ≥2 条 / 被 successor 替代 / 被撤销 → fail-closed。
+ * 6) **bundle loader**：经 packet 自带 loader（manifest 驱动）结构核验（「loader 全过」为字面真）。
+ *
  * 失败 → { ok:false, code:'CONTRACT_PACKET_UNREVIEWED', detail }——绝不静默降级。
- *
- * 设计上**不设缓存**：每次调用全量核验（百毫秒级）。状态机正确性优先于性能；
- * 缓存对抗（原子替换 / mtime 保持 / 后继 acceptance）因此天然免疫（v3 §A0.2）。
+ * 设计上**不设缓存**：每次全量核验（百毫秒级）；缓存对抗（原子替换 / mtime 保持 /
+ * 后继 acceptance / cache-hit）因此天然免疫（v3 §A0.2）。
  * @module dsh-bio-genie/design-gate
  */
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -27,6 +36,7 @@ export const ACCEPTANCE_PATH = join(DESIGN_DIR, 'acceptance.json')
 
 const GATE_CODE = 'CONTRACT_PACKET_UNREVIEWED'
 const INDEX_NAME = 'SHA256SUMS-packet.txt'
+const H64 = /^[0-9a-f]{64}$/
 
 function sha256File(p) {
   return createHash('sha256').update(readFileSync(p)).digest('hex')
@@ -58,46 +68,129 @@ function scanExtras(root, allowed) {
   return extras
 }
 
-/**
- * 全量核验 design packet。返回 { ok:true, manifest_sha256, index_sha256, checked_files }
- * 或 { ok:false, code, detail }。
- */
-export function verifyDesignPacket({ packetDir = PACKET_DIR, acceptancePath = ACCEPTANCE_PATH } = {}) {
-  // ── 1) acceptance 记录 ────────────────────────────────────────────────
-  if (!existsSync(acceptancePath)) return fail('acceptance record missing: ' + acceptancePath)
-  let acc
-  try {
-    acc = JSON.parse(readFileSync(acceptancePath, 'utf8'))
-  } catch (e) {
-    return fail('acceptance unreadable: ' + e.message)
+/** 全部绑定逐项核验（对某条 acceptance 记录；返回 problems 数组）。 */
+function verifyBindings(acc, packetDir, designDir) {
+  const problems = []
+  const b = acc.bindings || {}
+  const inPacket = [
+    ['pattern_library_sha256', 'meta/pattern-library.json'],
+    ['unicode_domain_table_sha256', 'meta/unicode-domain-table.json'],
+    ['common_defs_sha256', 'meta/common.defs.json'],
+  ]
+  for (const [key, rel] of inPacket) {
+    if (!b[key]) { problems.push('binding missing: ' + key); continue }
+    const got = sha256File(join(packetDir, rel))
+    if (got !== b[key]) problems.push('binding drift ' + key)
   }
-  if (acc.record_type !== 'packet_acceptance@1') return fail('acceptance record_type invalid')
-  if (acc.review?.decision !== 'approved') return fail('acceptance decision is not approved')
-  if ((acc.review?.blocker_count ?? 1) !== 0) return fail('acceptance blocker_count != 0')
-
-  // 1b) 撤销：任何指向本记录的 revocation 记录 → fail-closed
-  const revPath = join(dirname(acceptancePath), 'acceptance-revoked.json')
-  if (existsSync(revPath)) {
-    try {
-      const rev = JSON.parse(readFileSync(revPath, 'utf8'))
-      if (rev.record_type === 'packet_acceptance_revocation@1') {
-        return fail('acceptance revoked (revokes=' + String(rev.revokes).slice(0, 16) + ')')
-      }
-      return fail('unrecognized revocation record present')
-    } catch (e) {
-      return fail('revocation record unreadable: ' + e.message)
+  const corpora = [['c14n', 'corpus/c14n_cases.json'], ['schema', 'schema-corpus/schema_cases.json']]
+  for (const [key, rel] of corpora) {
+    if (!b.corpora?.[key]) { problems.push('binding missing: corpora.' + key); continue }
+    const got = sha256File(join(packetDir, rel))
+    if (got !== b.corpora[key]) problems.push('binding drift corpora.' + key)
+  }
+  if (b.locks && typeof b.locks === 'object') {
+    const locks = [['npm_package_lock_sha256', 'locks/node/package-lock.json'], ['python_requirements_lock_sha256', 'locks/python/requirements.lock']]
+    for (const [key, rel] of locks) {
+      if (!b.locks[key]) continue
+      const got = sha256File(join(packetDir, rel))
+      if (got !== b.locks[key]) problems.push('binding drift locks.' + key)
     }
   }
+  if (!b.profile_sha256) problems.push('binding missing: profile_sha256')
+  else {
+    const profPath = join(designDir, 'provenance', 'casefile-c14n-1.profile.md')
+    if (!existsSync(profPath)) problems.push('provenance profile missing')
+    else if (sha256File(profPath) !== b.profile_sha256) problems.push('binding drift profile')
+  }
+  if (!b.spec_chain || typeof b.spec_chain !== 'object') problems.push('binding missing: spec_chain')
+  else {
+    for (const [v, want] of Object.entries(b.spec_chain)) {
+      const p = join(designDir, 'provenance', 'genie-synbio-design-spec-' + v + '-2026-10-13.md')
+      if (!existsSync(p)) { problems.push('provenance spec missing: ' + v); continue }
+      if (sha256File(p) !== want) problems.push('binding drift spec_chain.' + v)
+    }
+  }
+  return problems
+}
 
-  // ── 2) packet index 全量集合 ─────────────────────────────────────────
+/**
+ * 全量核验 design packet（acceptance 链 + packet 完整性 + 全部绑定 + loader）。
+ * 返回 { ok:true, manifest_sha256, index_sha256, checked_files, acceptance_id, acceptance_file }
+ * 或 { ok:false, code, detail }。
+ */
+export function verifyDesignPacket({ packetDir = PACKET_DIR, designDir = DESIGN_DIR } = {}) {
+  // ── 1) acceptance 注册表发现与解析 ────────────────────────────────────
+  if (!existsSync(designDir)) return fail('design dir missing: ' + designDir)
+  const names = readdirSync(designDir).filter((n) => n.startsWith('acceptance') && n.endsWith('.json')).sort()
+  const records = []
+  const revocations = []
+  const problems = []
+  for (const name of names) {
+    const p = join(designDir, name)
+    const isRev = name === 'acceptance-revoked.json' || /^acceptance-revocation.*\.json$/.test(name)
+    let doc
+    try {
+      doc = JSON.parse(readFileSync(p, 'utf8'))
+    } catch (e) {
+      problems.push('unreadable record ' + name + ': ' + e.message)
+      continue
+    }
+    const id = sha256File(p)
+    if (isRev) {
+      if (!doc || doc.record_type !== 'packet_acceptance_revocation@1') { problems.push('malformed revocation record: ' + name); continue }
+      if (typeof doc.revokes !== 'string' || !H64.test(doc.revokes)) { problems.push('malformed revocation target in ' + name); continue }
+      revocations.push({ name, id, revokes: doc.revokes })
+    } else {
+      if (!doc || doc.record_type !== 'packet_acceptance@1') { problems.push('unknown acceptance registry record: ' + name); continue }
+      let sup = null
+      if (doc.supersedes != null) {
+        if (typeof doc.supersedes !== 'string' || !H64.test(doc.supersedes)) { problems.push('malformed supersedes in ' + name); continue }
+        sup = doc.supersedes
+      }
+      records.push({ name, id, doc, supersedes: sup })
+    }
+  }
+  if (problems.length) return fail('acceptance registry: ' + problems[0])
+  if (records.length === 0) return fail('no acceptance records in ' + designDir)
+
+  // ── 2) 链结构校验（fork / dangling / cycle / revocation target）────────
+  const ids = new Set(records.map((r) => r.id))
+  const bySup = new Map()
+  for (const r of records) {
+    if (r.supersedes) {
+      const arr = bySup.get(r.supersedes) || []
+      arr.push(r.name)
+      bySup.set(r.supersedes, arr)
+    }
+  }
+  for (const [t, arr] of bySup) {
+    if (arr.length > 1) return fail('supersedes fork: target ' + t.slice(0, 16) + ' has successors ' + arr.join(','))
+  }
+  for (const r of records) {
+    if (r.supersedes && !ids.has(r.supersedes)) {
+      return fail('dangling supersedes in ' + r.name + ': ' + r.supersedes.slice(0, 16) + ' matches no present record')
+    }
+  }
+  {
+    const byId = new Map(records.map((r) => [r.id, r]))
+    for (const r of records) {
+      let cur = r
+      let steps = 0
+      while (cur && cur.supersedes) {
+        cur = byId.get(cur.supersedes)
+        steps += 1
+        if (steps > records.length) return fail('supersedes cycle involving ' + r.name)
+      }
+    }
+  }
+  for (const v of revocations) {
+    if (!ids.has(v.revokes)) return fail('revocation target mismatch in ' + v.name + ': ' + v.revokes.slice(0, 16) + ' matches no present record')
+  }
+
+  // ── 3) packet 磁盘核验（index 全量集合 + extras）──────────────────────
   const indexPath = join(packetDir, INDEX_NAME)
   if (!existsSync(indexPath)) return fail('packet index missing')
   const indexSha = sha256File(indexPath)
-  const expectedIndexSha = String(acc.packet?.packet_index_sha256 || '')
-  if (!expectedIndexSha) return fail('acceptance.packet.packet_index_sha256 missing')
-  if (indexSha !== expectedIndexSha) {
-    return fail('packet index hash mismatch disk=' + indexSha.slice(0, 16) + ' expected=' + expectedIndexSha.slice(0, 16))
-  }
   const listed = new Map()
   for (const ln of readFileSync(indexPath, 'utf8').split('\n')) {
     if (!ln) continue
@@ -105,7 +198,7 @@ export function verifyDesignPacket({ packetDir = PACKET_DIR, acceptancePath = AC
     if (sp !== 64) return fail('index line malformed: ' + ln.slice(0, 60))
     const h = ln.slice(0, 64)
     const rel = ln.slice(66)
-    if (!/^[0-9a-f]{64}$/.test(h)) return fail('index hash malformed: ' + rel)
+    if (!H64.test(h)) return fail('index hash malformed: ' + rel)
     listed.set(rel, h)
   }
   if (listed.size === 0) return fail('packet index empty')
@@ -118,55 +211,58 @@ export function verifyDesignPacket({ packetDir = PACKET_DIR, acceptancePath = AC
   const allowed = new Set([...listed.keys(), INDEX_NAME])
   const extras = scanExtras(packetDir, allowed)
   if (extras.length) return fail('unregistered extra files: ' + extras.slice(0, 5).join(', '))
-
-  // ── 3) bundle manifest 哈希 == acceptance 绑定 ───────────────────────
   const manifestPath = join(packetDir, 'bundle.manifest.json')
   if (!existsSync(manifestPath)) return fail('bundle manifest missing')
   const manifestSha = sha256File(manifestPath)
-  const expectedManifest = String(acc.packet?.bundle_manifest_sha256 || '')
-  if (!expectedManifest) return fail('acceptance.packet.bundle_manifest_sha256 missing')
-  if (manifestSha !== expectedManifest) {
-    return fail('bundle manifest hash mismatch disk=' + manifestSha.slice(0, 16) + ' expected=' + expectedManifest.slice(0, 16))
+
+  // ── 4) 候选：与当前 packet 精确匹配 + approved + 绑定全过 ─────────────
+  const candidates = []
+  const candidateProblems = []
+  for (const r of records) {
+    const acc = r.doc
+    if (String(acc.packet?.packet_index_sha256 || '') !== indexSha) continue
+    if (String(acc.packet?.bundle_manifest_sha256 || '') !== manifestSha) continue
+    if (acc.review?.decision !== 'approved') { candidateProblems.push(r.name + ': decision=' + String(acc.review?.decision)); continue }
+    if ((acc.review?.blocker_count ?? 1) !== 0) { candidateProblems.push(r.name + ': blocker_count=' + String(acc.review?.blocker_count)); continue }
+    const bp = verifyBindings(acc, packetDir, designDir)
+    if (bp.length) { candidateProblems.push(r.name + ': ' + bp[0]); continue }
+    candidates.push(r)
   }
 
-  // ── 4) 全部绑定逐项核验 ──────────────────────────────────────────────
-  const b = acc.bindings || {}
-  const inPacket = [
-    ['pattern_library_sha256', 'meta/pattern-library.json'],
-    ['unicode_domain_table_sha256', 'meta/unicode-domain-table.json'],
-    ['common_defs_sha256', 'meta/common.defs.json'],
-  ]
-  for (const [key, rel] of inPacket) {
-    if (!b[key]) return fail('acceptance binding missing: ' + key)
-    const got = sha256File(join(packetDir, rel))
-    if (got !== b[key]) return fail('binding drift ' + key + ' disk=' + got.slice(0, 16) + ' expected=' + String(b[key]).slice(0, 16))
-  }
-  const corpora = [['c14n', 'corpus/c14n_cases.json'], ['schema', 'schema-corpus/schema_cases.json']]
-  for (const [key, rel] of corpora) {
-    if (!b.corpora?.[key]) return fail('acceptance binding missing: corpora.' + key)
-    const got = sha256File(join(packetDir, rel))
-    if (got !== b.corpora[key]) return fail('binding drift corpora.' + key)
-  }
-  // locks：acceptance 未声明时跳过（其字节仍被 index 全量核验覆盖）；声明则必须逐项相符
-  if (b.locks && typeof b.locks === 'object') {
-    const locks = [['npm_package_lock_sha256', 'locks/node/package-lock.json'], ['python_requirements_lock_sha256', 'locks/python/requirements.lock']]
-    for (const [key, rel] of locks) {
-      if (!b.locks[key]) continue
-      const got = sha256File(join(packetDir, rel))
-      if (got !== b.locks[key]) return fail('binding drift locks.' + key)
+  // ── 5) active 判定：候选 ∩ 未 superseded ∩ 未 revoked → 恰一条 ────────
+  const supersededBy = new Map()
+  for (const r of records) if (r.supersedes) supersededBy.set(r.supersedes, r.name)
+  const revokedBy = new Map()
+  for (const v of revocations) revokedBy.set(v.revokes, v.name)
+  const active = candidates.filter((r) => !supersededBy.has(r.id) && !revokedBy.has(r.id))
+  if (active.length === 0) {
+    const diag = []
+    for (const r of candidates) {
+      if (supersededBy.has(r.id)) diag.push(r.name + ' superseded by ' + supersededBy.get(r.id))
+      else if (revokedBy.has(r.id)) diag.push(r.name + ' revoked by ' + revokedBy.get(r.id))
     }
+    for (const d of candidateProblems) diag.push(d)
+    return fail('no active acceptance for current packet' + (diag.length ? ' (' + diag.slice(0, 3).join('; ') + ')' : ''))
   }
-  // provenance（packet 外随包携带；对 acceptance 绑定逐项核验）
-  if (!b.profile_sha256) return fail('acceptance binding missing: profile_sha256')
-  const profPath = join(DESIGN_DIR, 'provenance', 'casefile-c14n-1.profile.md')
-  if (!existsSync(profPath)) return fail('provenance profile missing')
-  if (sha256File(profPath) !== b.profile_sha256) return fail('binding drift profile')
-  if (!b.spec_chain || typeof b.spec_chain !== 'object') return fail('acceptance binding missing: spec_chain')
-  for (const [v, want] of Object.entries(b.spec_chain)) {
-    const p = join(DESIGN_DIR, 'provenance', 'genie-synbio-design-spec-' + v + '-2026-10-13.md')
-    if (!existsSync(p)) return fail('provenance spec missing: ' + v)
-    if (sha256File(p) !== want) return fail('binding drift spec_chain.' + v)
+  if (active.length > 1) return fail('multiple active acceptances: ' + active.map((r) => r.name).join(', '))
+  const winner = active[0]
+
+  // ── 6) bundle loader（manifest 驱动结构核验；「loader 全过」为字面真）──
+  try {
+    const req = createRequire(import.meta.url)
+    const loader = req(join(packetDir, 'build', 'bundle_loader.mjs'))
+    const res = loader.loadBundle(packetDir)
+    if (res.problems.length) return fail('bundle loader problems: ' + res.problems[0])
+  } catch (e) {
+    return fail('bundle loader unavailable: ' + String(e.message).slice(0, 160))
   }
 
-  return { ok: true, manifest_sha256: manifestSha, index_sha256: indexSha, checked_files: listed.size }
+  return {
+    ok: true,
+    manifest_sha256: manifestSha,
+    index_sha256: indexSha,
+    checked_files: listed.size,
+    acceptance_id: winner.id,
+    acceptance_file: winner.name,
+  }
 }

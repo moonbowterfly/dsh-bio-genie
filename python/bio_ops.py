@@ -45,6 +45,7 @@ from analysis_ext import (op_seq_introns, op_seq_dotplot, op_uniprot,
 from sc_tools import op_sc_qc
 # 来源审计（2026-10-10 新增）
 from source_audit_tools import op_source_audit
+from design_ops import op_design_stage_artifact, op_design_casefile_validate
 from seq_util import read_seq_input
 socket.setdefaulttimeout(20)
 from retry_utils import retry_on_network_error
@@ -2122,6 +2123,9 @@ OPS = {
     'sc_qc': op_sc_qc,
     # 来源审计（2026-10-10 新增）
     'source_audit': op_source_audit,
+    # design 通道（仅经 designTool；raw 通道由 TS 侧 spawn 前拒绝）
+    'design_stage_artifact': op_design_stage_artifact,
+    'design_casefile_validate': op_design_casefile_validate,
 }
 
 
@@ -2176,7 +2180,7 @@ def main():
             return
         result = OPS[op](args)
         result = _sanitize_json(result)
-        if op in {'deseq2', 'gsea', 'ml_pipeline'} and isinstance(result, dict) and result.get('error'):
+        if op in {'deseq2', 'gsea', 'ml_pipeline', 'design_stage_artifact', 'design_casefile_validate'} and isinstance(result, dict) and result.get('error'):
             print(json.dumps({'ok': False, 'code': result.get('code', 'ANALYSIS_FAILED'),
                               'error': result['error'], 'details': result},
                              ensure_ascii=False, cls=SafeEncoder))
