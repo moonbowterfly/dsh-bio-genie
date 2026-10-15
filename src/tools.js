@@ -146,6 +146,8 @@ function bioTool(config, opts) {
 export const DESIGN_TOOL_OPS = Object.freeze(['design_casefile_validate', 'design_casefile_export'])
 
 const DESIGN_CASEFILE_PATH = join(import.meta.dirname, '..', 'python', 'design_casefile.py')
+// B1 收口：design_consequence 独立 dispatcher（design_consequence.py；spawn 输出 = 扁平 C4 + ok，同 validate/export 形态）
+const DESIGN_CONSEQUENCE_PATH = join(import.meta.dirname, '..', 'python', 'design_consequence.py')
 
 function designTool(config, opts) {
   if (!DESIGN_OPS.has(opts.op)) {
@@ -197,12 +199,26 @@ function designTool(config, opts) {
       await throttle(opts.op)
       const py = opts.pythonPath || await requireEnv(config)
       const t0 = Date.now()
-      const res = await spawnPython(py, DESIGN_CASEFILE_PATH, { op: opts.op, args: { ...args, casefile_dir: caseDir } }, {
+      // design_consequence 走独立 dispatcher（python/design_consequence.py）；validate/export 照 B1P2 走
+      // design_casefile.py。信封提取统一「先取 res 再回退 stdout」（B1P2 修复；consequence 输出同形态）。
+      const workerPath = opts.op === 'design_consequence' ? DESIGN_CONSEQUENCE_PATH : DESIGN_CASEFILE_PATH
+      const workerArgs = { ...args, casefile_dir: caseDir }
+      if (opts.op === 'design_consequence' && workerArgs.model_ref && typeof workerArgs.model_ref === 'object') {
+        // 设计稿 §1：model_ref = metabolic_model_ref@1（v0 接线：内嵌已解析 sbml/card 路径，TS 不解析 ref）
+        const mr = workerArgs.model_ref
+        if (typeof mr.sbml_path === 'string') workerArgs.sbml_path = mr.sbml_path
+        if (typeof mr.expected_sbml_sha256 === 'string') workerArgs.expected_sbml_sha256 = mr.expected_sbml_sha256
+        if (typeof mr.card_path === 'string') workerArgs.card_path = mr.card_path
+      }
+      // consequence_run 落盘/引用（B1P1 artifacts 模式）：worker 写 staging + 自报 sha 引用；其余 op 不写 staging。
+      const stagingDir = opts.op === 'design_consequence' ? join(cwd, '.design-staging', opts.op) : ''
+      if (stagingDir) mkdirSync(stagingDir, { recursive: true })
+      const res = await spawnPython(py, workerPath, { op: opts.op, args: workerArgs }, {
         cwd,
         timeoutMs: callTimeout,
         signal: exec.signal,
         env: {
-          DSH_DESIGN_STAGING: '',
+          DSH_DESIGN_STAGING: stagingDir,
           DSH_DESIGN_DISPATCH_ID: '',
           DSH_DESIGN_PACKET: '',
           DSH_DESIGN_PACKET_FIXED: PACKET_DIR,
@@ -229,6 +245,16 @@ function designTool(config, opts) {
         // so the ordering remains guard → (no pre-cache) → audit/provenance.
         guard: () => gate,
         stampProvenance: (out) => stampProvenance(opts.name, out),
+        // 科学产物 refs（B1P1 形态 artifactRef）：validate/export 为路径 refs（被 structuredRefs
+        // 过滤，不回这里）；design_consequence 落盘 staging，逐 ref 解析 <staging>/<relative_path>。
+        registerScientific: async ({ artifact_refs: refs }) => {
+          for (const ref of refs) {
+            if (!stagingDir || !existsSync(join(stagingDir, ref.relative_path))) {
+              return { ok: false, code: 'REGISTRY_REF_UNRESOLVED', detail: ref.artifact_id.slice(0, 16) }
+            }
+          }
+          return { ok: true, registered: refs.length }
+        },
       })
       const terminalEnvelope = finalized.envelope || envelope
       if (config.enableLog !== false) {
@@ -2001,6 +2027,34 @@ function semanticTools(config) {
         format: { type: 'string', enum: ['zip', 'report', 'both'], default: 'both', description: '导出格式（默认 both：report.md + bundle.zip）' },
       },
       op: 'design_casefile_export',
+      timeoutMs: 300_000,
+    }),
+    // ============ design 通道：design_consequence（B1 收口批次）============
+    // 独立 designTool 路径（D5.5）；opts.op ↔ bio_ops.OPS 双向验收见
+    // test/design-consequence-tools.mjs。门禁（BLOCKED/NOT_RUN/INVALID_INPUT）exit 0
+    // + 扁平 C4 信封（不误判为 worker 崩溃）；consequence_run 落盘 staging + sha 引用。
+    designTool(config, {
+      name: 'design_consequence',
+      description:
+        '设计后果推理（design 通道，B1 收口）：把已注册、哈希绑定的 coupling_profile@1 施加到固定 GEM ' +
+        '（iML1515 + card）上 → consequence_run@1：baseline FBA + 逐声明场景 FBA/FVA + 逐 claim_target 的 ' +
+        'direction（growth 方向预测：ROBUST_DIRECTION/MIXED/INDETERMINATE/NOT_RUN）。门禁逐条 fail-closed：' +
+        'model_ref 缺失/哈希不符/card 缺失 → BLOCKED；strain 不匹配 → BLOCKED；rule 全 miss → NOT_RUN ' +
+        '（禁猜映射）；qualitative_direction → NOT_RUN NO_QUANTITATIVE_COUPLING（禁含 FBA/FVA 数值）；' +
+        '任一声明场景求解失败 → 相关 claim INDETERMINATE（禁止挑选剩余场景）；未登记/哈希不符工件引用 → ' +
+        'INVALID_INPUT。medium 必填（不支持默认富培养基）；objective 默认 biomass。返回 C4 信封 ' +
+        '{status, reason_code, artifact_refs, detail}；consequence_run 落盘引用（B1P1 artifacts 模式）。' +
+        '触发词：设计后果、consequence、耦合后果推理、growth 方向预测。',
+      parameters: {
+        model_ref: { type: 'object', additionalProperties: true, required: true, description: 'metabolic_model_ref@1：{sbml_path, expected_sbml_sha256, card_path}（v0 接线：内嵌已解析路径；哈希绑定，读前重哈希）' },
+        coupling_profile: { type: 'object', additionalProperties: true, required: true, description: 'coupling_profile@1 值：{coupling_mode?, rules: [{rule_id, reaction_id, operation, derived_bound, unit?}]}（已注册、哈希绑定语义；rule 未命中 → NOT_RUN，禁猜映射）' },
+        medium: { type: 'array', required: true, description: '显式培养基（exchange bounds；必填，不支持默认富培养基）', items: { type: 'object', additionalProperties: true } },
+        objective: { type: 'string', default: 'biomass', description: '目标反应（默认 biomass；场景可覆盖）' },
+        scenarios: { type: 'array', required: true, description: '声明场景集 [{scenario_id, target_reaction?, modifications?}]（任一声明场景求解失败 → 相关 claim INDETERMINATE）', items: { type: 'object', additionalProperties: true } },
+        casefile_dir: { type: 'string', description: 'casefile 目录（可选；须在工作区内且已存在；绑定后提交 audit overlay）' },
+        strict: { type: 'boolean', default: true, description: '严格模式（默认 true；只改变诊断详略，不放松门禁）' },
+      },
+      op: 'design_consequence',
       timeoutMs: 300_000,
     }),
     // ============ design 通道：宿主侧三工具（B1-part-1，designHostTool）============

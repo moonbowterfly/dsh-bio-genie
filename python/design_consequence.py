@@ -19,7 +19,11 @@
 
 用法（bridge/ops 模式）：
   echo '{"op":"design_consequence","args":{...}}' | python design_consequence.py
-输出：{"ok": true/false, "envelope": {...}, "consequence_run": {...}, "detail": "..."}
+输出（B1 收口接线后）：扁平 C4 信封 + ok（validate/export 同形态，供 TS 提取）
+  {"status": ..., "reason_code": ..., "artifact_refs": [...], "detail": ..., "ok": true,
+   "envelope": {...}, "consequence_run": {...}}
+门禁拒绝（BLOCKED/NOT_RUN/INVALID_INPUT 等 TOOL_STATES）→ exit 0 + ok:false（不误判为崩溃）；
+unknown op / 坏 JSON → exit 2 + INVALID_INPUT。
 """
 import copy
 import hashlib
@@ -327,28 +331,73 @@ def op_design_consequence(args):
     return {"ok": True, "envelope": envelope, "consequence_run": consequence_run}
 
 
+def _envelope(status, reason_code, detail, artifact_refs=None):
+    """扁平 C4 信封（validate/export 同形态）：reason_code/detail 空值回落（照 design_host._envelope 约定）。"""
+    return {
+        "status": status,
+        "reason_code": reason_code if reason_code else "OK",
+        "artifact_refs": artifact_refs or [],
+        "detail": detail or "",
+    }
+
+
+def _tool_error_envelope(exc):
+    """ToolError → 扁平 C4 信封；reason_code 取 detail 前缀大写约定（照 design_host.main，B1P1）。"""
+    status = exc.code if exc.code in TOOL_STATES else "EXECUTION_ERROR"
+    detail = exc.detail or ""
+    reason = status
+    if detail:
+        head, sep, tail = detail.partition(":")
+        head = head.strip()
+        if sep and head and all(ch.isupper() or ch == "_" for ch in head):
+            reason = head
+            detail = tail.strip()
+    return _envelope(status, reason, detail)
+
+
+def _stage_consequence_run(run):
+    """consequence_run 落盘/引用（照 B1P1 artifacts 模式）：DSH_DESIGN_STAGING 非空时写
+    <staging>/consequence_run.json 原始 JSON 字节 + sha256 引用（packet c14n/schema 适配留后续批次）。"""
+    staging = os.environ.get("DSH_DESIGN_STAGING") or ""
+    if not staging or not os.path.isdir(staging):
+        return []
+    raw = json.dumps(run, ensure_ascii=False).encode("utf-8")
+    sha = hashlib.sha256(raw).hexdigest()
+    with open(os.path.join(staging, "consequence_run.json"), "wb") as fh:
+        fh.write(raw)
+    return [{"artifact_id": sha, "expected_sha256": sha, "relative_path": "consequence_run.json"}]
+
+
 def main():
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
     try:
         payload = json.loads(sys.stdin.read() or "{}")
     except Exception as exc:  # noqa: BLE001
-        print(json.dumps({"ok": False, "code": "INVALID_INPUT", "detail": "stdin JSON: %s" % exc}))
+        env = _envelope("INVALID_INPUT", "BAD_REQUEST", "stdin JSON: %s" % exc)
+        print(json.dumps(dict(env, ok=False), ensure_ascii=False))
         return 2
     op = payload.get("op")
     args = payload.get("args") or {}
     if op != "design_consequence":
-        print(json.dumps({"ok": False, "code": "UNKNOWN_OP", "detail": str(op)}))
+        env = _envelope("INVALID_INPUT", "UNKNOWN_OP", "unknown op: %s" % op)
+        print(json.dumps(dict(env, ok=False), ensure_ascii=False))
         return 2
     try:
         result = op_design_consequence(args)
-        print(json.dumps(result, ensure_ascii=False))
+        env = _envelope(result["envelope"]["status"], result["envelope"].get("reason_code"),
+                        result["envelope"].get("detail"), _stage_consequence_run(result["consequence_run"]))
+        # 扁平 C4 + ok 供 TS 提取（validate/export 同形态）；envelope 二级键保留（CLI 契约，test_cli_smoke）。
+        out = dict(env, ok=bool(result.get("ok")), envelope=env, consequence_run=result["consequence_run"])
+        print(json.dumps(out, ensure_ascii=False))
         return 0
     except ToolError as exc:
-        print(json.dumps({"ok": False, "code": exc.code, "detail": exc.detail}, ensure_ascii=False))
+        env = _tool_error_envelope(exc)
+        print(json.dumps(dict(env, ok=False), ensure_ascii=False))
         return 0 if exc.code in TOOL_STATES else 1
     except Exception:  # noqa: BLE001
-        print(json.dumps({"ok": False, "code": "EXECUTION_ERROR", "detail": traceback.format_exc()[-800:]}, ensure_ascii=False))
+        env = _envelope("EXECUTION_ERROR", "WORKER_CRASH", traceback.format_exc()[-800:])
+        print(json.dumps(dict(env, ok=False), ensure_ascii=False))
         return 0
 
 
