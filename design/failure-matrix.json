@@ -1,0 +1,225 @@
+{
+  "schema_version": "1.0",
+  "matrix_id": "design-failure-matrix@1",
+  "spec_refs": [
+    "genie-synbio-design-spec-v0.2-2026-10-12.md#9 (A5 failure matrix：malformed/冲突输入、ambiguous/unmapped、solver infeasible/unbounded/non-optimal/timeout、OSTIR unavailable、validate 后工件被改、export-validate TOCTOU)",
+    "genie-synbio-design-spec-v0.3-2026-10-12.md#9 (A5 强化：每分支写明 expected status / reason / check ID，不只类别)"
+  ],
+  "fields": [
+    "branch_id",
+    "category",
+    "summary",
+    "injection",
+    "target_gate",
+    "expected_status",
+    "expected_reason",
+    "check_id",
+    "test_ref",
+    "not_yet_runnable",
+    "note"
+  ],
+  "expected_status_vocab": [
+    "INVALID_INPUT",
+    "BLOCKED",
+    "NOT_RUN",
+    "DEPENDENCY_UNAVAILABLE",
+    "EXECUTION_ERROR",
+    "OK"
+  ],
+  "branches": [
+    {
+      "branch_id": "F01",
+      "category": "malformed-input",
+      "summary": "malformed 输入（schema/c14n 级）：coupling_profile 传非对象（字符串）→ 工具入口类型门拒绝 INVALID_INPUT（fail-closed，不猜映射、不静默剔除）。",
+      "injection": {
+        "kind": "replace_value",
+        "target": "args.coupling_profile",
+        "delta": "非对象字符串（应为 coupling_profile@1 对象）"
+      },
+      "target_gate": {
+        "command": ["node", "test/design-failure-matrix.mjs"],
+        "timeout_ms": 300000
+      },
+      "expected_status": "INVALID_INPUT",
+      "expected_reason": "INVALID_INPUT",
+      "check_id": "design_consequence.py::op_design_consequence (coupling_profile 类型门；detail 无大写前缀 → reason 回落 status)",
+      "test_ref": "test/design-failure-matrix.mjs::F01（本批新增执行）",
+      "not_yet_runnable": false,
+      "note": "实现查证：design_consequence.py:253-254 `if not isinstance(profile, dict): raise ToolError(\"INVALID_INPUT\", ...)`；worker main 的 reason 回落规则（无 REASON: 前缀 → status）同 design_host 约定。"
+    },
+    {
+      "branch_id": "F02",
+      "category": "conflicting-input",
+      "summary": "冲突输入：consequence_run.model_ref 指向 kinetic_crn_ref（CRN 冒充 constraint GEM）→ casefile validate 红线 R1 检查 FAIL → 顶层 INVALID_INPUT。",
+      "injection": {
+        "kind": "replace_ref",
+        "target": "consequence_run.model_ref",
+        "delta": "kinetic_crn_ref artifact（builder mode=r1）"
+      },
+      "target_gate": {
+        "command": ["node", "test/design-failure-matrix.mjs"],
+        "timeout_ms": 300000
+      },
+      "expected_status": "INVALID_INPUT",
+      "expected_reason": "R1_MODEL_REF_INVALID",
+      "check_id": "design_casefile.py::_run_checks R1_CRN_NEQ_GEM（红线 R1：consequence 只接受经复核的 constraint_gem）",
+      "test_ref": "test/design-casefile-tools.mjs::§3 validate r1（既有，err.code===R1_MODEL_REF_INVALID）+ test/design-failure-matrix.mjs::F02（本批复跑）",
+      "not_yet_runnable": false,
+      "note": "实现查证：design_casefile.py CHECKS R1_CRN_NEQ_GEM required=true；fail code 由 _run_checks 首失败项给出；design-casefile-tools.mjs 已断言该 reason。"
+    },
+    {
+      "branch_id": "F03",
+      "category": "ambiguous-unmapped",
+      "summary": "ambiguous / unmapped：coupling rule 的 reaction_id 在模型中不存在（全 miss，无映射证据）→ consequence NOT_RUN（禁猜映射，v0.2 §8.1）。",
+      "injection": {
+        "kind": "replace_value",
+        "target": "coupling_profile.rules[0].reaction_id",
+        "delta": "模型不存在的 reaction_id"
+      },
+      "target_gate": {
+        "command": ["node", "test/design-failure-matrix.mjs"],
+        "timeout_ms": 300000
+      },
+      "expected_status": "NOT_RUN",
+      "expected_reason": "NOT_RUN",
+      "check_id": "design_consequence.py::validate_coupling_profile（rule 全 miss → NOT_RUN「禁猜映射」；detail 无前缀 → reason 回落 status）",
+      "test_ref": "test/test_design_consequence.py::test_rule_all_miss_not_run（既有）+ test/design-failure-matrix.mjs::F03（本批复跑）",
+      "not_yet_runnable": false,
+      "note": "实现查证：design_consequence.py:167 `raise ToolError(\"NOT_RUN\", \"所有 coupling rule 均未命中（禁猜映射）...\")`；pytest 已冻结该分支。"
+    },
+    {
+      "branch_id": "F04",
+      "category": "solver-infeasible",
+      "summary": "solver infeasible：声明场景经 modifications 使模型不可行 → 相关 claim INDETERMINATE，信封 NOT_RUN + SCENARIO_INDETERMINATE（禁止挑选剩余场景，v0.2 §8.1）。",
+      "injection": {
+        "kind": "replace_value",
+        "target": "scenarios[0].modifications",
+        "delta": "BIOMASS {lower_bound:10.0, upper_bound:10.0}（infeasible）"
+      },
+      "target_gate": {
+        "command": ["node", "test/design-failure-matrix.mjs"],
+        "timeout_ms": 300000
+      },
+      "expected_status": "NOT_RUN",
+      "expected_reason": "SCENARIO_INDETERMINATE",
+      "check_id": "design_consequence.py::op_design_consequence（scenario sol.status != optimal → 相关 claim INDETERMINATE；envelope NOT_RUN/SCENARIO_INDETERMINATE）",
+      "test_ref": "test/test_design_consequence.py::test_scenario_infeasible_indeterminate + test/design-consequence-tools.mjs::§3（既有）+ test/design-failure-matrix.mjs::F04（本批复跑）",
+      "not_yet_runnable": false,
+      "note": "实现查证：design_consequence.py:285-287（scenario status 记录）+ :300（direction_status INDETERMINATE）+ :326-329（envelope NOT_RUN/SCENARIO_INDETERMINATE）；既有两处测试已冻结。"
+    },
+    {
+      "branch_id": "F05",
+      "category": "solver-unbounded",
+      "summary": "solver unbounded：baseline/场景求解为 unbounded → 同一 status != optimal 门 → NOT_RUN（禁旧值/0 向量/NaN）。",
+      "injection": {
+        "kind": "not_yet_runnable",
+        "description": "planned：经 medium/scenario modifications 注入 ±inf 边界构造 unbounded LP，断言 status != optimal → NOT_RUN。"
+      },
+      "target_gate": {
+        "planned": "consequence 求解状态门（design_consequence.py:210-212 / :285-287 已实现 NOT_RUN/INDETERMINATE 语义；缺「求解参数/边界透传」注入通道）"
+      },
+      "expected_status": "NOT_RUN",
+      "expected_reason": "NOT_RUN",
+      "check_id": "design_consequence.py::solve_baseline / op_design_consequence（status != optimal → NOT_RUN）",
+      "test_ref": "pending:design-failure-matrix-F05（不可注入）",
+      "not_yet_runnable": true,
+      "note": "实测（2026-10-15）：cobra native glpk 将 ±inf 边界归一化为有限值（EX_glc__D_e inf 边界 + 目标优化实测 status=optimal），工具 args 契约（medium/scenario modifications 仅有限 float 边界）无法构造真 unbounded LP；需求解参数透传通道（如时间/边界模式参数）后方可注入。"
+    },
+    {
+      "branch_id": "F06",
+      "category": "solver-non-optimal",
+      "summary": "solver non-optimal：求解返回非 optimal 状态 → 同一 status 门 → NOT_RUN。",
+      "injection": {
+        "kind": "not_yet_runnable",
+        "description": "planned：注入使 glpk 返回 suboptimal/非 optimal 状态（如求解中止/劣化配置），断言 NOT_RUN。"
+      },
+      "target_gate": {
+        "planned": "consequence 求解状态门（同 F05；缺求解器配置注入通道）"
+      },
+      "expected_status": "NOT_RUN",
+      "expected_reason": "NOT_RUN",
+      "check_id": "design_consequence.py::solve_baseline / op_design_consequence（status != optimal → NOT_RUN）",
+      "test_ref": "pending:design-failure-matrix-F06（不可注入）",
+      "not_yet_runnable": true,
+      "note": "glpk 对可行 LP 恒返回 optimal；工具契约无求解器配置（tolerance/中止）注入通道，无法构造 suboptimal 返回。"
+    },
+    {
+      "branch_id": "F07",
+      "category": "solver-timeout",
+      "summary": "solver timeout：求解超时（status != optimal）→ 同一状态门 → NOT_RUN（场景 → INDETERMINATE）。",
+      "injection": {
+        "kind": "not_yet_runnable",
+        "description": "planned：经求解器时间上限注入（如 glpk tm_lim）使求解中止，断言 NOT_RUN/INDETERMINATE。"
+      },
+      "target_gate": {
+        "planned": "consequence 求解状态门（同 F05；worker 无 time_limit 透传——需 solve_baseline/fva_direction 支持求解参数）"
+      },
+      "expected_status": "NOT_RUN",
+      "expected_reason": "NOT_RUN",
+      "check_id": "design_consequence.py::solve_baseline / op_design_consequence（status != optimal → NOT_RUN）",
+      "test_ref": "pending:design-failure-matrix-F07（不可注入）",
+      "not_yet_runnable": true,
+      "note": "实测（2026-10-15）：cobra solver type=Model（native glpk），`solver.configuration` 无 time_limit 属性（设置被静默忽略，实测仍 optimal）；worker args 契约无求解参数通道。TS 传输层超时另有既有负例（design-envelope.mjs::case4 python execution timed out），非本分支（solver 级）。"
+    },
+    {
+      "branch_id": "F08",
+      "category": "ostir-unavailable",
+      "summary": "OSTIR unavailable：circuit_contextualize 携带 ostir_request → preflight（import ostir + RNA）失败 → DEPENDENCY_UNAVAILABLE/OSTIR_UNAVAILABLE（不静默降级）。",
+      "injection": {
+        "kind": "add_arg",
+        "target": "args.ostir_request",
+        "delta": "{sequence: 'ACGU...'（本环境 ostir 未安装 → preflight ImportError）}"
+      },
+      "target_gate": {
+        "command": ["node", "test/design-failure-matrix.mjs"],
+        "timeout_ms": 300000
+      },
+      "expected_status": "DEPENDENCY_UNAVAILABLE",
+      "expected_reason": "OSTIR_UNAVAILABLE",
+      "check_id": "design_host.py::_ostir_proxy（preflight import RNA/ostir ImportError → DEPENDENCY_UNAVAILABLE/OSTIR_UNAVAILABLE）",
+      "test_ref": "test/design-failure-matrix.mjs::F08（本批新增执行；real designTool 通道 + chassis 产出的 host_profile_ref）",
+      "not_yet_runnable": false,
+      "note": "实现查证：design_host.py:1273-1277（ImportError → OSTIR_UNAVAILABLE）；spec v0.2 §7.8 可选依赖 preflight，不可用 → DEPENDENCY_UNAVAILABLE，不静默降级。"
+    },
+    {
+      "branch_id": "F09",
+      "category": "validate-after-tamper",
+      "summary": "validate 后工件被改：validate 通过后篡改 objects/<id> 字节 → 重跑 validate → MANIFEST_DISK_HASH 检查 FAIL → 顶层 INVALID_INPUT/OBJECT_HASH_MISMATCH。",
+      "injection": {
+        "kind": "append_bytes",
+        "target": "<case>/objects/<artifact_id>",
+        "delta": "尾部追加一个空格字节（对象名≠内容 sha256）"
+      },
+      "target_gate": {
+        "command": ["node", "test/design-failure-matrix.mjs"],
+        "timeout_ms": 300000
+      },
+      "expected_status": "INVALID_INPUT",
+      "expected_reason": "OBJECT_HASH_MISMATCH",
+      "check_id": "design_casefile.py::_run_checks MANIFEST_DISK_HASH（_object_verify → OBJECT_HASH_MISMATCH → add FAIL code）",
+      "test_ref": "test/design-failure-matrix.mjs::F09（本批新增执行；builder clean case + 真实 validate 两跑）",
+      "not_yet_runnable": false,
+      "note": "实现查证：design_casefile.py:298-303（_object_verify 返回 OBJECT_HASH_MISMATCH → MANIFEST_DISK_HASH FAIL）；validate 每次从磁盘重校验，无缓存。"
+    },
+    {
+      "branch_id": "F10",
+      "category": "export-validate-toctou",
+      "summary": "export-validate TOCTOU：validate 通过 → 篡改工件 → export（export 内部重跑全部 check）→ INVALID_INPUT/VALIDATE_GATE_FAILED（TOCTOU 被重跑门闭合，无产物、不改科学快照）。",
+      "injection": {
+        "kind": "append_bytes",
+        "target": "<case>/objects/<artifact_id>（validate 与 export 之间）",
+        "delta": "尾部追加一个空格字节（篡改窗口 = validate 返回后、export 提交前）"
+      },
+      "target_gate": {
+        "command": ["node", "test/design-failure-matrix.mjs"],
+        "timeout_ms": 300000
+      },
+      "expected_status": "INVALID_INPUT",
+      "expected_reason": "VALIDATE_GATE_FAILED",
+      "check_id": "design_casefile.py::op_design_casefile_export（重跑 _run_checks → overall_ok=false → VALIDATE_GATE_FAILED；binding 同一 snapshot 前先过门）",
+      "test_ref": "test/design-casefile-tools.mjs::§3 export gate（既有：validate 未过 → VALIDATE_GATE_FAILED 无产物）+ test/design-failure-matrix.mjs::F10（本批新增：validate 后篡改窗口）",
+      "not_yet_runnable": false,
+      "note": "实现查证：design_casefile.py:680-685（export 内 _run_checks 重跑；首失败 check 入 detail）；REFERENCE-REGISTRY §5 口径：拒绝执行不产出部分结果。"
+    }
+  ]
+}

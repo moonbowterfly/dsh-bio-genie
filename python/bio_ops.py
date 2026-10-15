@@ -54,7 +54,7 @@ from design_ops import op_design_stage_artifact, op_design_casefile_validate
 from design_casefile import op_design_casefile_export
 # B1-part-1：宿主侧三工具（design_host.py；dispatcher 注册 + OPS 表）
 from design_host import (op_design_chassis_profile, op_design_integration_candidates,
-                         op_design_circuit_contextualize)
+                         op_design_circuit_contextualize, ToolError, TOOL_STATES, _envelope)
 # B1 收口：design_consequence（design_consequence.py；独立 dispatcher，仅经 designTool 通道）
 from design_consequence import op_design_consequence
 from seq_util import read_seq_input
@@ -2206,6 +2206,24 @@ def main():
                              ensure_ascii=False, cls=SafeEncoder))
             return
         print(json.dumps({'ok': True, 'result': result}, ensure_ascii=False, cls=SafeEncoder))
+    except ToolError as exc:
+        # host 三 op（chassis/integration/contextualize）以 ToolError 抛出门禁拒绝；
+        # 照 design_host.main() 同款信封归一（status 来自状态词；reason_code 取 detail
+        # 大写前缀 "REASON: msg" 约定；无前缀回落 status）——不得把门禁拒绝误判为
+        # worker 崩溃（A5 F08 分支验收点）。
+        status = exc.code if exc.code in TOOL_STATES else "EXECUTION_ERROR"
+        detail = exc.detail or ""
+        reason = status
+        if detail:
+            head, sep, tail = detail.partition(":")
+            head = head.strip()
+            if sep and head and all(ch.isupper() or ch == "_" for ch in head):
+                reason = head
+                detail = tail.strip()
+        print(json.dumps({"ok": True,
+                          "result": {"envelope": _envelope(status, reason, detail), "artifacts": []}},
+                         ensure_ascii=False, cls=SafeEncoder))
+        return
     except Exception as e:
         traceback.print_exc(file=sys.stderr)
         print(json.dumps({'ok': False, 'error': f'{type(e).__name__}: {e}'}, ensure_ascii=False))
