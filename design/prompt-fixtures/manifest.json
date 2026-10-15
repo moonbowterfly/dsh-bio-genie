@@ -7,7 +7,7 @@
   ],
   "config_fingerprint": {
     "dsh_version": {
-      "value": "0.6.48",
+      "value": "0.6.49",
       "source": "package.json#version"
     },
     "preset": {
@@ -27,7 +27,7 @@
     }
   },
   "config_hash": {
-    "value": "38c635227b19cc66b46e12d45f215e4c84e8de952d912c9050d986516e334742",
+    "value": "efaba7653e0d23824c63e6252c8badd6792c7bd8595a0e21267fd42fcad23006",
     "canonical_fields": ["fixture_version", "dsh_version", "preset", "skill_registry_digest"],
     "note": "仅对可固化字段取规范化 JSON（键排序）算 sha256；model 为 pending 不参与"
   },
