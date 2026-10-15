@@ -6,15 +6,22 @@
  * 三处引用仍写旧值」的情况。本检查从**代码实证**出发，断言各处文档声称一致。
  *
  * 真值来源（不硬编码）：
- *   语义化工具 = src/tools.js 中 bioTool(config, { 的出现次数
- *   全部工具   = src/tools.js 中唯一 name: 'bio_xxx' 的个数
+ *   语义化工具 = src/tools.js 中四类注册调用（bioTool / designTool / designHostTool /
+ *                designCasefileExportTool）的出现次数（[P1-6]：design 链工具纳入计数门）
+ *   全部工具   = src/tools.js 中唯一 name: 'bio_xxx' / 'design_xxx' 的个数
  *   skill 数   = skills/*.md（递归）+ docs/agent-guide/*.md + 1（主 skill）
  */
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
+import { homedir } from 'node:os'
 import { SKILL_MANIFEST, GUIDE_MANIFEST } from '../src/skills.js'
+import { registerTools } from '../src/tools.js'
 
 const ROOT = process.cwd()
+const VENV = process.env.DSH_BIO_PYTHON || [
+  join(homedir(), '.dsh', 'dsh-bio-genie', 'python-env', 'Scripts', 'python.exe'),
+  join(homedir(), '.dsh', 'dsh-bio-genie', 'python-env', 'bin', 'python'),
+].find(existsSync)
 
 function read(p) {
   return existsSync(join(ROOT, p)) ? readFileSync(join(ROOT, p), 'utf8') : ''
@@ -32,15 +39,25 @@ function countFiles(dir) {
 }
 
 const toolsSrc = read('src/tools.js')
-const semanticTools = (toolsSrc.match(/bioTool\(config, \{/g) || []).length
-const allToolNames = new Set([...toolsSrc.matchAll(/name: '(bio_[a-z0-9_]+)'/g)].map((m) => m[1]))
+// [P1-6] 真值源覆盖四类注册调用：bioTool（58）/ designTool（2）/ designHostTool（3）/
+// designCasefileExportTool（1 次调用；定义行 `function designCasefileExportTool(config) {`
+// 不含 `,` 尾随逗号，不会被计入——注册形态见 src/tools.js:351 / :2293）。
+const bioToolCount = (toolsSrc.match(/bioTool\(config, \{/g) || []).length
+const designToolCount = (toolsSrc.match(/designTool\(config, \{/g) || []).length
+const hostToolCount = (toolsSrc.match(/designHostTool\(config, \{/g) || []).length
+const exportToolCount = (toolsSrc.match(/designCasefileExportTool\(config\),/g) || []).length
+const semanticTools = bioToolCount + designToolCount + hostToolCount + exportToolCount
+const allToolNames = new Set([...toolsSrc.matchAll(/name: '(bio_[a-z0-9_]+|design_[a-z0-9_]+)'/g)].map((m) => m[1]))
+// design_casefile_export 以 `const op = 'design_casefile_export'; name: op` 注册
+// （src/tools.js:352-355），无 `name: '...'` 字面量——按其注册名唯一字面量补入。
+if (toolsSrc.includes("'design_casefile_export'")) allToolNames.add('design_casefile_export')
 const allTools = allToolNames.size
 const skillFiles = countFiles('skills')
 const guideFiles = countFiles('docs/agent-guide')
 const skillTotal = skillFiles + guideFiles + 1 // +1 = 主 skill（GENIE_SKILL_CONTENT）
 
 console.log('代码实证真值：')
-console.log(`  语义化工具 = ${semanticTools}`)
+console.log(`  语义化工具 = ${semanticTools}（bioTool ${bioToolCount} + designTool ${designToolCount} + designHostTool ${hostToolCount} + designCasefileExportTool ${exportToolCount}）`)
 console.log(`  全部工具   = ${allTools}`)
 console.log(`  skill 总数 = ${skillTotal}（skills/ ${skillFiles} + agent-guide ${guideFiles} + 主 skill 1）`)
 console.log()
@@ -49,6 +66,34 @@ let pass = 0
 let fail = 0
 let warned = 0
 let skipped = 0
+
+// [P1-6] design 链六工具：经注册表实取，恰好注册一次（重复/缺失 → FAIL）。
+// 注册形态异构（name: '字面量' 与 name: op 变量两种），字面量计数会误判
+// （如 design_casefile_export 以 `const op = '...'; name: op` 注册、design_consequence
+// 的 name/op 各出现一次字面量）——以 registerTools 实注册结果为准。
+{
+  const SIX_DESIGN_TOOLS = [
+    'bio_chassis_profile', 'bio_integration_candidates', 'bio_circuit_contextualize',
+    'design_consequence', 'design_casefile_validate', 'design_casefile_export',
+  ]
+  const registered = []
+  const ctx = { tools: { register: (t) => { registered.push(t.name); return () => {} } } }
+  registerTools(ctx, { enableLog: false, pythonPath: VENV })
+  const count = (n) => registered.filter((x) => x === n).length
+  let allOnce = true
+  for (const t of SIX_DESIGN_TOOLS) {
+    const n = count(t)
+    if (n !== 1) {
+      allOnce = false
+      console.log(`FAIL  六 design 工具注册唯一性：${t} 注册 ${n} 次（预期恰好 1 次）`)
+      fail += 1
+    }
+  }
+  if (allOnce) {
+    console.log(`PASS  六 design 链工具在 src/tools.js 恰好注册一次（${SIX_DESIGN_TOOLS.join(', ')}）`)
+    pass += 1
+  }
+}
 
 /** 断言：某文件里出现的 `N 个<单位>` 必须全部等于真值。 */
 function assertCount(file, re, truth, label) {
@@ -100,8 +145,13 @@ assertCount('preset/bio-genie/agent.cordis.yml', /(\d+)\s*个工具/g, allTools,
 // 否则会产生大量误报（首版就误报了 5 个）。
 function mentionedTools(text) {
   const out = new Set()
-  for (const m of text.matchAll(/\b(bio_[a-z0-9_]+)\b/g)) out.add(m[1])
+  for (const m of text.matchAll(/\b(bio_[a-z0-9_]+|design_[a-z0-9_]+)\b/g)) out.add(m[1])
   for (const m of text.matchAll(/\b(bio_[a-z0-9_]+?)\/([a-z0-9_]+)\b/g)) {
+    const parts = m[1].split('_')
+    parts[parts.length - 1] = m[2]
+    out.add(parts.join('_'))
+  }
+  for (const m of text.matchAll(/\b(design_[a-z0-9_]+?)\/([a-z0-9_]+)\b/g)) {
     const parts = m[1].split('_')
     parts[parts.length - 1] = m[2]
     out.add(parts.join('_'))

@@ -2,7 +2,7 @@
 language: none
 ---
 
-# 工具全参考（66 个）
+# 工具全参考（69 个）
 
 > 每个工具：功能 → 参数（★=必填）→ 返回关键字段 → 典型触发词。**选工具第一优先，`bio_python` 执行器第二优先**。
 
@@ -258,3 +258,9 @@ language: none
 **bio_integration_candidates** — 基因组整合位点候选：`host_profile`（或 `host_profile_ref`）+ `genome_files ★` + `cassette ★`（序列或长度）+ `candidates`/`scan` + `top_n`（≤16）。按正式 integration-ruleset 逐条强制评估（unknown_policy=block，绝不输出 safe）；无注释/注释不可信 → NOT_RUN；缺 ruleset → BLOCKED。触发词：整合位点、插入候选、integration site。
 
 **bio_circuit_contextualize** — 回路表达情景化：`circuit ★`（components[] 或 sbol_file）+ `host_profile` + `coupling_mode`（仅产耦合草案，不可定量授权）+ `parts_evidence`。返回 expression_scenario@1（元件证据查表排名；无证据只给 rank + risk，禁绝对表达）+ 可选 kinetic_crn_ref@1（封装既有 bio_circuit_compile 输出）。ostir 不可用 → DEPENDENCY_UNAVAILABLE。触发词：表达情景、元件排名、耦合草案。
+
+**design_consequence** — 耦合后果推理（design 通道）：`model_ref ★`（sbml + card）、`coupling_profile ★`、`medium`（必填，不支持默认富培养基）、`objective`（默认 biomass）、`scenarios[]`、`casefile_dir`（可选）、`strict`（默认 true）。返回 consequences@1（scenario → growth 方向预测与置信区间）+ design envelope（status/reason_code/artifact_refs/detail）。门禁拒绝 → BLOCKED；规则全 miss → NOT_RUN（禁猜映射）。触发词：设计后果、consequence、耦合后果推理、growth 方向预测。
+
+**design_casefile_validate** — casefile 红线校验（design 通道）：`casefile_dir ★`（工作区内）。返回 checks[8]（SNAPSHOT_BINDING / MANIFEST_COMPLETE / MANIFEST_DISK_HASH / SCHEMA / R1 / R2 / R3 / DAG_ACYCLIC），全 PASS 才放行导出。触发词：案例包校验、红线检查、validate casefile。
+
+**design_casefile_export** — casefile 归档导出（design 通道）：`casefile_dir ★` + `format`（zip/report/both，默认 both）+ `audit_view_id` + `expected_parent_snapshot_sha`。对未收口快照执行确定性 report-finalize 事务（S_n → 含 report.md 的 S_(n+1)）→ 精确 validate → 导出；产物落 `exports/<snap12>/`，不入科学快照；纯导出要求目标快照恰含 1 个终态化报告，否则 INVALID_INPUT/REPORT_FINALIZE_REQUIRED。触发词：导出案例包、最终报告、归档 bundle。

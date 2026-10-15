@@ -133,6 +133,21 @@ for (const s of SKILL_MANIFEST) {
   }
 }
 
+// [G11] protocol 磁盘集合 ↔ SKILL_MANIFEST（category: 'protocol'）双向一致：
+// 磁盘有文件而 manifest 无条目 → 运行时注册不可见（FAIL）；manifest 有条目而文件缺失 → FAIL。
+{
+  const diskProtocols = existsSync(join(skillsDir, 'protocols'))
+    ? readdirSync(join(skillsDir, 'protocols')).filter((n) => n.endsWith('.md')).map((n) => 'protocols/' + n)
+    : []
+  const manifestProtocols = SKILL_MANIFEST.filter((s) => s.category === 'protocol').map((s) => s.file)
+  const diskOnly = diskProtocols.filter((f) => !manifestProtocols.includes(f))
+  const manifestOnly = manifestProtocols.filter((f) => !existsSync(join(skillsDir, f)))
+  assert(diskOnly.length === 0,
+    `protocol 磁盘↔manifest 双向一致（磁盘有而 manifest 无 → 注册不可见: ${diskOnly.join(', ')}）`)
+  assert(manifestOnly.length === 0,
+    `protocol 磁盘↔manifest 双向一致（manifest 有而磁盘缺: ${manifestOnly.join(', ')}）`)
+}
+
 // ── 棘轮收紧：自基线 commit 起**被改动过**的 skill 不得继续留在豁免名单 ──
 // 2026-09-12：原基线是静态白名单，改动过的 skill 仍只 WARN，规则形同虚设。
 {
@@ -150,8 +165,11 @@ for (const s of SKILL_MANIFEST) {
   }
   // ⚠️ git 给的是 `skills/xxx.md`，manifest 的 s.file 是 `xxx.md`：不归一化就永远匹配不到，
   // 检查会静默空转（2026-09-12 实测：8 个改动文件匹配到 0 个）。
-  // 取路径末段即可（git 给 `skills/x.md`，manifest 存 `x.md`）——用 split 而非正则，免去转义层踩坑
-  const toSkillName = (f) => SKILL_MANIFEST.find((s) => s.file === f.split('/').pop())?.name
+  // [G11] 棘轮路径映射修复：先试去掉 `skills/` 前缀的全相对路径（如 `protocols/design-casefile.md`，
+  // 与 manifest 的 s.file 逐字节一致），失败再回落末段（扁平文件沿用旧行为）。
+  const toSkillName = (f) =>
+    SKILL_MANIFEST.find((s) => s.file === f.replace(/^skills\//, ''))?.name
+    ?? SKILL_MANIFEST.find((s) => s.file === f.split('/').pop())?.name
   const changedNames = new Set(changed.map(toSkillName).filter(Boolean))
   if (changed.length > 0) {
     assert(changedNames.size > 0,

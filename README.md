@@ -30,7 +30,7 @@
 | 📜 **透明性日志** | 每次代码执行/工具调用异步记 JSONL 日志（哈希/预览/耗时），`bio_log` 可回溯任何一次分析；日志自动 30 天轮转清理 |
 | 🧬 **科学严谨性约束** | persona 强制「生物学结论必须可溯源到工具输出」，纯推断标注 [推断-未验证] |
 | 🧠 **会话记忆** | 成功代码模式 + 错误→修复经验自动沉淀（本地 JSON），`bio_memory` 查询，越用越聪明 |
-| ⚙️ **设置面板** | dsh 设置面板（⚙️ 齿轮）侧栏「BioGenie」菜单——标签页：总览（包元信息/配置默认值）、Skill 模块（51 个条目按主 skill/领域/研究/协议/指南分组）、Python 环境（venv 包列表）、工具试运行；同实例安装 dsh-bio-gem / dsh-bio-graft / dsh-bio-galatea 时还分别显示「代谢建模」「基因编辑设计」「蛋白设计」只读五态面板（**蛋白设计页含「模型目录」管理：可把 galatea 大模型安装到其他磁盘**） |
+| ⚙️ **设置面板** | dsh 设置面板（⚙️ 齿轮）侧栏「BioGenie」菜单——标签页：总览（包元信息/配置默认值）、Skill 模块（52 个条目按主 skill/领域/研究/协议/指南分组）、Python 环境（venv 包列表）、工具试运行；同实例安装 dsh-bio-gem / dsh-bio-graft / dsh-bio-galatea 时还分别显示「代谢建模」「基因编辑设计」「蛋白设计」只读五态面板（**蛋白设计页含「模型目录」管理：可把 galatea 大模型安装到其他磁盘**） |
 | 📚 **协议知识库** | 19 个高频任务协议（质控/比对/BLAST/克隆/建树/结构/富集/出版级绘图/坐标系统/统计检验/差异表达/GSEA/NGS 流程…），每个含可执行代码模板 + 常见坑，随插件打包 |
 
 ---
@@ -176,7 +176,7 @@ X 与 gap 在翻译时按未知碱基处理（Biopython 标准行为），含 X/
 
 ---
 
-## 📚 Skill 体系（51 个）
+## 📚 Skill 体系（52 个）
 
 ### 主 skill：`dsh-bio-genie`
 工具分层决策树：**先查语义化工具表 → 命中就用；否则用 bio_python 执行器写 Biopython 代码**。
@@ -203,7 +203,7 @@ X 与 gap 在翻译时按未知碱基处理（Biopython 标准行为），含 X/
 | `bio-ml` | scikit-learn 生物数据机器学习（分类/降维/聚类/特征重要性） |
 | `bio-dna-design` | DNA 设计（引物、密码子优化、质粒图谱） |
 
-研究方法 skill：`bio-survival-analysis`（生存分析）、`bio-variant-analysis`（变异分析）、`bio-literature-review`（文献检索与综述，含 PRISMA 2020 系统综述流程）、`bio-evidence-appraisal`（证据分级与结论强度：证据层级/GRADE/四轴评估/措辞边界）、`bio-paper-writing`（论文写作）。另有 20 个协议模板与 8 份 agent 使用指南，随插件打包。
+研究方法 skill：`bio-survival-analysis`（生存分析）、`bio-variant-analysis`（变异分析）、`bio-literature-review`（文献检索与综述，含 PRISMA 2020 系统综述流程）、`bio-evidence-appraisal`（证据分级与结论强度：证据层级/GRADE/四轴评估/措辞边界）、`bio-paper-writing`（论文写作）。另有 21 个协议模板与 8 份 agent 使用指南，随插件打包。
 
 ---
 
@@ -213,13 +213,13 @@ X 与 gap 在翻译时按未知碱基处理（Biopython 标准行为），含 X/
 
 ### 它是什么
 
-- **人设源文件**（`preset/bio-genie/`：`preset.yml` + `agent.cordis.yml` + `skills/`）——覆盖 base persona，告诉 AI「你手头有 66 个工具 + 51 个 skill」；`cordis.patch.yml` 的 preset 段由 `scripts/build-preset-patch.mjs` 从此目录生成（单一数据源，勿手改生成物）。
+- **人设源文件**（`preset/bio-genie/`：`preset.yml` + `agent.cordis.yml` + `skills/`）——覆盖 base persona，告诉 AI「你手头有 69 个工具 + 52 个 skill」；`cordis.patch.yml` 的 preset 段由 `scripts/build-preset-patch.mjs` 从此目录生成（单一数据源，勿手改生成物）。
 - **入门口诀**（`skills/dsh-bio-genie-expert.md`）——一个 meta-skill：「先看工作区 → 二选一（语义化工具 / `bio_python`） → 失败按 ACR 三层修 → 报告带可追溯链」。
 - **一键安装**：0.2.0+ 由插件自带的 preset 声明直接提供（装完即有，零后置动作）；0.1.x 由 `postinstall` 钩子把 preset 复制到 `~/.dsh/.agent-presets/bio-genie/`（需先批准构建脚本，见上文）。
 
 ### 它**不是**
 
-- ❌ **不接管 66 个工具**——所有 `bio_*` 工具仍由本插件的 `cordis.patch.yml` 注入，preset **不重声明**任何工具，避免冲突。
+- ❌ **不接管 69 个工具**——所有 `bio_*` / `design_*` 工具仍由本插件的 `cordis.patch.yml` 注入，preset **不重声明**任何工具，避免冲突。
 - ❌ **不抢默认人设**——安装后「生物基因精灵」出现在 dsh 预设选择器里；用户**主动选择**才激活。`agent-presets.default` 不会被改成 `bio-genie`。
 - ❌ **不破坏其他插件**——presets 与 plugins 是 dsh 的两个独立 seam，共存不冲突。
 

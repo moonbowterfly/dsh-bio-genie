@@ -243,6 +243,12 @@ export const SKILL_MANIFEST = [
     description: '来源审计协议：标识符/序列与权威来源核验（bio_source_audit）——何时审计、三模式、六态解读、修正与留痕纪律。',
     file: 'protocols/source-audit.md',
   },
+  {
+    name: 'bio-proto-design-casefile',
+    category: 'protocol',
+    description: 'design casefile 工作流：六工具链逐段提交、红线校验、报告终态化、导出归档（离线、快照冻结）。',
+    file: 'protocols/design-casefile.md',
+  },
   // ---- 科研专精（preset skills，含统计严谨性 + 完整代码模板）----
   {
     name: 'bio-survival-analysis',

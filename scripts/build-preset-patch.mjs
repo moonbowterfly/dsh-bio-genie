@@ -14,9 +14,10 @@
  *           解析时自动禁用该行（安全跳过）；preset 仍由 postinstall
  *           （scripts/install-preset.js）以文件式（~/.dsh/.agent-presets）提供。
  *
- * 用法：node scripts/build-preset-patch.mjs
+ * 用法：node scripts/build-preset-patch.mjs            # 写入 cordis.patch.yml
+ *       node scripts/build-preset-patch.mjs --check    # 不写盘，与已提交文件逐字节比对
  */
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -109,6 +110,27 @@ ${body.join('\n')}
 `
 
 const outPath = join(REPO_ROOT, 'cordis.patch.yml')
-writeFileSync(outPath, out, 'utf8')
-console.log(`generated: ${outPath}`)
-console.log(`  lines: ${out.split('\n').length} | skillsReplaced: ${skillsReplaced}`)
+// [G11] freshness gate：--check 照常生成内容但**不写盘**，与已提交文件逐字节比对。
+// 一致 → exit 0（打印 fresh）；不一致 → 打印差异摘要 + exit 1。禁止在 check 模式写文件。
+const CHECK = process.argv.includes('--check')
+if (CHECK) {
+  const existing = existsSync(outPath) ? readFileSync(outPath, 'utf8') : null
+  if (existing === out) {
+    console.log(`fresh: ${outPath} 与生成内容逐字节一致`)
+  } else {
+    const a = (existing ?? '').split('\n')
+    const b = out.split('\n')
+    let firstDiff = -1
+    for (let i = 0; i < Math.max(a.length, b.length); i += 1) {
+      if (a[i] !== b[i]) { firstDiff = i; break }
+    }
+    console.error(`stale: ${outPath} 与生成内容不一致（现有 ${a.length} 行 vs 生成 ${b.length} 行`
+      + `${firstDiff >= 0 ? `；首个差异行 #${firstDiff + 1}（${a[firstDiff] ?? '<无>'}  vs  ${b[firstDiff] ?? '<无>'}）` : ''}）`)
+    console.error('提示：计数/清单变更后请以写入模式重跑 node scripts/build-preset-patch.mjs 刷新')
+    process.exit(1)
+  }
+} else {
+  writeFileSync(outPath, out, 'utf8')
+  console.log(`generated: ${outPath}`)
+  console.log(`  lines: ${out.split('\n').length} | skillsReplaced: ${skillsReplaced}`)
+}

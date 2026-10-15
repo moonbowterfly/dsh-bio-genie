@@ -35,7 +35,7 @@ plugin.apply(ctx, { warmUp: false })
 
 // ② 无 webServer 环境下：工具与 skill 已注册、rigor-guard 事件已挂
 assert.equal(toolRegistrations, 69, `expected 69 tool registrations, got ${toolRegistrations}`)
-assert.equal(skillRegistrations, 51, `expected 51 skill registrations, got ${skillRegistrations}`)
+assert.equal(skillRegistrations, 52, `expected 52 skill registrations, got ${skillRegistrations}`)
 assert.ok(onEvents.includes('tools/post-execute'), 'rigor-guard post-execute hook missing')
 assert.ok(onEvents.includes('agent/turn-stopping'), 'rigor-guard turn-stopping hook missing')
 

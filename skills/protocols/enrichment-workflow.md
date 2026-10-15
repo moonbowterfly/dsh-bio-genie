@@ -75,3 +75,12 @@ for d in docs[:5]:
 - ORA（Enrichr）：输入是**基因列表**（阈值截断后）——信息有损但简单。
 - GSEA/ranked：输入是**全基因组排序**（按 log2FC）——不丢信息、能检出"整体弱趋势"。
 - 插件已提供两类工具：ORA（`bio_enrichr`）与 GSEA（`bio_gsea`，GSEApy 1.3.1 prerank，需完整排序及真实 GMT 或可解析命名库）。`bio_gsea` 不默认替换为 Hallmark 示例集；应核对物种和基因 ID 命名空间，已知冲突拒绝，无法核验时明确说明。完整表、GMT hash、集合交集和排除计数随结果记录。
+
+## 验收标准
+
+- [ ] 输入为去重后的基因符号列表（5-500 个），物种与命名统一（人源大写 / 小鼠首字母大写 / 其他物种先转 human ortholog）
+- [ ] 至少跑一个库（GO_BP 或 KEGG），按 `adjusted_p_value` 升序取 top，而非 raw p 值
+- [ ] 结论只报 adjusted p 值 + 重叠基因数/总命中数 + combined score；不跨库比 p 值大小（背景集不同）
+- [ ] 富集到某通路 ≠ 该组基因致癌/致病——只陈述与已知通路的成员重叠，并结合基因已知功能交叉验证
+- [ ] 输出标注证据来源（Enrichr/GSEApy + library 名 + 日期）；需文献支撑时转 literature-review 协议并带 PMID/DOI
+

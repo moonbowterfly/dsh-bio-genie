@@ -2,7 +2,7 @@
 language: none
 ---
 
-# Skill 体系导航（51 个注册条目）
+# Skill 体系导航（52 个注册条目）
 
 > skill 是插件内置的可加载知识库（配方/工作流/坑）。加载方式：用 skill 工具按名字加载。**写非平凡代码前先加载对应领域 skill；命中协议场景直接加载协议。**
 
@@ -19,7 +19,7 @@ language: none
 | 协议 skill | `bio-proto-*`（20 个） | 按 **高频任务**划分（质控/建树/富集/绘图/差异表达/GSEA…）——教「某类任务怎么完整做完」，含可执行代码模板 + 常见坑 |
 | 指南 skill | `dsh-bio-genie-guide-*`（8 个） | 插件**整体说明书**——教「这个插件怎么用」，按主题划分 |
 
-合计：主 1 + 领域 17 + 研究 5 + 协议 20 + 指南 8 = **51 个注册条目（不含主 skill 为 50 个）**。
+合计：主 1 + 领域 17 + 研究 5 + 协议 21 + 指南 8 = **52 个注册条目（不含主 skill 为 51 个）**。
 
 ### 维度二：按语言解释器（这个 skill 的代码跑在哪个环境）
 
@@ -99,6 +99,7 @@ language: none
 | `bio-proto-coords` | 基因组坐标：0/1-based 转换/BED-GFF-VCF 惯例/GRCh37-38/左对齐 |
 | `bio-proto-statistics` | 统计：检验选择/scipy+statsmodels 模板/多重校正/效应量对照/样本量与功效规划 |
 | `bio-proto-source-audit` | 来源审计：标识符/序列与权威来源逐项核验（先查后写；六态；not_found≠unreachable） |
+| `bio-proto-design-casefile` | design casefile 工作流：六工具链逐段提交 → 红线校验 → 报告终态化 → 导出归档（离线、快照冻结） |
 
 ## 四、加载策略
 
