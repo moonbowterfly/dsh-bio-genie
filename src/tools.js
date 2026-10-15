@@ -169,9 +169,10 @@ function designTool(config, opts) {
       // Guard is deliberately before throttle/env/bootstrap/cache/provenance.
       // The six design tools never use generic bioTool pre-cache.
       const cwd = resolveWorkdir(exec)
+      const cwdN = resolve(cwd) // 归一化分隔符：header.cwd 可能为正斜杠而 path.resolve 产出反斜杠，直接比较会误拒（2026-10-16 现场修复）
       const raw = typeof args.casefile_dir === 'string' ? args.casefile_dir : ''
-      const caseDir = isAbsolute(raw) ? resolve(raw) : resolve(cwd, raw)
-      const rel = caseDir === cwd ? '' : (caseDir.startsWith(cwd + '\\') || caseDir.startsWith(cwd + '/') ? caseDir.slice(cwd.length + 1) : null)
+      const caseDir = isAbsolute(raw) ? resolve(raw) : resolve(cwdN, raw)
+      const rel = caseDir === cwdN ? '' : (caseDir.startsWith(cwdN + '\\') || caseDir.startsWith(cwdN + '/') ? caseDir.slice(cwdN.length + 1) : null)
       if (rel === null || rel.startsWith('..') || !existsSync(caseDir)) {
         const err = new Error('casefile_dir 必须在工作区内且已存在')
         err.status = 'OUT_OF_DOMAIN'
@@ -370,9 +371,10 @@ function designCasefileExportTool(config) {
     async execute(args, exec) {
       if (exec.signal.aborted) throw new Error('aborted')
       const cwd = resolveWorkdir(exec)
+      const cwdN = resolve(cwd) // 归一化分隔符：header.cwd 可能为正斜杠而 path.resolve 产出反斜杠，直接比较会误拒（2026-10-16 现场修复）
       const raw = typeof args.casefile_dir === 'string' ? args.casefile_dir : ''
-      const caseDir = isAbsolute(raw) ? resolve(raw) : resolve(cwd, raw)
-      const rel = caseDir === cwd ? '' : (caseDir.startsWith(cwd + '\\') || caseDir.startsWith(cwd + '/') ? caseDir.slice(cwd.length + 1) : null)
+      const caseDir = isAbsolute(raw) ? resolve(raw) : resolve(cwdN, raw)
+      const rel = caseDir === cwdN ? '' : (caseDir.startsWith(cwdN + '\\') || caseDir.startsWith(cwdN + '/') ? caseDir.slice(cwdN.length + 1) : null)
       if (rel === null || rel.startsWith('..') || !existsSync(caseDir)) {
         const err = new Error('casefile_dir 必须在工作区内且已存在')
         err.status = 'OUT_OF_DOMAIN'
@@ -714,13 +716,14 @@ function designHostTool(config, opts) {
     async execute(args, exec) {
       if (exec.signal.aborted) throw new Error('aborted')
       const cwd = resolveWorkdir(exec)
+      const cwdN = resolve(cwd) // 归一化分隔符（同 designTool 守卫修复：正斜杠 header.cwd 误拒）
       // ── case 绑定（可选；casefile_dir 必须在工作区内且为既有 case）──
       let caseHandle = null
       let caseDir = null
       if (typeof args.casefile_dir === 'string' && args.casefile_dir) {
         const raw = args.casefile_dir
-        const candidate = isAbsolute(raw) ? resolve(raw) : resolve(cwd, raw)
-        const rel = candidate === cwd ? '' : (candidate.startsWith(cwd + '\\') || candidate.startsWith(cwd + '/') ? candidate.slice(cwd.length + 1) : null)
+        const candidate = isAbsolute(raw) ? resolve(raw) : resolve(cwdN, raw)
+        const rel = candidate === cwdN ? '' : (candidate.startsWith(cwdN + '\\') || candidate.startsWith(cwdN + '/') ? candidate.slice(cwdN.length + 1) : null)
         if (rel === null || rel.startsWith('..') || !existsSync(candidate)) {
           const err = new Error('casefile_dir 必须在工作区内且已存在')
           err.status = 'OUT_OF_DOMAIN'; err.code = 'OUT_OF_DOMAIN'; throw err

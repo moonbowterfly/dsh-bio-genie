@@ -10,7 +10,7 @@
 import { spawnSync } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { DESIGN_TOOL_OPS, registerTools } from '../src/tools.js'
 import { DESIGN_OPS } from '../src/design-ops.js'
@@ -129,6 +129,36 @@ function pythonEval(code, cwd = ROOT) {
   const envl = JSON.parse(r.stdout.trim() || '{}')
   check('unknown op → 非零退出', r.status !== 0, `status=${r.status}`)
   check('unknown op → INVALID_INPUT/UNKNOWN_OP 信封', envl.status === 'INVALID_INPUT' && envl.reason_code === 'UNKNOWN_OP', r.stdout)
+}
+
+// ── 5) 守卫回归（P0 现场修复，2026-10-16 实战测试发现）：正斜杠 header.cwd 不得误拒 ──
+{
+  const wd = workdir()
+  const clean = buildCase('clean', join(wd, 'b-clean'))
+  const tools = {}
+  const ctx = { tools: { register: (t) => { tools[t.name] = t; return () => {} } } }
+  registerTools(ctx, { enableLog: false })
+  const exec = (cwd) => ({ signal: new AbortController().signal, agent: { session: { header: { cwd } } } })
+  const run = async (tool, args, cwd) => {
+    try {
+      const v = await tool.execute(args, exec(cwd))
+      return { threw: false, value: v }
+    } catch (e) {
+      return { threw: true, status: e.status, code: e.code, envelope: e.envelope, message: String(e.message) }
+    }
+  }
+  const wdFwd = wd.replace(/\\/g, '/') // 模拟 API 创建会话时 header.cwd 的正斜杠形态
+  const vFwd = await run(tools.design_casefile_validate, { casefile_dir: clean.case_dir }, wdFwd)
+  check('正斜杠 cwd + 工作区内 casefile_dir → 不误拒（守卫修复回归）', vFwd.threw === false && vFwd.value.status === 'OK', vFwd.message)
+  const vBack = await run(tools.design_casefile_validate, { casefile_dir: clean.case_dir }, wd)
+  check('反斜杠 cwd 对照 → 同样通过', vBack.threw === false && vBack.value.status === 'OK', vBack.message)
+  const vRel = await run(tools.design_casefile_validate, { casefile_dir: relative(wd, clean.case_dir) }, wdFwd)
+  check('正斜杠 cwd + 相对 casefile_dir → 不误拒', vRel.threw === false && vRel.value.status === 'OK', vRel.message)
+  const outside = workdir()
+  const vOut = await run(tools.design_casefile_validate, { casefile_dir: outside }, wdFwd)
+  check('工作区外 casefile_dir → 仍拒绝 OUT_OF_DOMAIN（containment 不放松）', vOut.threw === true && vOut.code === 'OUT_OF_DOMAIN', vOut.message)
+  const vOutRel = await run(tools.design_casefile_validate, { casefile_dir: '../outside' }, wdFwd)
+  check('正斜杠 cwd + 越界相对路径 → 仍拒绝', vOutRel.threw === true && vOutRel.code === 'OUT_OF_DOMAIN', vOutRel.message)
 }
 
 for (const root of roots) {
