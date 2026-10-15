@@ -9,9 +9,22 @@ import { fileURLToPath } from 'node:url'
 import { registerApiRoutes } from '../src/server.js'
 import { callBio } from '../src/python.js'
 import { DESIGN_OPS } from '../src/design-ops.js'
+import { registerTools } from '../src/tools.js'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
 process.env.DSH_HOME = mkdtempSync(join(tmpdir(), 'design-contain-home-'))
+
+// B3's public six-tool contract. Keep this explicit rather than deriving it
+// from DESIGN_OPS: that set also contains the internal staging primitive.
+const FORMAL_DESIGN_TOOLS = Object.freeze([
+  Object.freeze({ name: 'bio_chassis_profile', op: 'design_chassis_profile' }),
+  Object.freeze({ name: 'bio_integration_candidates', op: 'design_integration_candidates' }),
+  Object.freeze({ name: 'bio_circuit_contextualize', op: 'design_circuit_contextualize' }),
+  Object.freeze({ name: 'design_consequence', op: 'design_consequence' }),
+  Object.freeze({ name: 'design_casefile_validate', op: 'design_casefile_validate' }),
+  Object.freeze({ name: 'design_casefile_export', op: 'design_casefile_export' }),
+])
+const INTERNAL_STAGING_OP = 'design_stage_artifact'
 
 let pass = 0
 let fail = 0
@@ -60,7 +73,15 @@ const routes = []
 const ctx = { webServer: { register: (route) => { routes.push(route); return () => {} } } }
 registerApiRoutes(ctx, { pythonEnvDir: fakeEnv })
 const route = routes.find((r) => r.path.endsWith('/execute-tool'))
+const schemaRoute = routes.find((r) => r.path.endsWith('/tool-schemas'))
 check('execute-tool route found', !!route)
+check('tool-schemas route found', !!schemaRoute)
+
+const registeredTools = {}
+registerTools({ tools: { register: (tool) => { registeredTools[tool.name] = tool; return () => {} } } }, { enableLog: false })
+check('six formal design tools registered and allowlisted',
+  FORMAL_DESIGN_TOOLS.length === 6 && FORMAL_DESIGN_TOOLS.every(({ name, op }) =>
+    typeof registeredTools[name]?.execute === 'function' && DESIGN_OPS.has(op)))
 
 function mockRes() {
   const res = {
@@ -89,12 +110,59 @@ async function post(body) {
   return { status: res.statusCode, json }
 }
 
-// ── 1) 六个 design op raw POST → 403 PANEL_OP_NOT_ALLOWED + 无进程 ──
-for (const op of DESIGN_OPS) {
+async function getToolSchemas() {
+  const res = mockRes()
+  const req = {
+    method: 'GET',
+    url: '/api/dsh-bio-genie/tool-schemas',
+    socket: { remoteAddress: '127.0.0.1' },
+    headers: { host: '127.0.0.1:3080', origin: 'http://127.0.0.1:3080' },
+  }
+  req[Symbol.asyncIterator] = async function* () {}
+  await schemaRoute.handler(req, res)
+  let json = null
+  try { json = JSON.parse(res.body) } catch { /* keep null */ }
+  return { status: res.statusCode, json }
+}
+
+// ── 1) B3 panel/registration relation + six public design ops ─────────────
+const schemaResponse = await getToolSchemas()
+const schemaEntries = Array.isArray(schemaResponse.json?.value) ? schemaResponse.json.value : []
+const panelOps = new Set(schemaEntries.map((schema) => schema?.name))
+check('tool-schemas returns unique nonempty panel ops',
+  schemaResponse.status === 200 && schemaResponse.json?.ok === true
+  && schemaEntries.length > 0 && panelOps.size === schemaEntries.length
+  && schemaEntries.every((schema) => typeof schema?.name === 'string' && schema.name)
+  && panelOps.has('env_status'), JSON.stringify(schemaResponse))
+const formalPanelNames = FORMAL_DESIGN_TOOLS.flatMap(({ name, op }) => [name, op])
+check('TOOL_SCHEMAS excludes the six registered design tools and internal staging op',
+  [...formalPanelNames, INTERNAL_STAGING_OP].every((name) => !panelOps.has(name)),
+  JSON.stringify([...panelOps].sort()))
+
+for (const { op } of FORMAL_DESIGN_TOOLS) {
   clearMarker()
   const r = await post({ op, args: {} })
   check(`raw POST ${op} -> PANEL_OP_NOT_ALLOWED`, r.status === 403 && r.json?.code === 'PANEL_OP_NOT_ALLOWED', JSON.stringify(r))
   check(`raw POST ${op} -> python 未启动`, !markerExists())
+}
+
+// Internal staging is not one of the formal six tools, but remains raw-denied.
+clearMarker()
+{
+  const r = await post({ op: INTERNAL_STAGING_OP, args: {} })
+  check(`raw POST ${INTERNAL_STAGING_OP} -> PANEL_OP_NOT_ALLOWED`, r.status === 403 && r.json?.code === 'PANEL_OP_NOT_ALLOWED', JSON.stringify(r))
+  check(`raw POST ${INTERNAL_STAGING_OP} -> python 未启动`, !markerExists())
+}
+
+// Kill the former design-only denylist: this is a real, registered bio op that
+// is intentionally absent from the trial panel, so it must be raw-denied too.
+check('off-panel bio_fig_lint remains formally registered',
+  typeof registeredTools.bio_fig_lint?.execute === 'function' && !panelOps.has('fig_lint'))
+clearMarker()
+{
+  const r = await post({ op: 'fig_lint', args: {} })
+  check('raw POST off-panel fig_lint -> PANEL_OP_NOT_ALLOWED', r.status === 403 && r.json?.code === 'PANEL_OP_NOT_ALLOWED', JSON.stringify(r))
+  check('raw POST off-panel fig_lint -> python 未启动', !markerExists())
 }
 
 // ── 2) 阳性对照：benign op 确实 spawn（哨兵灵敏性证明）──

@@ -229,6 +229,12 @@ const TOOL_SCHEMAS = [
 ]
 
 
+// `/execute-tool` is the trial-panel transport, not a generic bio_ops
+// dispatcher. Keep its executable surface exactly aligned with the schemas the
+// panel can render. DESIGN_OPS remains a second, fail-closed guard below so a
+// future accidental schema exposure cannot reopen a design submission path.
+const PANEL_OPS = new Set(TOOL_SCHEMAS.map((schema) => schema.name))
+
 /** 单端点执行上限（ms）。pip freeze 在冷启动 venv 内通常 <2s，留 10x 余量。 */
 const HARD_TIMEOUT_MS = 20_000
 
@@ -440,11 +446,17 @@ async function handleExecuteTool(req, res, config) {
   const op = body.op
   const args = body.args || {}
 
-  // design 六 op：raw 通道一律拒绝（必须在任何 Python 启动之前；v3 §B0 / spec v0.3 §4.5）
-  if (DESIGN_OPS.has(op)) {
+  // Raw panel execution is closed by TOOL_SCHEMAS. Design operations retain a
+  // separate deny guard: even an accidental future schema entry must never
+  // reopen their required designTool submission path. Both checks precede all
+  // environment resolution and Python process creation (v3 §B0/B3).
+  const isDesignOp = DESIGN_OPS.has(op)
+  if (isDesignOp || !PANEL_OPS.has(op)) {
     return writeJson(res, 403, {
       ok: false, code: PANEL_OP_NOT_ALLOWED,
-      message: `design 工具 '${op}' 不开放 raw 通道（须经 designTool 提交路径）`,
+      message: isDesignOp
+        ? `design 工具 '${op}' 不开放 raw 通道（须经 designTool 提交路径）`
+        : `工具 '${op}' 不在工具试运行面板 allowlist 中`,
     })
   }
 
