@@ -10,8 +10,8 @@
  */
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { ensureEnvironment, venvPython, resolveEnvDir, ensureExtraDeps } from './runtime.js'
-import { runBridge, callBio } from './python.js'
-import { join } from 'node:path'
+import { runBridge, callBio, spawnPython } from './python.js'
+import { join, resolve, isAbsolute } from 'node:path'
 import { existsSync } from 'node:fs'
 import { resolveWorkdir, fallbackWorkspace } from './workdir.js'
 import { cacheGet, cacheSet, throttle } from './throttle.js'
@@ -22,6 +22,9 @@ import {
   readPatterns, readLessons, searchMemory,
 } from './memory.js'
 import { stampProvenance } from './provenance.js'
+import { verifyDesignPacket, PACKET_DIR } from './design-gate.js'
+import { DESIGN_OPS } from './design-ops.js'
+import { deriveDesignInputHash, finalizeDesignResult } from './design-envelope.js'
 
 /** 引导可能耗时数分钟；工具执行期间等待引导完成。 */
 const BOOT_WAIT_MS = 600_000
@@ -112,6 +115,149 @@ function bioTool(config, opts) {
       // 计算防火墙：返回值挂 _provenance 背书字段（台账记录由 rigor-guard 的
       // tools/post-execute 钩子统一完成，那里拿得到 agent 上下文）
       return stampProvenance(opts.name, result)
+    },
+  })
+}
+
+// ============================================================================
+// designTool —— 六新工具的独立 designTool 路径（v0.5 §D5.5：不复用通用 pre-cache；
+// 每次调用全量 gate + 直连 python/design_casefile.py 独立 dispatcher）。
+//
+// 与 bioTool 的差异（契约要点）：
+//  - op 必须属于 DESIGN_OPS（design 通道白名单）；raw 通道由 server.js 拒绝。
+//  - 每次执行先 verifyDesignPacket（gate 先于任何 spawn/cache/registry），
+//    并把 packet 身份（PACKET_FIXED + index/manifest/acceptance sha）注入子进程
+//    （split-packet 防线，与 A3 dispatchDesignOp 同一身份模型）。
+//  - 子进程 = python/design_casefile.py（validate/export 专用 dispatcher）：
+//    validate 任一 required check FAIL → 进程非零退出（任务书 §1.1「失败非零退出」；
+//    bio_ops.py 受 P2-1 全 exit-0 契约约束，故本路径直连专用 dispatcher）。
+//  - 结果信封 = v0.4 §C4 {status, reason_code, artifact_refs[], detail}（另附 checks[]）。
+//  - validate/export 只写 receipt / audit overlay（TS 侧 design-envelope），
+//    不产生也不修改科学快照（v0.4 §C2）。
+// ============================================================================
+
+/** 本批次注册的 designTool op 集合（双向验收：与 bio_ops.OPS 互为子集）。 */
+export const DESIGN_TOOL_OPS = Object.freeze(['design_casefile_validate', 'design_casefile_export'])
+
+const DESIGN_CASEFILE_PATH = join(import.meta.dirname, '..', 'python', 'design_casefile.py')
+
+function designTool(config, opts) {
+  if (!DESIGN_OPS.has(opts.op)) {
+    throw new Error(`designTool 注册失败：${opts.op} 不在 DESIGN_OPS（design 通道白名单）`)
+  }
+  const callTimeout = opts.timeoutMs ?? 300_000
+  return defineTool({
+    name: opts.name,
+    description: opts.description,
+    parameters: opts.parameters,
+    timeoutMs: callTimeout + BOOT_WAIT_MS,
+    output: {
+      schema: opts.outputSchema ?? { type: 'object', additionalProperties: true },
+      render: (_args, value) => [{ type: 'text', text: JSON.stringify(value, null, 2) }],
+    },
+    async execute(args, exec) {
+      if (exec.signal.aborted) throw new Error('aborted')
+      // Guard is deliberately before throttle/env/bootstrap/cache/provenance.
+      // The six design tools never use generic bioTool pre-cache.
+      const cwd = resolveWorkdir(exec)
+      const raw = typeof args.casefile_dir === 'string' ? args.casefile_dir : ''
+      const caseDir = isAbsolute(raw) ? resolve(raw) : resolve(cwd, raw)
+      const rel = caseDir === cwd ? '' : (caseDir.startsWith(cwd + '\\') || caseDir.startsWith(cwd + '/') ? caseDir.slice(cwd.length + 1) : null)
+      if (rel === null || rel.startsWith('..') || !existsSync(caseDir)) {
+        const err = new Error('casefile_dir 必须在工作区内且已存在')
+        err.status = 'OUT_OF_DOMAIN'
+        err.code = 'OUT_OF_DOMAIN'
+        throw err
+      }
+      // Gate before every side effect which can create state.  A guard
+      // failure still gets a receipt-attached TS audit overlay when the case
+      // path is available; it can never use cache or provenance.
+      const gate = verifyDesignPacket()
+      if (!gate.ok) {
+        const terminal = await finalizeDesignResult({
+          operation: opts.op,
+          worker: null,
+          inputHashes: [deriveDesignInputHash(opts.op, args)],
+          caseDir,
+          guard: () => gate,
+        })
+        const err = new Error(`design gate 拒绝：${terminal.code || gate.code} ${gate.detail || ''}`)
+        err.status = 'DEPENDENCY_UNAVAILABLE'
+        err.code = terminal.code || gate.code
+        err.audit = terminal.audit
+        throw err
+      }
+      // designTool does not reuse generic pre-cache (D5.5): no cacheGet/cacheSet.
+      await throttle(opts.op)
+      const py = opts.pythonPath || await requireEnv(config)
+      const t0 = Date.now()
+      const res = await spawnPython(py, DESIGN_CASEFILE_PATH, { op: opts.op, args: { ...args, casefile_dir: caseDir } }, {
+        cwd,
+        timeoutMs: callTimeout,
+        signal: exec.signal,
+        env: {
+          DSH_DESIGN_STAGING: '',
+          DSH_DESIGN_DISPATCH_ID: '',
+          DSH_DESIGN_PACKET: '',
+          DSH_DESIGN_PACKET_FIXED: PACKET_DIR,
+          DSH_DESIGN_EXPECT_INDEX_SHA: gate.index_sha256 || '',
+          DSH_DESIGN_EXPECT_MANIFEST_SHA: gate.manifest_sha256 || '',
+          DSH_DESIGN_ACCEPTANCE_ID: gate.acceptance_id || '',
+        },
+      })
+      const duration = Date.now() - t0
+      let envelope = res && typeof res === 'object' && res.ok !== undefined && typeof res.status === 'string' ? res : null
+      if (!envelope) {
+        try {
+          const parsed = JSON.parse(String(res.stdout || '').trim())
+          if (parsed && typeof parsed === 'object' && typeof parsed.status === 'string') envelope = parsed
+        } catch { /* fallthrough */ }
+      }
+      const finalized = await finalizeDesignResult({
+        operation: opts.op,
+        envelope,
+        worker: res,
+        inputHashes: [deriveDesignInputHash(opts.op, args)],
+        caseDir,
+        // Gate was verified before Python spawn.  Reuse its immutable result
+        // so the ordering remains guard → (no pre-cache) → audit/provenance.
+        guard: () => gate,
+        stampProvenance: (out) => stampProvenance(opts.name, out),
+      })
+      const terminalEnvelope = finalized.envelope || envelope
+      if (config.enableLog !== false) {
+        appendLog({
+          kind: 'op',
+          op: opts.op,
+          ok: finalized.ok === true,
+          duration_ms: duration,
+          error: finalized.ok ? undefined : `${terminalEnvelope?.reason_code || finalized.code || 'EXECUTION_ERROR'} ${terminalEnvelope?.detail || finalized.detail || ''}`.slice(0, 300),
+        })
+      }
+      if (!finalized.ok) {
+        const status = terminalEnvelope?.status || finalized.status || 'EXECUTION_ERROR'
+        const code = terminalEnvelope?.reason_code || finalized.code || 'EXECUTION_ERROR'
+        const detail = terminalEnvelope?.detail || finalized.detail || '结果信封无效或审计登记失败'
+        const err = new Error(`design ${opts.op} ${status}: ${code} ${detail}`)
+        err.status = status
+        err.code = code
+        err.envelope = terminalEnvelope || undefined
+        err.audit = finalized.audit
+        throw err
+      }
+      // Keep the public C4 response surface deliberately narrow.  The worker
+      // transport's `ok`/`code` fields stay receipt-only; checks[] remains the
+      // documented validator extension.  Provenance is applied by the A5
+      // finalizer only after guard/audit/registry have completed.
+      const out = {
+        status: finalized.envelope.status,
+        reason_code: finalized.envelope.reason_code,
+        artifact_refs: finalized.envelope.artifact_refs,
+        detail: finalized.envelope.detail,
+      }
+      if (Array.isArray(finalized.envelope.checks)) out.checks = finalized.envelope.checks
+      if (finalized.envelope._provenance) out._provenance = finalized.envelope._provenance
+      return out
     },
   })
 }
@@ -1422,6 +1568,39 @@ function semanticTools(config) {
         out_csv: { type: 'string', description: '完整结果表落盘路径（可选）' },
       },
       op: 'gsea',
+      timeoutMs: 300_000,
+    }),
+    // ============ design 通道：casefile validate / export（B1-part-2）============
+    // 独立 designTool 路径（D5.5）；opts.op ↔ bio_ops.OPS 双向验收见
+    // test/design-casefile-tools.mjs。validate 失败非零退出；export 先过 validate 门禁。
+    designTool(config, {
+      name: 'design_casefile_validate',
+      description:
+        'design casefile 验证（正式工具级，B1-part-2）：绑定不可变 snapshot，逐检查项验证——' +
+        'snapshot 绑定/manifest 与磁盘 hash 一致/全工件 schema/三条红线反向核查（R1 CRN≠GEM、' +
+        'R2 分数≠bound、R3 proxy≠capacity）/DAG 无环/缺 manifest 条目。任一 required check FAIL ' +
+        '→ INVALID_INPUT + 非零退出 + 禁止 export。返回 C4 信封 {status, reason_code, artifact_refs, detail} + checks[]。' +
+        '触发词：validate casefile、验证 case、casefile 检查、红线核查。',
+      parameters: {
+        casefile_dir: { type: 'string', required: true, description: 'casefile 根目录（绝对路径，或相对工作区；须在工作区内且已存在）' },
+        strict: { type: 'boolean', default: true, description: '严格模式（默认 true；v0 阶段全部检查项均为 required）' },
+      },
+      op: 'design_casefile_validate',
+      timeoutMs: 300_000,
+    }),
+    designTool(config, {
+      name: 'design_casefile_export',
+      description:
+        'design casefile 导出（正式工具级，B1-part-2）：validate 门禁（未过 → 拒绝导出，非零退出）→ ' +
+        'report.md（含证据分级与假设清单；禁含 case_instance_id/workdir/临时路径/run UUID/真实时间/stderr/bundle 路径/snapshot_sha；' +
+        '可含 case_content_id/policy_hash/artifact IDs/claim IDs）+ bundle.zip（全工件 + 哈希清单，解压可重验）；' +
+        '不可重放项列出；同一快照确定性输出。导出产物为导出侧产物，不改变科学快照。' +
+        '触发词：export casefile、导出 case、报告导出、bundle。',
+      parameters: {
+        casefile_dir: { type: 'string', required: true, description: 'casefile 根目录（绝对路径，或相对工作区；须在工作区内且已存在）' },
+        format: { type: 'string', enum: ['zip', 'report', 'both'], default: 'both', description: '导出格式（默认 both：report.md + bundle.zip）' },
+      },
+      op: 'design_casefile_export',
       timeoutMs: 300_000,
     }),
   ]

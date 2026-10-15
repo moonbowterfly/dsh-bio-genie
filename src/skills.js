@@ -554,6 +554,7 @@ language: mixed
 23. 蛋白注释路由：查蛋白功能/PTM/交叉引用/通路/序列用 bio_uniprot（mode 参数切换），**不要用 bio_entrez_fetch 绕道去取蛋白注释**——UniProt 的注释粒度远高于 GenBank。PTM 位点为序列坐标且带证据码；通路取自交叉引用，可再交叉核对 KEGG（bio_pathway_search）。
 24. 基因结构路由：内含子-外显子与剪接位点用 bio_seq_introns（需**基因组类**登录号 NG_/NC_；gene 参数是**精确匹配**——product 描述常提及邻近基因名，子串匹配会串基因；未匹配时工具返回 available_genes 供纠正；坐标按转录方向排序，负链递减）；建树一致性用 bio_phylo_compare（RF 距离 0 = 拓扑一致；比较前两棵树叶名须归一）；序列相似区段/重复/重排的可视化核验用 bio_seq_dotplot。
 25. RNA 结构与单细胞路由：RNA 二级结构/稳定性用 bio_rna_fold（MFE ΔG 越负越稳；mean_base_pair_distance 越小结构越确定）；单细胞数据质控用 bio_sc_qc（species 选错会导致 MT% 恒为 0——human 用 MT- 前缀、mouse 用 mt-）。二者首次调用自动装依赖（ViennaRNA / scanpy），提示用户等待。
+26. design casefile 路由：验证 design casefile（绑定不可变 snapshot、manifest/磁盘 hash、schema、三条红线 R1 CRN≠GEM / R2 分数≠bound / R3 proxy≠capacity、DAG 无环；任一 required 检查 FAIL → 非零退出并禁止导出）用 design_casefile_validate；导出（validate 门禁 → report.md 含证据分级与假设清单 + bundle.zip 全工件与哈希清单，解压可独立复核）用 design_casefile_export。触发词：validate casefile、导出 case、红线核查、case 报告。
 
 
 ## 自动代码修复（ACR）— 三层职责边界

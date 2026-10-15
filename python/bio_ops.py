@@ -45,7 +45,13 @@ from analysis_ext import (op_seq_introns, op_seq_dotplot, op_uniprot,
 from sc_tools import op_sc_qc
 # 来源审计（2026-10-10 新增）
 from source_audit_tools import op_source_audit
+# design 通道（B1-part-2）：design_stage_artifact 保持 design_ops（A3）；validate/export
+# 升级为正式工具级（python/design_casefile.py）。A3 对象级原语 op_design_casefile_validate
+# 仍在 design_ops.py 中保留（契约不变），bio_ops 路由继续指向 A3 对象级原语
+# （{object_path, artifact_type}）；正式工具级 validate（casefile_dir + 快照绑定）
+# 由 python/design_casefile.py 独立 dispatcher 提供，经 TS designTool 通道调用。
 from design_ops import op_design_stage_artifact, op_design_casefile_validate
+from design_casefile import op_design_casefile_export
 from seq_util import read_seq_input
 socket.setdefaulttimeout(20)
 from retry_utils import retry_on_network_error
@@ -2125,7 +2131,10 @@ OPS = {
     'source_audit': op_source_audit,
     # design 通道（仅经 designTool；raw 通道由 TS 侧 spawn 前拒绝）
     'design_stage_artifact': op_design_stage_artifact,
+    # B1-part-2：正式工具级 validate / export（design_casefile.py；A3 对象级原语
+    # op_design_casefile_validate 仍在 python/design_ops.py 保留，契约不变）
     'design_casefile_validate': op_design_casefile_validate,
+    'design_casefile_export': op_design_casefile_export,
 }
 
 
@@ -2180,7 +2189,7 @@ def main():
             return
         result = OPS[op](args)
         result = _sanitize_json(result)
-        if op in {'deseq2', 'gsea', 'ml_pipeline', 'design_stage_artifact', 'design_casefile_validate'} and isinstance(result, dict) and result.get('error'):
+        if op in {'deseq2', 'gsea', 'ml_pipeline', 'design_stage_artifact', 'design_casefile_validate', 'design_casefile_export'} and isinstance(result, dict) and result.get('error'):
             print(json.dumps({'ok': False, 'code': result.get('code', 'ANALYSIS_FAILED'),
                               'error': result['error'], 'details': result},
                              ensure_ascii=False, cls=SafeEncoder))
