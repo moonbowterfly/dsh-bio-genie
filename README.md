@@ -213,13 +213,13 @@ X 与 gap 在翻译时按未知碱基处理（Biopython 标准行为），含 X/
 
 ### 它是什么
 
-- **人设源文件**（`preset/bio-genie/`：`preset.yml` + `agent.cordis.yml` + `skills/`）——覆盖 base persona，告诉 AI「你手头有 63 个工具 + 51 个 skill」；`cordis.patch.yml` 的 preset 段由 `scripts/build-preset-patch.mjs` 从此目录生成（单一数据源，勿手改生成物）。
+- **人设源文件**（`preset/bio-genie/`：`preset.yml` + `agent.cordis.yml` + `skills/`）——覆盖 base persona，告诉 AI「你手头有 66 个工具 + 51 个 skill」；`cordis.patch.yml` 的 preset 段由 `scripts/build-preset-patch.mjs` 从此目录生成（单一数据源，勿手改生成物）。
 - **入门口诀**（`skills/dsh-bio-genie-expert.md`）——一个 meta-skill：「先看工作区 → 二选一（语义化工具 / `bio_python`） → 失败按 ACR 三层修 → 报告带可追溯链」。
 - **一键安装**：0.2.0+ 由插件自带的 preset 声明直接提供（装完即有，零后置动作）；0.1.x 由 `postinstall` 钩子把 preset 复制到 `~/.dsh/.agent-presets/bio-genie/`（需先批准构建脚本，见上文）。
 
 ### 它**不是**
 
-- ❌ **不接管 63 个工具**——所有 `bio_*` 工具仍由本插件的 `cordis.patch.yml` 注入，preset **不重声明**任何工具，避免冲突。
+- ❌ **不接管 66 个工具**——所有 `bio_*` 工具仍由本插件的 `cordis.patch.yml` 注入，preset **不重声明**任何工具，避免冲突。
 - ❌ **不抢默认人设**——安装后「生物基因精灵」出现在 dsh 预设选择器里；用户**主动选择**才激活。`agent-presets.default` 不会被改成 `bio-genie`。
 - ❌ **不破坏其他插件**——presets 与 plugins 是 dsh 的两个独立 seam，共存不冲突。
 

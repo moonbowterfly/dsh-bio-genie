@@ -2,7 +2,7 @@
 language: none
 ---
 
-# 工具全参考（63 个）
+# 工具全参考（66 个）
 
 > 每个工具：功能 → 参数（★=必填）→ 返回关键字段 → 典型触发词。**选工具第一优先，`bio_python` 执行器第二优先**。
 
@@ -250,3 +250,11 @@ language: none
 **bio_circuit_compile** — 基因回路编译（BioCRNpyler，**第二层依赖，首次调用自动安装**）：`components ★`（[{type: promoter|rbs|cds|terminator, name, regulators?}]）、`name`（构建体名称，默认 circuit）、`context`（表达体系，txtl_extract/expression，默认 txtl_extract）、`out_file`（SBML 输出路径，可选，默认工作区 `<name>.xml`；⚠️ 参数名是 `out_file`，无 `output_sbml` 参数）。组装 DNA_construct → TxTlExtract → compile_crn()，返回 SBML 路径 + 物种数/反应数 + networkx 网络图 PNG。构建体 DNA 模板物种（`dna_part_*`）初始浓度默认设为 1.0（相对体系 RNAP=0.5/Ribo=10/RNase=0.25），避免默认仿真全零；显式设置的正值不会被覆盖。触发词：基因回路、回路编译、repressilator、CRN。
 
 **bio_circuit_simulate** — 回路动力学仿真（Bioscrape，**第二层依赖，首次调用自动安装**）：`sbml_file ★`（bio_circuit_compile 的输出）、`simulation_type`（ode 默认 / ssa 随机模拟）、`timepoints`（{start, end, points}，默认 0-200 共 200 点）、`parameter_overrides`（参数覆盖 dict；**只能覆盖参数**（速率常数等），不能覆盖物种初始浓度——覆盖键不是 SBML parameter id 时返回 `invalid_overrides` + `hint`，不报错）、`out_file`（曲线图输出路径，可选）。返回动力学曲线图 PNG（matplotlib，物种浓度 vs 时间）+ 稳态值 + 峰值时间；稳态全零时 `note` 附诊断提示（检查 DNA 模板/物种初始浓度）。触发词：回路仿真、动力学模拟、SSA 随机模拟。
+
+### 宿主侧设计工具（design 通道，B1-part-1）
+
+**bio_chassis_profile** — 宿主底盘档案：`genome_files ★`（[{path, format}]，至少一个 fasta；gff3/genbank/segments_tsv 可选）、`coord_convention ★`（0-based-half-open / 1-based-inclusive，必须显式声明）、`contig_topology`、`condition`、`parts_evidence_file`、`casefile_dir`。返回 genome_ref@1 + host_profile@1（GC/密码子/contig 统计 + 证据完整度状态）；不含 GEM growth 锚点、不声明产品档位。门禁：HASH_FAILED / COORD_CONVENTION_UNDECLARED / DUPLICATE_CONTIG_NAME → BLOCKED。触发词：底盘档案、宿主画像、chassis profile。
+
+**bio_integration_candidates** — 基因组整合位点候选：`host_profile`（或 `host_profile_ref`）+ `genome_files ★` + `cassette ★`（序列或长度）+ `candidates`/`scan` + `top_n`（≤16）。按正式 integration-ruleset 逐条强制评估（unknown_policy=block，绝不输出 safe）；无注释/注释不可信 → NOT_RUN；缺 ruleset → BLOCKED。触发词：整合位点、插入候选、integration site。
+
+**bio_circuit_contextualize** — 回路表达情景化：`circuit ★`（components[] 或 sbol_file）+ `host_profile` + `coupling_mode`（仅产耦合草案，不可定量授权）+ `parts_evidence`。返回 expression_scenario@1（元件证据查表排名；无证据只给 rank + risk，禁绝对表达）+ 可选 kinetic_crn_ref@1（封装既有 bio_circuit_compile 输出）。ostir 不可用 → DEPENDENCY_UNAVAILABLE。触发词：表达情景、元件排名、耦合草案。
