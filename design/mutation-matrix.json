@@ -29,18 +29,21 @@
       "owner": "P0b-fixture",
       "summary": "deterministic replay：不同临时目录/启动时间两跑，canonical + content hashes 必须相同（receipt 可异）；注入时间戳/运行元数据后双跑 hash 分叉。",
       "injection": {
-        "kind": "not_yet_runnable",
-        "description": "planned：在 canonical 输入中注入运行期元数据（如 _provenance.at / fetched_at 漂移），断言双跑 content/canonical hash 分叉被门拒绝。"
+        "kind": "replace_text",
+        "target": "test/fixtures/design/replay-probe-input.json",
+        "old": "\"title\": \"REPLAY_PROBE_PURE_MARKER\"",
+        "new": "\"title\": \"REPLAY_PROBE_PURE_MARKER\", \"_provenance\": { \"at\": \"2025-01-01T00:00:00Z\" }"
       },
       "target_gate": {
-        "planned": "P0b: design-casefile replay probe（canonicalizeViaPacket + deriveCaseContentId 双跑对照）— 尚未实现"
+        "command": ["node", "test/design-replay-probe.mjs"],
+        "timeout_ms": 120000
       },
       "expected_status": "deny",
       "expected_reason": "DETERMINISM_VIOLATION",
       "expected_failure_class": "DETERMINISM_VIOLATION",
-      "check_id": "pending:design-casefile-replay-probe",
-      "not_yet_runnable": true,
-      "note": "仓库层尚无双跑 replay 门（packet 内部 check_readonly_replay.py 仅覆盖 packet 树）。"
+      "check_id": "design-replay-probe.mjs::1.valid 纯度 / 2.双跑确定性 / 3.invalid 拒绝 (DETERMINISM_VIOLATION)",
+      "not_yet_runnable": false,
+      "note": "E3 已实现：src/design-casefile.js canonicalizeViaPacket 单点 fail-closed 拒绝（scanRuntimeMetadata denylist=_provenance/generated_at/captured_at/run_uuid；fetched_at 因 genome_ref schema 合法字段移除）；fixture + 门 test/design-replay-probe.mjs；双跑跨子进程/临时目录。spec v0.3 §4.1+§8 M0。"
     },
     {
       "mutation_id": "M1",

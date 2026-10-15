@@ -1,0 +1,84 @@
+{
+  "fixture_id": "replay-probe-input@1",
+  "spec_refs": [
+    "genie-synbio-design-spec-v0.3-2026-10-12.md#4.1 (canonical 序列化必须剥离/拒绝任何 runtime metadata；_provenance.at 只进 receipt)",
+    "genie-synbio-design-spec-v0.3-2026-10-12.md#8 M0 (deterministic replay：不同临时目录/启动时间两跑 canonical + content hashes 相同；receipt 可异)"
+  ],
+  "purpose": "M0 replay probe 冻结输入：valid[] 为纯净 canonical 输入样本（门断言纯度 + 双跑确定性）；invalid[] 为 tainted 样本（断言系统级拒绝 DETERMINISM_VIOLATION）。注入锚点见 design/mutation-matrix.json#M0（title 字段值，全文件恰 1 次）。样本 doc 均为无数组标量对象（c14n 契约：数组需 set 注解；manifest 形态样本由 computeSnapshotSha 内部注解）。",
+  "valid": [
+    {
+      "id": "pure-doc-1",
+      "doc": {
+        "title": "REPLAY_PROBE_PURE_MARKER",
+        "schema_version": "1.0",
+        "mode": "fixture",
+        "value": 42
+      },
+      "root_input_artifact_ids": [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      ],
+      "policy_version": "1",
+      "canonical_params": { "objective": "biomass", "strict": true }
+    },
+    {
+      "id": "pure-manifest-1",
+      "doc": {
+        "schema_version": "1.0",
+        "case_content_id": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "artifacts": [
+          { "artifact_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "type": "host_profile@1", "inputs": [], "producer": "test" }
+        ],
+        "policy": { "policy_version": "1", "tier": "fixture" }
+      },
+      "root_input_artifact_ids": [
+        "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      ],
+      "policy_version": "1",
+      "canonical_params": {}
+    },
+    {
+      "id": "pure-doc-2",
+      "doc": {
+        "genome": "ATGCATGC",
+        "coord_convention": "0-based-half-open",
+        "contig_count": 1,
+        "source": "fixture"
+      },
+      "root_input_artifact_ids": [],
+      "policy_version": "1",
+      "canonical_params": { "mode": "annotate" }
+    }
+  ],
+  "invalid": [
+    {
+      "id": "taint-top-level-provenance",
+      "doc": {
+        "title": "tainted top-level",
+        "value": 1
+      },
+      "_provenance": { "tool": "bio_x", "at": "2025-01-01T00:00:00Z" }
+    },
+    {
+      "id": "taint-nested-provenance",
+      "doc": {
+        "title": "tainted nested",
+        "nested": { "_provenance": { "at": "2025-02-02T00:00:00Z" } },
+        "value": 2
+      }
+    },
+    {
+      "id": "taint-canonical-params-run-uuid",
+      "root_input_artifact_ids": [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ],
+      "policy_version": "1",
+      "canonical_params": { "run_uuid": "b29b2b48-2a1b-4a5b-8c1d-000000000000" }
+    }
+  ],
+  "injection": {
+    "kind": "replace_text",
+    "target": "test/fixtures/design/replay-probe-input.json",
+    "note": "锚点与注入片段见 design/mutation-matrix.json#M0（本文件不含锚点字面量副本，保证全文件恰 1 次）"
+  }
+}

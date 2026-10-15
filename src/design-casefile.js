@@ -80,8 +80,57 @@ export function validateCaseInstanceId(id) {
   return { ok: problems.length === 0, problems }
 }
 
+/**
+ * [E3 M0] runtime metadata denylist（spec v0.3 §4.1：canonical 序列化必须剥离/拒绝
+ * 任何 runtime metadata——provenance.js:96 注入的字段一律不进 canonical，只进 receipt）。
+ *
+ * denylist 定稿（2026-10-15 全仓 grep 查证）：
+ *   `_provenance`（含其下所有子键）——注入层字段（src/provenance.js:96-100
+ *     stampProvenance 挂 `{tool, at}`；src/tools.js:292/954 输出信封附加），
+ *     全仓无任何 schema 将其定义为工件合法字段；
+ *   `generated_at` / `captured_at` / `run_uuid` —— 全仓 0 处合法用途；
+ *   `fetched_at` —— **已从 denylist 移除**：design/packet/schemas/genome_ref.json:102
+ *     将其定义为 genome_ref 工件合法字段（$ref isoTimestamp），且
+ *     test/design-dispatch.mjs:47 以 fetched_at 变体构造合法 genome_ref 工件走
+ *     canonical 路径（保留会破坏纯净输入，违反「纯净输入零行为变化」约束）。
+ */
+const RUNTIME_METADATA_DENYLIST = new Set(['_provenance', 'generated_at', 'captured_at', 'run_uuid'])
+
+/** 递归扫描对象/数组中的 runtime metadata 键。返回命中键的路径列表（空数组 = 纯净）。 */
+export function scanRuntimeMetadata(value, path = '$') {
+  const hits = []
+  const walk = (v, p) => {
+    if (Array.isArray(v)) {
+      for (let i = 0; i < v.length; i += 1) walk(v[i], p + '[' + i + ']')
+      return
+    }
+    if (v && typeof v === 'object') {
+      for (const k of Object.keys(v)) {
+        const child = p + '.' + k
+        if (RUNTIME_METADATA_DENYLIST.has(k)) hits.push(child)
+        walk(v[k], child)
+      }
+    }
+  }
+  walk(value, path)
+  return hits
+}
+
 /** 经冻结 c14n（packet impl CLI 子进程）做 canonical 序列化。 */
 export function canonicalizeViaPacket(text, annotations) {
+  // [E3 M0] 系统级 fail-closed 拒绝（单点接线）：解析后、进 c14n 子进程前扫描
+  // runtime metadata。命中 → DETERMINISM_VIOLATION，不进入子进程；下游
+  // （content id / snapshot sha / artifact staging / ingress inventory）自动继承拒绝。
+  let scanned = null
+  try {
+    scanned = JSON.parse(text)
+  } catch { /* 非 JSON 文本交给下游既有路径（c14n 子进程自行判定），不改变行为 */ }
+  if (scanned !== null) {
+    const hits = scanRuntimeMetadata(scanned)
+    if (hits.length > 0) {
+      return { ok: false, code: 'DETERMINISM_VIOLATION', detail: 'runtime metadata in canonical input: ' + hits.join(', ') }
+    }
+  }
   const work = mkdtempSync(join(tmpdir(), 'design-casefile-c14n-'))
   try {
     const casePath = join(work, 'case.json')

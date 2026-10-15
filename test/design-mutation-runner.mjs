@@ -90,11 +90,13 @@ function runRunner(args) {
 }
 
 // ── 附：not_yet_runnable 条目显式跳过 ──────────────────────────────
+// （E3：M0 已转可运行，跳过断言改用仍 planned 的 M2；M0 击杀由
+//   --all-runnable 全杀与 --id M0 验收命令覆盖）
 {
-  const { status, json } = runRunner(['--matrix', MATRIX, '--id', 'M0'])
+  const { status, json } = runRunner(['--matrix', MATRIX, '--id', 'M2'])
   const r = json?.results?.[0]
-  check('D1 M0 skipped=true executed=false', r?.skipped === true && r?.executed === false, JSON.stringify(r))
-  check('D2 M0 exit 0（跳过非错误）', status === 0, 'status=' + status)
+  check('D1 M2 skipped=true executed=false', r?.skipped === true && r?.executed === false, JSON.stringify(r))
+  check('D2 M2 exit 0（跳过非错误）', status === 0, 'status=' + status)
 }
 
 console.log('design-mutation-runner: %d passed, %d failed', pass, fail)
