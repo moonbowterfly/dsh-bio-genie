@@ -43,6 +43,46 @@ function isContained(rootReal, targetReal) {
   return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel))
 }
 
+/**
+ * [P0-reparse] 逐段校验/创建目录链：anchor 之下每一段都必须是真实目录、且 realpath 后仍在 anchor 内。
+ * 必须在任何写入（mkdir/文件写）之前调用——recursive mkdir 在 Windows 上会被「预置的
+ * junction/symlink」跟随（写穿到目标目录），而事后 lstat 无法撤销已经发生的写入。
+ * 顺序：对已存在段先做 realpath containment（逃逸优先报 ESCAPE），再做 reparse 判定
+ * （isSymbolicLink → REPARSE；含解析后仍在 anchor 内部的 junction——全链拒绝，与 ingress
+ * 「ancestor junction 即使解析在 case root 内部也拒绝」同口径）；缺失段仅在祖先段全部通过后
+ * 逐段 mkdir（单层，无 recursive）。返回 {ok:true} 或 {ok:false, suffix, path?, real?, detail?}；
+ * 调用方将 suffix 映射到本模块错误码前缀（如 CASE_ROOT_/CASE_STAGING_）。
+ */
+export function ensureRealDirChain(anchor, target, { create = false } = {}) {
+  const anchorAbs = resolve(anchor)
+  const targetAbs = resolve(target)
+  if (!isContained(anchorAbs, targetAbs)) return { ok: false, suffix: 'ESCAPE', path: targetAbs }
+  let anchorStat
+  try { anchorStat = lstatSync(anchorAbs) } catch (e) { return { ok: false, suffix: 'UNREADABLE', path: anchorAbs, detail: String(e.code || e.message) } }
+  if (!anchorStat.isDirectory()) return { ok: false, suffix: 'NOT_DIR', path: anchorAbs }
+  if (anchorStat.isSymbolicLink()) return { ok: false, suffix: 'REPARSE', path: anchorAbs }
+  let anchorReal
+  try { anchorReal = realpathSync(anchorAbs) } catch (e) { return { ok: false, suffix: 'UNREADABLE', path: anchorAbs, detail: String(e.code || e.message) } }
+  const rel = relative(anchorAbs, targetAbs)
+  const parts = rel ? rel.split(/[\\/]+/).filter(Boolean) : []
+  let current = anchorAbs
+  for (const part of parts) {
+    current = join(current, part)
+    if (!existsSync(current)) {
+      if (!create) return { ok: false, suffix: 'MISSING', path: current }
+      try { mkdirSync(current) } catch (e) { return { ok: false, suffix: 'MKDIR_FAILED', path: current, detail: String(e.code || e.message) } }
+    }
+    let st
+    try { st = lstatSync(current) } catch (e) { return { ok: false, suffix: 'UNREADABLE', path: current, detail: String(e.code || e.message) } }
+    let real
+    try { real = realpathSync(current) } catch (e) { return { ok: false, suffix: 'UNREADABLE', path: current, detail: String(e.code || e.message) } }
+    if (!isContained(anchorReal, real)) return { ok: false, suffix: 'ESCAPE', path: current, real }
+    if (st.isSymbolicLink()) return { ok: false, suffix: 'REPARSE', path: current }
+    if (!st.isDirectory()) return { ok: false, suffix: 'NOT_DIR', path: current }
+  }
+  return { ok: true }
+}
+
 /** 键序不敏感的 JSON 深比较（canonical 相等语义的最小充分实现）。快照经 c14n
  *  序列化读回后对象键被重排，直接 JSON.stringify 比较会把同义 policy 误判为
  *  POLICY_MISMATCH（键序差异是合法输入，不是内容差异）。 */
@@ -345,16 +385,19 @@ export function ensureCaseDir(workdir, caseInstanceId, { create = true } = {}) {
   if (!idv.ok) return { ok: false, code: 'CASE_INSTANCE_ID_UNSAFE', problems: idv.problems }
 
   const caseRoot = join(wd, 'result', 'design')
-  if (create) {
-    try {
-      mkdirSync(caseRoot, { recursive: true })
-    } catch (e) {
-      return { ok: false, code: 'CASE_ROOT_MKDIR_FAILED', caseRoot, problems: [String(e.message).slice(0, 160)] }
+  // [P0-reparse] 逐段校验/创建（写前）：预置 junction/symlink（含解析在 workdir 内部的）
+  // 在任何 mkdir 发生之前被拒绝——修复「recursive mkdir 先写穿、事后 containment 才拒绝」。
+  const rootChain = ensureRealDirChain(wd, caseRoot, { create })
+  if (!rootChain.ok) {
+    return {
+      ok: false,
+      code: 'CASE_ROOT_' + rootChain.suffix,
+      caseRoot,
+      ...(rootChain.path ? { path: rootChain.path } : {}),
+      ...(rootChain.real ? { real: rootChain.real } : {}),
+      ...(rootChain.detail ? { problems: [rootChain.detail] } : {}),
     }
   }
-  if (!existsSync(caseRoot)) return { ok: false, code: 'CASE_ROOT_MISSING', caseRoot }
-  const crStat = lstatSync(caseRoot)
-  if (!crStat.isDirectory()) return { ok: false, code: 'CASE_ROOT_NOT_DIR', caseRoot }
   const wdReal = realpathSync(wd)
   const crReal = realpathSync(caseRoot)
   if (!isContained(wdReal, crReal)) return { ok: false, code: 'CASE_ROOT_ESCAPE', caseRoot, real: crReal }
@@ -560,9 +603,7 @@ export function commitTransaction(handle, { caseContentId = null, policy = null,
     if (baseArtifacts.length + newArtifacts.length > L.maxArtifactsPerSnapshot) {
       return { ok: false, code: 'MANIFEST_TOO_MANY_ARTIFACTS', step: 0, txid: id }
     }
-    // ① stage（canonicalize + 写 staging/<txid>/<sha>）
-    const stagingDir = join(caseDir, 'staging', id)
-    mkdirSync(stagingDir, { recursive: true })
+    // ① canonicalize + schema 校验（内存态；全部通过前不落任何盘）[P0-store-order]
     const staged = []
     for (const a of newArtifacts) {
       if (!a || typeof a.type !== 'string' || !a.value || typeof a.value !== 'object' || Array.isArray(a.value)) {
@@ -576,7 +617,6 @@ export function commitTransaction(handle, { caseContentId = null, policy = null,
       const bytes = Buffer.from(canon.canonical, 'utf8')
       if (bytes.length > L.maxObjectBytes) return { ok: false, code: 'OBJECT_TOO_LARGE', step: 1, txid: id, size: bytes.length }
       const sha = sha256hex(bytes)
-      writeFileSync(join(stagingDir, sha), bytes)
       staged.push({
         sha, bytes, stem,
         producer: typeof a.producer === 'string' && a.producer ? a.producer : 'bsp',
@@ -599,17 +639,8 @@ export function commitTransaction(handle, { caseContentId = null, policy = null,
     if (fresh.length === 0) {
       return { ok: true, no_change: true, txid: id, snapshot_sha: headSha }
     }
-    // ③ 发布 objects（已存在必须逐字节相同）
-    for (const s of fresh) {
-      const target = join(objectsDir, s.sha)
-      if (existsSync(target)) {
-        const existing = readFileSync(target)
-        if (!existing.equals(s.bytes)) return { ok: false, code: 'OBJECT_HASH_COLLISION', step: 3, txid: id, sha: s.sha }
-      } else {
-        atomicWriteBytes(target, s.bytes)
-      }
-    }
-    // ④ 写 + fsync 快照
+    // ②.5 先判后存（P0-store-order）：目标快照 sha 与 receipt 行在任何写入之前预检；
+    // staging 链逐段校验后才写 staged 文件——校验失败不留任何落盘残片。
     const newEntries = fresh.map((s) => ({
       artifact_id: s.sha,
       type: typeOf(s.stem),
@@ -624,6 +655,45 @@ export function commitTransaction(handle, { caseContentId = null, policy = null,
       artifacts: [...baseArtifacts, ...newEntries],
       policy: policyDoc,
     }
+    const shaPre = computeSnapshotSha(manifest)
+    if (!shaPre.ok) return { ok: false, code: 'SNAPSHOT_INVALID', step: 4, txid: id, problems: shaPre.problems }
+    const rcEvent = {
+      event: 'committed',
+      txid: id,
+      snapshot_sha: shaPre.snapshot_sha,
+      parent_snapshot_sha: headSha,
+      at: new Date().toISOString(),
+      artifacts: fresh.map((s) => ({ artifact_id: s.sha, type: typeOf(s.stem) })),
+    }
+    const rcLineBytes = Buffer.byteLength(JSON.stringify(rcEvent), 'utf8') + 1
+    if (rcLineBytes > L.maxReceiptLineBytes) return { ok: false, code: 'RECEIPT_TOO_LARGE', step: 4, txid: id, size: rcLineBytes }
+    const stagingDir = join(caseDir, 'staging', id)
+    const stagingChain = ensureRealDirChain(caseDir, stagingDir, { create: true })
+    if (!stagingChain.ok) {
+      return {
+        ok: false,
+        code: 'CASE_STAGING_' + stagingChain.suffix,
+        step: 1,
+        txid: id,
+        ...(stagingChain.path ? { path: stagingChain.path } : {}),
+      }
+    }
+    try {
+      for (const s of staged) writeFileSync(join(stagingDir, s.sha), s.bytes)
+    } catch (e) {
+      return { ok: false, code: 'CASE_STAGING_WRITE_FAILED', step: 1, txid: id, detail: String(e.code || e.message).slice(0, 160) }
+    }
+    // ③ 发布 objects（已存在必须逐字节相同）
+    for (const s of fresh) {
+      const target = join(objectsDir, s.sha)
+      if (existsSync(target)) {
+        const existing = readFileSync(target)
+        if (!existing.equals(s.bytes)) return { ok: false, code: 'OBJECT_HASH_COLLISION', step: 3, txid: id, sha: s.sha }
+      } else {
+        atomicWriteBytes(target, s.bytes)
+      }
+    }
+    // ④ 写 + fsync 快照
     const ws = writeSnapshot({ snapshotsDir, manifest, validate: (m) => validateDesignArtifact('case_manifest', m) })
     if (!ws.ok) return { ok: false, code: ws.code, step: 4, txid: id, problems: ws.problems }
     const manifestBytes = readFileSync(ws.path)
@@ -641,16 +711,29 @@ export function commitTransaction(handle, { caseContentId = null, policy = null,
       }
       return { ok: false, code: wh.code, step: 5, txid: id }
     }
-    // ⑥ committed receipt
-    const rc = appendReceipt(caseDir, {
-      event: 'committed',
-      txid: id,
-      snapshot_sha: ws.snapshot_sha,
-      parent_snapshot_sha: headSha,
-      at: new Date().toISOString(),
-      artifacts: fresh.map((s) => ({ artifact_id: s.sha, type: typeOf(s.stem) })),
-    }, { limits: L })
-    if (!rc.ok) return { ok: false, code: rc.code, step: 6, txid: id }
+    // ⑥ committed receipt（行尺寸预检已在上方完成；I/O 失败 → 回滚 HEAD，恢复「失败 ⇒ HEAD 不变」不变量）
+    let rc
+    try {
+      rc = appendReceipt(caseDir, rcEvent, { limits: L })
+    } catch (e) {
+      rc = { ok: false, code: 'RECEIPT_APPEND_FAILED', detail: String(e.code || e.message).slice(0, 120) }
+    }
+    if (!rc.ok) {
+      let rolled = false
+      if (headSha) {
+        const back = writeHeadAtomic(caseDir, headSha, { expect: ws.snapshot_sha })
+        rolled = back.ok === true
+        if (rolled && !ws.existed) {
+          try { unlinkSync(ws.path) } catch { /* best effort */ }
+        }
+      }
+      const out = { ok: false, code: rc.code, step: 6, txid: id, rolled_back: rolled }
+      if (!rolled) {
+        out.committed = true
+        out.snapshot_sha = ws.snapshot_sha
+      }
+      return out
+    }
     return { ok: true, snapshot_sha: ws.snapshot_sha, parent: headSha, txid: id, published: fresh.map((s) => s.sha) }
   }, { op: 'commit' })
 }
@@ -724,22 +807,7 @@ export function commitReportFinalizeTransaction(handle, {
       return { ok: false, code: 'REPORT_ARTIFACT_ID_COLLISION', step: 2, txid: id, report_artifact_id: reportId }
     }
 
-    // 1) stage the already TS-rechecked bytes in the transaction namespace.
-    const stagingDir = join(caseDir, 'staging', id)
-    mkdirSync(stagingDir, { recursive: true })
-    writeFileSync(join(stagingDir, reportId), bytes)
-
-    // 2) raw report validation above is the schema-equivalent narrow gate.
-    // 3) publish content-addressed object, refusing a non-identical collision.
-    const objectPath = join(objectsDir, reportId)
-    if (existsSync(objectPath)) {
-      if (!readFileSync(objectPath).equals(bytes)) {
-        return { ok: false, code: 'OBJECT_HASH_COLLISION', step: 3, txid: id, sha: reportId }
-      }
-    } else {
-      atomicWriteBytes(objectPath, bytes)
-    }
-
+    // 0.5) 先判后存（P0-store-order）：目标快照 sha 与 receipt 行在任何写入之前预检。
     const reportEntry = {
       artifact_id: reportId,
       type: CASE_REPORT_TYPE,
@@ -754,6 +822,48 @@ export function commitReportFinalizeTransaction(handle, {
       artifacts: [...baseArtifacts, reportEntry],
       policy: snap.manifest.policy,
     }
+    const shaPre = computeSnapshotSha(manifest)
+    if (!shaPre.ok) return { ok: false, code: 'SNAPSHOT_INVALID', step: 4, txid: id, problems: shaPre.problems }
+    const rcEvent = {
+      event: 'committed',
+      txid: id,
+      snapshot_sha: shaPre.snapshot_sha,
+      parent_snapshot_sha: expectHead,
+      at: new Date().toISOString(),
+      artifacts: [{ artifact_id: reportId, type: CASE_REPORT_TYPE }],
+      report_finalize: true,
+    }
+    const rcLineBytes = Buffer.byteLength(JSON.stringify(rcEvent), 'utf8') + 1
+    if (rcLineBytes > L.maxReceiptLineBytes) return { ok: false, code: 'RECEIPT_TOO_LARGE', step: 4, txid: id, size: rcLineBytes }
+    // 1) stage the already TS-rechecked bytes in the transaction namespace.
+    const stagingDir = join(caseDir, 'staging', id)
+    const stagingChain = ensureRealDirChain(caseDir, stagingDir, { create: true })
+    if (!stagingChain.ok) {
+      return {
+        ok: false,
+        code: 'CASE_STAGING_' + stagingChain.suffix,
+        step: 1,
+        txid: id,
+        ...(stagingChain.path ? { path: stagingChain.path } : {}),
+      }
+    }
+    try {
+      writeFileSync(join(stagingDir, reportId), bytes)
+    } catch (e) {
+      return { ok: false, code: 'CASE_STAGING_WRITE_FAILED', step: 1, txid: id, detail: String(e.code || e.message).slice(0, 160) }
+    }
+
+    // 2) raw report validation above is the schema-equivalent narrow gate.
+    // 3) publish content-addressed object, refusing a non-identical collision.
+    const objectPath = join(objectsDir, reportId)
+    if (existsSync(objectPath)) {
+      if (!readFileSync(objectPath).equals(bytes)) {
+        return { ok: false, code: 'OBJECT_HASH_COLLISION', step: 3, txid: id, sha: reportId }
+      }
+    } else {
+      atomicWriteBytes(objectPath, bytes)
+    }
+
     // 4) immutable snapshot (the frozen manifest schema explicitly permits
     // case_report@1 even though its raw bytes use this local narrow validator).
     const ws = writeSnapshot({ snapshotsDir, manifest, validate: (m) => validateDesignArtifact('case_manifest', m) })
@@ -775,16 +885,26 @@ export function commitReportFinalizeTransaction(handle, {
     }
     // 6) receipt records the committed science transition.  Runtime fields
     // live only here and can never be rendered into report.md.
-    const rc = appendReceipt(caseDir, {
-      event: 'committed',
-      txid: id,
-      snapshot_sha: ws.snapshot_sha,
-      parent_snapshot_sha: expectHead,
-      at: new Date().toISOString(),
-      artifacts: [{ artifact_id: reportId, type: CASE_REPORT_TYPE }],
-      report_finalize: true,
-    }, { limits: L })
-    if (!rc.ok) return { ok: false, code: rc.code, step: 6, txid: id }
+    // I/O 失败 → 回滚 HEAD（行尺寸预检已在上方完成），恢复「失败 ⇒ HEAD 不变」不变量。
+    let rc
+    try {
+      rc = appendReceipt(caseDir, rcEvent, { limits: L })
+    } catch (e) {
+      rc = { ok: false, code: 'RECEIPT_APPEND_FAILED', detail: String(e.code || e.message).slice(0, 120) }
+    }
+    if (!rc.ok) {
+      const back = writeHeadAtomic(caseDir, expectHead, { expect: ws.snapshot_sha })
+      const rolled = back.ok === true
+      if (rolled && !ws.existed) {
+        try { unlinkSync(ws.path) } catch { /* best effort */ }
+      }
+      const out = { ok: false, code: rc.code, step: 6, txid: id, rolled_back: rolled }
+      if (!rolled) {
+        out.committed = true
+        out.snapshot_sha = ws.snapshot_sha
+      }
+      return out
+    }
     return {
       ok: true,
       snapshot_sha: ws.snapshot_sha,

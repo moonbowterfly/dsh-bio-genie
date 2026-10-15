@@ -101,6 +101,25 @@ function mkRoot() {
   check('经 result junction 逃逸拒绝（CASE_ROOT_ESCAPE）', r5.ok === false && r5.code === 'CASE_ROOT_ESCAPE', JSON.stringify(r5))
 }
 
+// [P0-reparse] 写前链校验：预置 junction 不被 mkdir 跟随（修复前 result junction 会被递归创建穿透）。
+{
+  const wd = mkRoot()
+  const outside = mkRoot()
+  symlinkSync(outside, join(wd, 'result'), 'junction')
+  const r = ensureCaseDir(wd, 'no-write-case')
+  check('result junction escape rejects (CASE_ROOT_ESCAPE)', r.ok === false && r.code === 'CASE_ROOT_ESCAPE', JSON.stringify(r))
+  check('no write-through: junction target untouched', readdirSync(outside).length === 0, JSON.stringify(readdirSync(outside)))
+}
+{
+  const wd = mkRoot()
+  const inner = join(wd, 'inner-target')
+  mkdirSync(inner)
+  symlinkSync(inner, join(wd, 'result'), 'junction')
+  const r = ensureCaseDir(wd, 'inner-case')
+  check('internal junction rejected all-chain (CASE_ROOT_REPARSE)', r.ok === false && r.code === 'CASE_ROOT_REPARSE', JSON.stringify(r))
+  check('no write-through on internal junction', readdirSync(inner).length === 0, JSON.stringify(readdirSync(inner)))
+}
+
 // ── 4) case_content_id 派生（derivation v1）─────────────────────────
 const params = { capability_policy: 'design-capability-policy@0', design_tier: 'reference_profile' }
 {
@@ -211,7 +230,7 @@ const params = { capability_policy: 'design-capability-policy@0', design_tier: '
   })
   check('tx3 无效工件 → ARTIFACT_INVALID(step2)', tx3.ok === false && tx3.code === 'ARTIFACT_INVALID' && tx3.step === 2, JSON.stringify(tx3).slice(0, 220))
   check('tx3 all-or-none：objects/HEAD 未变', readdirSync(cs.objectsDir).length === objsBefore && readHead(cs.caseDir).snapshot_sha === tx2.snapshot_sha)
-  check('tx3 staging 留痕（待 GC）', existsSync(join(cs.caseDir, 'staging', tx3.txid)))
+  check('tx3 校验失败零落盘（先判后存）', !existsSync(join(cs.caseDir, 'staging', tx3.txid)))
   const tx4 = commitTransaction(cs, { expectHead: 'f'.repeat(64), newArtifacts: [{ type: 'host_profile', value: hp, producer: 'test' }] })
   check('tx4 CAS 不符 → HEAD_CAS_MISMATCH', tx4.ok === false && tx4.code === 'HEAD_CAS_MISMATCH', JSON.stringify(tx4))
   const tx5 = commitTransaction(cs, { limits: { maxObjectBytes: 100 }, newArtifacts: [{ type: 'host_profile', value: hp, producer: 'test' }] })
@@ -226,6 +245,65 @@ const params = { capability_policy: 'design-capability-policy@0', design_tier: '
   check('tx7 缺 base → BASE_REQUIRED', tx7.ok === false && tx7.code === 'BASE_REQUIRED')
   const tx8 = commitTransaction(cs, { newArtifacts: [{ type: 'host_profile', value: hp, producer: 'test' }] })
   check('tx8 全重复 → no_change', tx8.ok === true && tx8.no_change === true && tx8.snapshot_sha === tx2.snapshot_sha, JSON.stringify(tx8).slice(0, 200))
+}
+
+// [P0-reparse] commitTransaction staging 链写前校验（预置 junction 不被跟随）。
+{
+  const wd = mkRoot()
+  const cs = ensureCaseDir(wd, 'stage-junc')
+  const target = join(wd, 'stage-junc-target')
+  mkdirSync(target)
+  symlinkSync(target, join(cs.caseDir, 'staging'), 'junction')
+  const policy = { policy_id: 'design-capability-policy', policy_version: '0', policy_hash: B }
+  const tx = commitTransaction(cs, {
+    caseContentId: GOLDEN_CONTENT_ID, policy,
+    newArtifacts: [{ type: 'genome_ref', value: findCase('gvr-01').doc, producer: 'test' }],
+  })
+  check('pre-placed staging junction (external target) rejects before write (CASE_STAGING_ESCAPE)', tx.ok === false && tx.code === 'CASE_STAGING_ESCAPE', JSON.stringify(tx))
+  check('staging junction target untouched', readdirSync(target).length === 0, JSON.stringify(readdirSync(target)))
+  check('HEAD unchanged after staging rejection', readHead(cs.caseDir).snapshot_sha === null)
+}
+// [P0-reparse] 内部 junction（解析在 caseDir 内）→ 全链拒绝（CASE_STAGING_REPARSE）。
+{
+  const wd = mkRoot()
+  const cs = ensureCaseDir(wd, 'stage-junc-inner')
+  const target = join(cs.caseDir, 'inner-target')
+  mkdirSync(target)
+  symlinkSync(target, join(cs.caseDir, 'staging'), 'junction')
+  const policy = { policy_id: 'design-capability-policy', policy_version: '0', policy_hash: B }
+  const tx = commitTransaction(cs, {
+    caseContentId: GOLDEN_CONTENT_ID, policy,
+    newArtifacts: [{ type: 'genome_ref', value: findCase('gvr-01').doc, producer: 'test' }],
+  })
+  check('internal staging junction rejected all-chain (CASE_STAGING_REPARSE)', tx.ok === false && tx.code === 'CASE_STAGING_REPARSE', JSON.stringify(tx))
+  check('internal junction target untouched', readdirSync(target).length === 0, JSON.stringify(readdirSync(target)))
+}
+// [P0-store-order] receipt 超限在任何写入之前拒绝（HEAD/快照/objects/staging/receipt 零残留）。
+{
+  const wd = mkRoot()
+  const cs = ensureCaseDir(wd, 'receipt-cap')
+  const policy = { policy_id: 'design-capability-policy', policy_version: '0', policy_hash: B }
+  const tx = commitTransaction(cs, {
+    caseContentId: GOLDEN_CONTENT_ID, policy, limits: { maxReceiptLineBytes: 64 },
+    newArtifacts: [{ type: 'genome_ref', value: findCase('gvr-01').doc, producer: 'test' }],
+  })
+  check('receipt over-limit fails before any write (RECEIPT_TOO_LARGE)', tx.ok === false && tx.code === 'RECEIPT_TOO_LARGE' && tx.step === 4, JSON.stringify(tx))
+  check('HEAD unchanged after receipt pre-check failure', readHead(cs.caseDir).snapshot_sha === null)
+  check('no snapshot/objects/staging/receipt residue', readdirSync(cs.snapshotsDir).length === 0 && readdirSync(cs.objectsDir).length === 0 && (!existsSync(join(cs.caseDir, 'staging')) || readdirSync(join(cs.caseDir, 'staging')).length === 0) && !existsSync(join(cs.caseDir, 'run_receipt.jsonl')))
+}
+// [P0-store-order] receipt I/O 失败 → HEAD 回滚（原子性不变量：失败 ⇒ HEAD 不变）。
+{
+  const wd = mkRoot()
+  const cs = ensureCaseDir(wd, 'receipt-io')
+  const policy = { policy_id: 'design-capability-policy', policy_version: '0', policy_hash: B }
+  const ok1 = commitTransaction(cs, { caseContentId: GOLDEN_CONTENT_ID, policy, newArtifacts: [{ type: 'genome_ref', value: findCase('gvr-01').doc, producer: 'test' }] })
+  check('receipt-io base commit ok', ok1.ok === true, JSON.stringify(ok1))
+  unlinkSync(join(cs.caseDir, 'run_receipt.jsonl'))
+  mkdirSync(join(cs.caseDir, 'run_receipt.jsonl'))
+  const tx = commitTransaction(cs, { caseContentId: GOLDEN_CONTENT_ID, policy, newArtifacts: [{ type: 'host_profile', value: findCase('hpf-01').doc, producer: 'test' }] })
+  check('receipt I/O failure rolls back HEAD (atomicity)', tx.ok === false && tx.code === 'RECEIPT_APPEND_FAILED' && tx.rolled_back === true && tx.committed === undefined, JSON.stringify(tx))
+  check('HEAD restored to pre-commit value', readHead(cs.caseDir).snapshot_sha === ok1.snapshot_sha)
+  check('rolled-back snapshot removed', readdirSync(cs.snapshotsDir).length === 1)
 }
 
 // ── 9) 孤儿 GC（根=全部不可变快照）─────────────────────────────────

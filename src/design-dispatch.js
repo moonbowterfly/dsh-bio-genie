@@ -20,7 +20,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve, win32 } from 'n
 import { DESIGN_OPS } from './design-ops.js'
 import { verifyDesignPacket, PACKET_DIR } from './design-gate.js'
 import { deriveAnnotationsForArtifact, validateDesignArtifact } from './design-validate.js'
-import { CASE_LIMITS, commitTransaction, computeSnapshotSha, loadSnapshot, readHead } from './design-casefile.js'
+import { CASE_LIMITS, commitTransaction, computeSnapshotSha, loadSnapshot, readHead, scanRuntimeMetadata } from './design-casefile.js'
 import { spawnPython } from './python.js'
 
 const OPS_PATH = join(import.meta.dirname, '..', 'python', 'bio_ops.py')
@@ -349,6 +349,12 @@ function canonicalCheckViaPacket(artifactType, text) {
   } catch (e) {
     return { ok: false, code: 'STAGED_UNREADABLE', detail: String(e.message).slice(0, 120) }
   }
+  // [E3 M0/P0-rework] runtime metadata 拒绝与 casefile canonicalizeViaPacket 同源（单点 denylist）：
+  // standalone（无 casefile）dispatch 路径此前不经过该门——在此同口径 fail-closed（写前拒绝）。
+  const runtimeHits = scanRuntimeMetadata(value)
+  if (runtimeHits.length > 0) {
+    return { ok: false, code: 'DETERMINISM_VIOLATION', detail: 'runtime metadata in canonical input: ' + runtimeHits.join(', ') }
+  }
   const ann = deriveAnnotationsForArtifact(artifactType, value)
   if (ann === null) return { ok: false, code: 'PACKET_UNVERIFIED', detail: 'annotations derivation failed' }
   const work = mkdtempSync(join(tmpdir(), 'design-c14n-'))
@@ -504,8 +510,11 @@ export function reserveDesignDispatch({ op, args = {}, cwd, caseHandle = null, p
   }
   const dispatchId = randomUUID()
   const paths = dispatchPaths({ cwd, caseHandle, dispatchId })
+  // [P0-reparse] 任何写入之前逐段校验/创建 dispatch 存储链（root/control/staging/本次 uuid）：
+  // 预置 junction/symlink 在 reserve 即被拒绝，manifest/record/staging 写入不会跟随 reparse。
+  const dirs = ensureDispatchDirectories(paths, { cwd, caseHandle }, { create: true })
+  if (!dirs.ok) return dirs
   try {
-    mkdirSync(paths.stagingDir, { recursive: true })
     const created = iso(now)
     const manifest = {
       schema_version: '1.0',
@@ -564,6 +573,10 @@ function releaseConsumeLock(paths) {
 }
 
 function terminalFailure(paths, record, code, { now = Date.now(), detail = null } = {}) {
+  // [P0-reparse] 终态写入前复验：以 dir 的真实父目录为 anchor（不依赖 cwd 推导，
+  // 兼容 recover 的显式 dispatchDir 场景）——control 父目录或其下 dispatch 目录为 reparse → 拒绝写。
+  const chain = ensureRealDirectory(dirname(paths.dir), paths.dir, { create: false })
+  if (!chain.ok) return chain
   try {
     const t = transitionRecord(paths, record, 'FAILED_CONSUMED', { now, failureCode: code, note: detail })
     if (!t.ok) return t
@@ -573,10 +586,13 @@ function terminalFailure(paths, record, code, { now = Date.now(), detail = null 
   }
 }
 
-function legacyPromote(paths, candidates) {
+function legacyPromote(paths, candidates, { cwd } = {}) {
+  // [P0-reparse] standalone objects 目录写入前逐段校验（<cwd>/objects 预置 junction 拒绝）。
+  const anchor = resolve(cwd || process.cwd())
+  const dirs = ensureRealDirectory(anchor, paths.standaloneObjectsDir, { create: true })
+  if (!dirs.ok) return dirs
   const objects = []
   try {
-    mkdirSync(paths.standaloneObjectsDir, { recursive: true })
     for (const candidate of candidates) {
       const objectPath = join(paths.standaloneObjectsDir, candidate.sha256 + '.json')
       if (existsSync(objectPath) && !readFileSync(objectPath).equals(candidate.bytes)) return fail('OBJECT_HASH_COLLISION', candidate.sha256)
@@ -598,6 +614,9 @@ export function consumeDispatchCandidates({ cwd, caseHandle = null, dispatchId, 
   const read = readDispatchRecord({ cwd, caseHandle, dispatchId })
   if (!read.ok) return read
   const { paths } = read
+  // [P0-reparse] 写前逐段复验存储链：reserve 之后被替换的 reparse 在此拦截（早于 lock/receipt/record 任何写入）。
+  const chain = ensureDispatchDirectories(paths, { cwd, caseHandle }, { create: false })
+  if (!chain.ok) return chain
   const gotLock = consumeLock(paths)
   if (!gotLock.ok) return gotLock
   try {
@@ -651,7 +670,7 @@ export function consumeDispatchCandidates({ cwd, caseHandle = null, dispatchId, 
       committedSnapshot = tx.snapshot_sha || record.parent_snapshot
       objects = inspected.candidates.map((c) => ({ ...c, object_path: join(caseHandle.objectsDir, c.sha256) }))
     } else {
-      const promoted = legacyPromote(paths, inspected.candidates)
+      const promoted = legacyPromote(paths, inspected.candidates, { cwd })
       if (!promoted.ok) return terminalFailure(paths, record, promoted.code, { now, detail: promoted.detail })
       objects = promoted.objects
     }
@@ -701,6 +720,14 @@ export function recoverDispatches({ cwd, caseHandle = null, dispatchRoot = null,
   const root = dispatchRoot || dispatchRootFor({ cwd, caseHandle })
   const controlRoot = join(root, 'control')
   if (!existsSync(controlRoot)) return { ok: true, recovered: [], kept: [], problems: [] }
+  // [P0-reparse] recovery 的读/写同样不得跟随预置 reparse（root/control 链逐段复验）。
+  // 显式 dispatchRoot（调用方自定域根）以 root 自身为 anchor：校验 root/control 为真实目录；
+  // 默认路径则以 cwd/caseDir 为 anchor 做全链校验。
+  const recAnchor = dispatchRoot ? resolve(dispatchRoot) : dispatchAnchor({ cwd, caseHandle })
+  const rootCheck = ensureRealDirectory(recAnchor, root, { create: false })
+  if (!rootCheck.ok) return { ok: false, recovered: [], kept: [], problems: [rootCheck.code] }
+  const controlCheck = ensureRealDirectory(root, controlRoot, { create: false })
+  if (!controlCheck.ok) return { ok: false, recovered: [], kept: [], problems: [controlCheck.code] }
   const recovered = []; const kept = []; const problems = []
   for (const entry of readdirSync(controlRoot)) {
     const dir = join(controlRoot, entry)
@@ -744,6 +771,17 @@ export function gcDispatches({ cwd, caseHandle = null, dispatchRoot = null, now 
   const root = dispatchRoot || dispatchRootFor({ cwd, caseHandle })
   const recovery = recoverDispatches({ cwd, caseHandle, dispatchRoot: root, now })
   if (!existsSync(root)) return { ok: recovery.ok, removed: [], kept: [], recovery }
+  // [P0-reparse] 删除前复验（预置 reparse → fail-closed，不做任何删除；不存在的子域不触发）。
+  // 显式 dispatchRoot 以 root 自身为 anchor；默认路径以 cwd/caseDir 为 anchor。
+  const gcAnchor = dispatchRoot ? resolve(dispatchRoot) : dispatchAnchor({ cwd, caseHandle })
+  const chainRoot = ensureRealDirectory(gcAnchor, root, { create: false })
+  if (!chainRoot.ok) return { ok: false, removed: [], kept: [], recovery }
+  for (const sub of ['control', 'staging']) {
+    const subPath = join(root, sub)
+    if (!existsSync(subPath)) continue
+    const subCheck = ensureRealDirectory(root, subPath, { create: false })
+    if (!subCheck.ok) return { ok: false, removed: [], kept: [], recovery }
+  }
   const removed = []; const kept = []
   const controlRoot = join(root, 'control')
   const stagingRoot = join(root, 'staging')

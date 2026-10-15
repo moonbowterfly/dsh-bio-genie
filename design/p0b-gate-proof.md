@@ -26,6 +26,7 @@
 ## E3 新增证据（M0 replay probe）
 
 - 系统级拒绝接线：`src/design-casefile.js` `canonicalizeViaPacket` 单点（JSON.parse 后、c14n 子进程前）扫描 runtime metadata → 命中即 `{ok:false, code:'DETERMINISM_VIOLATION'}`；denylist 定稿 `_provenance / generated_at / captured_at / run_uuid`（`fetched_at` 因 `design/packet/schemas/genome_ref.json:102` 为合法工件字段而移除——全仓 grep 查证）。
+- [P0-rework 2026-10-15 复核轮处置] dispatch 路径同口径接线：`src/design-dispatch.js` `canonicalCheckViaPacket` 复用 `scanRuntimeMetadata`（同一 denylist，单点定义）——堵住「standalone（无 casefile）consume 写入不受 E3 门覆盖」的缺口；测试=`test/design-dispatch.mjs`「runtime metadata taint rejects on standalone path」（含 standalone objects 零写入断言）。同轮另修：reparse 写前链校验（`ensureRealDirChain` + reserve/consume/recover/gc 接线）与 store-order/receipt 原子性（先判后存 + HEAD 回滚）。
 - 冻结 fixture：`test/fixtures/design/replay-probe-input.json`（valid[3] 纯净样本 + invalid[3] tainted 样本；锚点唯一；注入片段自洽）。
 - 门：`test/design-replay-probe.mjs`（17 断言：fixture 完整性 / valid 纯度 / 双跑确定性跨独立子进程+临时目录 / invalid 拒绝；通过态不打印 `DETERMINISM_VIOLATION`）。
 - 全杀：M0 击杀 observed=`DETERMINISM_VIOLATION`、gate_exit_code=1、restore_verified=true；`--id M0` 单跑与 `--all-runnable` 全跑均 exit 0。

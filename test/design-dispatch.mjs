@@ -2,7 +2,7 @@
 // Covers formal state transitions, staging protocol, recovery/GC, and one
 // real Python worker route.  Fixtures are self-contained and cleaned up.
 import { spawnSync } from 'node:child_process'
-import { existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, linkSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -164,7 +164,8 @@ function consume(res, worker = null, options = {}) {
     rmSync(r.paths.stagingDir, { recursive: true, force: true })
     symlinkSync(target, r.paths.stagingDir, 'junction')
     const c = consume(r)
-    check('junction staging root rejects as reparse point', c.ok === false && c.code === 'STAGING_REPARSE_POINT', JSON.stringify(c))
+    // [P0-reparse] consume 入口写前链校验先于 inspect 拦截（更早、更强；修复前由 inspect 报 STAGING_REPARSE_POINT）。
+    check('junction staging dir rejects pre-write (chain gate)', c.ok === false && c.code === 'DISPATCH_REPARSE_POINT', JSON.stringify(c))
   } catch (e) {
     check('junction fixture is constructible (never silently skipped)', false, String(e.message))
   }
@@ -191,6 +192,39 @@ function consume(res, worker = null, options = {}) {
   const manifest = JSON.parse(readFileSync(r.paths.manifestPath, 'utf8'))
   const inspected = inspectStagingCandidates({ manifest, stagingDir: r.paths.stagingDir, now: 1_000_001 })
   check('pure inspect accepts a canonical regular candidate', inspected.ok && inspected.candidates.length === 1 && inspected.candidates[0].sha256.length === 64, JSON.stringify(inspected))
+}
+
+// [P0-reparse] 预置 junction 在 reserve 阶段被写前链校验拒绝（修复前会被递归 mkdir 跟随写穿）。
+{
+  const wd = workdir()
+  const target = join(wd, 'pre-junction-target')
+  mkdirSync(join(wd, 'result', 'design'), { recursive: true })
+  mkdirSync(target)
+  symlinkSync(target, join(wd, 'result', 'design', '.dispatches'), 'junction')
+  const r = reserve(wd)
+  check('pre-placed dispatch-root junction rejects at reserve', r.ok === false && r.code === 'DISPATCH_REPARSE_POINT', JSON.stringify(r))
+  check('junction target untouched (no write-through at reserve)', readdirSync(target).length === 0, JSON.stringify(readdirSync(target)))
+}
+{
+  const wd = workdir()
+  const target = join(wd, 'pre-control-target')
+  mkdirSync(join(wd, 'result', 'design', '.dispatches'), { recursive: true })
+  mkdirSync(target)
+  symlinkSync(target, join(wd, 'result', 'design', '.dispatches', 'control'), 'junction')
+  const r = reserve(wd)
+  check('pre-placed control-dir junction rejects at reserve', r.ok === false && r.code === 'DISPATCH_REPARSE_POINT', JSON.stringify(r))
+  check('control junction target untouched', readdirSync(target).length === 0, JSON.stringify(readdirSync(target)))
+}
+// [E3 M0] runtime metadata 在 standalone dispatch 路径同样被拒绝（与 casefile 单点 denylist 同源）。
+{
+  const wd = workdir()
+  const r = reserve(wd)
+  const tainted = JSON.parse(JSON.stringify(GOOD.doc))
+  tainted._provenance = { tool: 'review', at: '2026-01-01T00:00:00Z' }
+  writeFileSync(join(r.paths.stagingDir, 'genome_ref.json'), JSON.stringify(tainted))
+  const c = consume(r)
+  check('runtime metadata taint rejects on standalone path', c.ok === false && c.code === 'DETERMINISM_VIOLATION', JSON.stringify(c))
+  check('no standalone objects promoted for tainted candidate', !existsSync(join(wd, 'objects')) || readdirSync(join(wd, 'objects')).length === 0, '')
 }
 
 // ── R4/R6/R7: expiration, late result, restart recovery and GC roots ──────
