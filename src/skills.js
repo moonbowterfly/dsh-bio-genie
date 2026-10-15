@@ -555,6 +555,7 @@ language: mixed
 24. 基因结构路由：内含子-外显子与剪接位点用 bio_seq_introns（需**基因组类**登录号 NG_/NC_；gene 参数是**精确匹配**——product 描述常提及邻近基因名，子串匹配会串基因；未匹配时工具返回 available_genes 供纠正；坐标按转录方向排序，负链递减）；建树一致性用 bio_phylo_compare（RF 距离 0 = 拓扑一致；比较前两棵树叶名须归一）；序列相似区段/重复/重排的可视化核验用 bio_seq_dotplot。
 25. RNA 结构与单细胞路由：RNA 二级结构/稳定性用 bio_rna_fold（MFE ΔG 越负越稳；mean_base_pair_distance 越小结构越确定）；单细胞数据质控用 bio_sc_qc（species 选错会导致 MT% 恒为 0——human 用 MT- 前缀、mouse 用 mt-）。二者首次调用自动装依赖（ViennaRNA / scanpy），提示用户等待。
 26. design casefile 路由：验证 design casefile（绑定不可变 snapshot、manifest/磁盘 hash、schema、三条红线 R1 CRN≠GEM / R2 分数≠bound / R3 proxy≠capacity、DAG 无环；任一 required 检查 FAIL → 非零退出并禁止导出）用 design_casefile_validate；导出（validate 门禁 → report.md 含证据分级与假设清单 + bundle.zip 全工件与哈希清单，解压可独立复核）用 design_casefile_export。触发词：validate casefile、导出 case、红线核查、case 报告。
+27. 宿主侧设计路由（B1-part-1）：宿主底盘档案（FASTA + 可选注释 → genome_ref@1 + host_profile@1；必须显式声明坐标体系，输出宿主侧证据状态、不声明产品档位）用 bio_chassis_profile；整合位点候选（host_profile + cassette → integration_candidate@1[]，正式 ruleset 逐条强制评估，≤top_n=16；环状跨 origin 显式处理）用 bio_integration_candidates——**先底盘档案后位点候选**，位点候选必须绑定 host_profile/genome_ref 且 FASTA 序列与之一致；回路表达情景化（circuit components[] + host_profile → expression_scenario@1，证据查表排名、禁绝对表达；coupling_mode 仅产耦合草案不可定量授权；可选 kinetic_crn_ref@1 封装既有 bio_circuit_compile 输出）用 bio_circuit_contextualize。三工具均为 design 通道（结果信封 + artifact_ref；casefile_dir 可绑定 case 快照），不参与 bio_* 语义路由的通用缓存。触发词：底盘档案、宿主画像、整合位点、插入候选、表达情景、元件排名、耦合草案。
 
 
 ## 自动代码修复（ACR）— 三层职责边界

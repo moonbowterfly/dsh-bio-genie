@@ -11,8 +11,8 @@
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { ensureEnvironment, venvPython, resolveEnvDir, ensureExtraDeps } from './runtime.js'
 import { runBridge, callBio, spawnPython } from './python.js'
-import { join, resolve, isAbsolute } from 'node:path'
-import { existsSync } from 'node:fs'
+import { join, resolve, isAbsolute, basename } from 'node:path'
+import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
 import { resolveWorkdir, fallbackWorkspace } from './workdir.js'
 import { cacheGet, cacheSet, throttle } from './throttle.js'
 import { detectDomain, domainById } from './domain-adapter.js'
@@ -25,6 +25,12 @@ import { stampProvenance } from './provenance.js'
 import { verifyDesignPacket, PACKET_DIR } from './design-gate.js'
 import { DESIGN_OPS } from './design-ops.js'
 import { deriveDesignInputHash, finalizeDesignResult } from './design-envelope.js'
+import { dispatchDesignOp } from './design-dispatch.js'
+import { ingestExternalInput } from './design-ingress.js'
+import {
+  commitTransaction, deriveCaseContentId, ensureCaseDir, loadArtifact, loadSnapshot, readHead, resolveCaseContext,
+} from './design-casefile.js'
+import { loadCapabilityPolicy } from './design-capability.js'
 
 /** 引导可能耗时数分钟；工具执行期间等待引导完成。 */
 const BOOT_WAIT_MS = 600_000
@@ -258,6 +264,400 @@ function designTool(config, opts) {
       if (Array.isArray(finalized.envelope.checks)) out.checks = finalized.envelope.checks
       if (finalized.envelope._provenance) out._provenance = finalized.envelope._provenance
       return out
+    },
+  })
+}
+
+/**
+ * B1-part-1 宿主侧三工具（designHostTool）——独立 designTool 路径：
+ *   gate → throttle → A4 ingress（外部文件经 ingestExternalInput，case 内提交 input_snapshot@1）
+ *   → A2 事务绑定（caseContentId/policy/expectHead）→ A3 dispatch（bio_ops.py 路由 design_host
+ *   实现；Python 只写 staging、只返回候选）→ A5 envelope 归一（worker 信封 + TS 侧消费产物 refs）。
+ * allowedOutputs 一律 required=false：worker 合法终态（BLOCKED/NOT_RUN/DEPENDENCY_UNAVAILABLE）
+ * 不产候选；OK 必须产出声明输出（wrapper 层强制）。
+ */
+const DESIGN_HOST_OUTPUT_LIMIT = 16 // dispatch maxOutputFiles 上限（DISPATCH_LIMITS）
+const DESIGN_HOST_INPUT_BYTES = 128 * 1024 * 1024
+
+function designInputCopyDir({ cwd, caseHandle, op }) {
+  if (caseHandle) return join(caseHandle.caseDir, 'inputs')
+  return join(cwd, '.design-inputs', op)
+}
+
+/** A4 外部输入摄入：读 → hash → TS 拥有副本 → input_snapshot 提交（case 模式）。 */
+function ingestHostInputs(op, args, { cwd, caseHandle }) {
+  const entries = []
+  const push = (key, role, format, path) => entries.push({ key, role, format, path })
+  const gfiles = Array.isArray(args.genome_files) ? args.genome_files : []
+  for (const f of gfiles) {
+    if (!f || typeof f.path !== 'string' || !f.path) return fail('INGRESS_ENTRY_INVALID', 'genome_files 项需 {path, format}')
+    const fmt = typeof f.format === 'string' ? f.format : 'other'
+    const role = fmt === 'fasta' ? 'genome_sequence' : (fmt === 'segments_tsv' ? 'other' : 'genome_annotation')
+    push('genome_files', role, fmt === 'fasta' ? 'fasta' : (fmt === 'gff3' ? 'gff3' : (fmt === 'genbank' ? 'genbank' : 'other')), f.path)
+  }
+  const single = (key, role, fmt) => {
+    const v = args[key]
+    if (v && typeof v === 'object' && typeof v.path === 'string' && v.path) push(key, role, fmt, v.path)
+    else if (v !== undefined && v !== null) return fail('INGRESS_ENTRY_INVALID', key + ' 需 {path}')
+    return null
+  }
+  let r
+  r = single('parts_evidence_file', 'parts_evidence', 'json')
+  if (r) return r
+  r = single('essentiality_evidence', 'other', 'json')
+  if (r) return r
+  r = single('expression_evidence', 'other', 'json')
+  if (r) return r
+  if (args.parts_evidence && typeof args.parts_evidence === 'object' && !Array.isArray(args.parts_evidence)
+    && typeof args.parts_evidence.path === 'string' && args.parts_evidence.path) {
+    push('parts_evidence', 'parts_evidence', 'json', args.parts_evidence.path)
+  }
+  if (args.circuit && typeof args.circuit === 'object' && args.circuit.sbol_file
+    && typeof args.circuit.sbol_file === 'object' && typeof args.circuit.sbol_file.path === 'string') {
+    push('circuit.sbol_file', 'sbol', 'text', args.circuit.sbol_file.path)
+  }
+
+  const inputDir = designInputCopyDir({ cwd, caseHandle, op })
+  const inputRefs = []
+  const newArtifacts = []
+  const fileArgs = {}
+  const usedNames = new Set()
+  for (let i = 0; i < entries.length; i += 1) {
+    const e = entries[i]
+    if (!existsSync(e.path)) return fail('INPUT_FILE_MISSING', e.path)
+    const ingested = ingestExternalInput(e.path, { role: e.role, caseHandle })
+    if (!ingested.ok) return fail(ingested.code || 'INGRESS_FAILED', ingested.detail || e.path)
+    if (ingested.byte_size > DESIGN_HOST_INPUT_BYTES) return fail('INGRESS_SIZE_LIMIT', String(ingested.byte_size))
+    mkdirSync(inputDir, { recursive: true })
+    const copyPath = join(inputDir, ingested.sha256)
+    if (!existsSync(copyPath)) writeFileSync(copyPath, ingested.bytes)
+    const rel = 'input_snapshot-' + String(i + 1).padStart(2, '0') + '.json'
+    const name = rel
+    usedNames.add(name)
+    inputRefs.push({ artifact_id: ingested.sha256, expected_sha256: ingested.sha256, relative_path: name })
+    newArtifacts.push({
+      type: 'input_snapshot@1',
+      value: ingested.inventory,
+      producer: 'ingress',
+      inputs: [],
+      canonical_path: name,
+    })
+    if (e.key === 'genome_files') {
+      ;(fileArgs.genome_files = fileArgs.genome_files || []).push({
+        path: copyPath, sha256: ingested.sha256,
+        display_name: basename(e.path), format: e.format,
+      })
+    } else if (e.key === 'parts_evidence' || e.key === 'parts_evidence_file') {
+      fileArgs[e.key] = { path: copyPath, sha256: ingested.sha256, display_name: basename(e.path) }
+    } else if (e.key === 'essentiality_evidence' || e.key === 'expression_evidence') {
+      fileArgs[e.key] = { path: copyPath, sha256: ingested.sha256, display_name: basename(e.path) }
+    } else if (e.key === 'circuit.sbol_file') {
+      fileArgs.circuit_sbol = { path: copyPath, sha256: ingested.sha256, display_name: basename(e.path) }
+    }
+  }
+  return { ok: true, args: fileArgs, inputRefs, newArtifacts }
+}
+
+function fail(code, detail = null) {
+  return { ok: false, code, ...(detail ? { detail } : {}) }
+}
+
+/** dispatch 失败码 → C4 状态映射（worker 契约违例一律 EXECUTION_ERROR）。 */
+const DESIGN_DISPATCH_STATUS_MAP = {
+  DEPENDENCY_UNAVAILABLE: new Set(['PACKET_UNVERIFIED', 'PACKET_IDENTITY', 'POLICY_UNVERIFIED', 'GUARD_REJECTED']),
+  INVALID_INPUT: new Set([
+    'NOT_A_DESIGN_OP', 'DISPATCH_BINDING_INVALID', 'INPUT_REF_UNRESOLVED', 'DUPLICATE_LOGICAL_NAME',
+    'OUTPUT_NAME_INVALID', 'OUTPUT_FILE_LIMIT', 'OUTPUT_FILE_TOO_LARGE', 'OUTPUT_TOTAL_TOO_LARGE',
+    'UNDECLARED_OUTPUT', 'REQUIRED_OUTPUT_MISSING', 'WORKER_ARTIFACT_TYPE_MISMATCH', 'WORKER_HASH_MISMATCH',
+    'WORKER_PATH_UNTRUSTED',
+  ]),
+}
+
+function designDispatchStatus(code) {
+  if (DESIGN_DISPATCH_STATUS_MAP.DEPENDENCY_UNAVAILABLE.has(code)) return 'DEPENDENCY_UNAVAILABLE'
+  if (DESIGN_DISPATCH_STATUS_MAP.INVALID_INPUT.has(code)) return 'INVALID_INPUT'
+  return 'EXECUTION_ERROR'
+}
+
+/** 解析 ref（case objects 无扩展名；standalone objects 带 .json）。 */
+function resolveRefValue({ caseHandle, cwd, artifactId }) {
+  if (typeof artifactId !== 'string' || !/^[0-9a-f]{64}$/.test(artifactId)) return fail('REF_INVALID', 'artifact_id 需 sha256')
+  if (caseHandle) {
+    const art = loadArtifact(caseHandle, artifactId)
+    return art.ok ? { ok: true, value: art.value } : art
+  }
+  const p = join(cwd, 'objects', artifactId + '.json')
+  if (!existsSync(p)) return fail('OBJECT_NOT_FOUND', artifactId.slice(0, 16))
+  try {
+    return { ok: true, value: JSON.parse(readFileSync(p, 'utf8')) }
+  } catch (e) {
+    return fail('OBJECT_UNREADABLE', String(e.message).slice(0, 120))
+  }
+}
+
+function designHostTool(config, opts) {
+  if (!DESIGN_OPS.has(opts.op)) {
+    throw new Error(`designHostTool 注册失败：${opts.op} 不在 DESIGN_OPS（design 通道白名单）`)
+  }
+  const callTimeout = opts.timeoutMs ?? 300_000
+  return defineTool({
+    name: opts.name,
+    description: opts.description,
+    parameters: opts.parameters,
+    timeoutMs: callTimeout + BOOT_WAIT_MS,
+    output: {
+      schema: opts.outputSchema ?? { type: 'object', additionalProperties: true },
+      render: (_args, value) => [{ type: 'text', text: JSON.stringify(value, null, 2) }],
+    },
+    async execute(args, exec) {
+      if (exec.signal.aborted) throw new Error('aborted')
+      const cwd = resolveWorkdir(exec)
+      // ── case 绑定（可选；casefile_dir 必须在工作区内且为既有 case）──
+      let caseHandle = null
+      let caseDir = null
+      if (typeof args.casefile_dir === 'string' && args.casefile_dir) {
+        const raw = args.casefile_dir
+        const candidate = isAbsolute(raw) ? resolve(raw) : resolve(cwd, raw)
+        const rel = candidate === cwd ? '' : (candidate.startsWith(cwd + '\\') || candidate.startsWith(cwd + '/') ? candidate.slice(cwd.length + 1) : null)
+        if (rel === null || rel.startsWith('..') || !existsSync(candidate)) {
+          const err = new Error('casefile_dir 必须在工作区内且已存在')
+          err.status = 'OUT_OF_DOMAIN'; err.code = 'OUT_OF_DOMAIN'; throw err
+        }
+        const c = ensureCaseDir(cwd, basename(candidate), { create: false })
+        if (!c.ok || resolve(c.caseDir) !== resolve(candidate)) {
+          const err = new Error(`casefile_dir 不是合法 case：${c.detail || c.code || ''}`)
+          err.status = 'OUT_OF_DOMAIN'; err.code = 'OUT_OF_DOMAIN'; throw err
+        }
+        caseHandle = c
+        caseDir = c.caseDir
+      }
+      // ── gate（side-effect 之前）──
+      const gate = verifyDesignPacket()
+      if (!gate.ok) {
+        const terminal = await finalizeDesignResult({
+          operation: opts.op, worker: null,
+          inputHashes: [deriveDesignInputHash(opts.op, args)],
+          caseDir, guard: () => gate,
+        })
+        const err = new Error(`design gate 拒绝：${terminal.code || gate.code} ${gate.detail || ''}`)
+        err.status = 'DEPENDENCY_UNAVAILABLE'; err.code = terminal.code || gate.code; err.audit = terminal.audit
+        throw err
+      }
+      await throttle(opts.op)
+      const py = opts.pythonPath || await requireEnv(config)
+      const t0 = Date.now()
+      // 本地终态 helper：合成 C4 信封 → A5 审计 → 抛错（带 envelope/audit）
+      const fail = async (status, code, detail) => {
+        const envelope = { status, reason_code: code, artifact_refs: [], detail: String(detail || '').slice(0, 800) }
+        const finalized = await finalizeDesignResult({
+          operation: opts.op, envelope, worker: null,
+          inputHashes: [deriveDesignInputHash(opts.op, args)],
+          caseDir, guard: () => gate,
+        })
+        const err = new Error(`design ${opts.op} ${status}: ${code} ${detail || ''}`)
+        err.status = status; err.code = code
+        err.envelope = finalized.envelope || envelope
+        err.audit = finalized.audit
+        throw err
+      }
+      try {
+        // ── output cap: integration top_n <= 16 (dispatch maxOutputFiles; tighten only)
+        if (opts.op === 'design_integration_candidates') {
+          const topN = args.top_n
+          if (topN !== undefined && topN !== null && (!Number.isInteger(topN) || topN < 1 || topN > 16)) {
+            return await fail('INVALID_INPUT', 'TOP_N_LIMIT', 'top_n 需 1..16（dispatch maxOutputFiles 上限）')
+          }
+        }
+        // ── host_profile / genome_ref / crn 引用解析（refs-only 校验）──
+        const hpRef = args.host_profile_ref
+        let hpValue = args.host_profile
+        if (hpRef && typeof hpRef === 'object' && typeof hpRef.artifact_id === 'string') {
+          const resolved = resolveRefValue({ caseHandle, cwd, artifactId: hpRef.artifact_id })
+          if (!resolved.ok) return await fail('INVALID_INPUT', 'HOST_PROFILE_REF_UNRESOLVED', resolved.detail || 'host_profile ref 不可解析')
+          hpValue = resolved.value
+        }
+        if (opts.op === 'design_integration_candidates' || opts.op === 'design_circuit_contextualize') {
+          if (!hpValue || typeof hpValue !== 'object' || hpValue.artifact_type !== 'host_profile@1') {
+            return await fail('INVALID_INPUT', 'HOST_PROFILE_REQUIRED', '需 host_profile 值或可解析的 host_profile_ref')
+          }
+          let grValue = args.genome_ref_value
+          if (!grValue && hpValue.genome_ref && typeof hpValue.genome_ref === 'object' && typeof hpValue.genome_ref.artifact_id === 'string') {
+            const resolved = resolveRefValue({ caseHandle, cwd, artifactId: hpValue.genome_ref.artifact_id })
+            if (!resolved.ok) return await fail('INVALID_INPUT', 'GENOME_REF_UNRESOLVED', resolved.detail || 'genome_ref 不可解析')
+            grValue = resolved.value
+          }
+          if (!grValue || typeof grValue !== 'object' || grValue.artifact_type !== 'genome_ref@1') {
+            return await fail('INVALID_INPUT', 'GENOME_REF_REQUIRED', '需 genome_ref_value（或随 host_profile_ref 解析）')
+          }
+          args = { ...args, host_profile: hpValue, genome_ref_value: grValue }
+          delete args.host_profile_ref
+        }
+        if (opts.op === 'design_circuit_contextualize' && args.crn_sbml_ref
+          && typeof args.crn_sbml_ref === 'object' && typeof args.crn_sbml_ref.artifact_id === 'string') {
+          const resolved = resolveRefValue({ caseHandle, cwd, artifactId: args.crn_sbml_ref.artifact_id })
+          if (!resolved.ok) return await fail('INVALID_INPUT', 'CRN_REF_UNRESOLVED', resolved.detail || 'crn_sbml_ref 不可解析')
+        }
+        // ── A4 ingress ──
+        const ingest = ingestHostInputs(opts.op, args, { cwd, caseHandle })
+        if (!ingest.ok) return await fail('INVALID_INPUT', ingest.code, ingest.detail || '输入摄入失败')
+        const workerArgs = { ...args, ...ingest.args }
+        delete workerArgs.casefile_dir
+        const inputRefs = ingest.inputRefs
+        // ── case 绑定：policy / caseContentId / parent ──
+        let caseContentId = null
+        let policyDoc = null
+        let parentSnapshot = undefined
+        if (caseHandle) {
+          const head = readHead(caseHandle.caseDir)
+          if (!head.ok) return await fail('EXECUTION_ERROR', 'HEAD_UNREADABLE', 'case HEAD 不可读')
+          if (!head.snapshot_sha) {
+            const p = loadCapabilityPolicy()
+            if (!p.ok) return await fail('DEPENDENCY_UNAVAILABLE', 'POLICY_UNVERIFIED', p.problems ? String(p.problems[0]) : 'capability policy 不可用')
+            policyDoc = p.policy
+            caseContentId = deriveCaseContentId({
+              rootInputArtifactIds: inputRefs.map((x) => x.artifact_id).sort(),
+              policyVersion: String(policyDoc.policy_version || '0'),
+              canonicalParams: {},
+            })
+          } else {
+            const snap = loadSnapshot(caseHandle.snapshotsDir, head.snapshot_sha)
+            if (!snap.ok) return await fail('EXECUTION_ERROR', 'SNAPSHOT_UNREADABLE', snap.detail || 'snapshot unreadable')
+            caseContentId = snap.manifest.case_content_id
+            policyDoc = snap.manifest.policy
+          }
+          parentSnapshot = head.snapshot_sha
+          if (ingest.newArtifacts.length > 0) {
+            const tx = commitTransaction(caseHandle, {
+              caseContentId, policy: policyDoc,
+              expectHead: head.snapshot_sha, txid: null,
+              newArtifacts: ingest.newArtifacts,
+            })
+            if (!tx.ok) return await fail('EXECUTION_ERROR', tx.code, tx.detail || 'input commit failed')
+            parentSnapshot = tx.snapshot_sha
+          }
+        }
+        // ── A3 dispatch（bio_ops.py 路由 design_host 实现）──
+        const res = await dispatchDesignOp(py, opts.op, workerArgs, {
+          cwd,
+          timeoutMs: callTimeout,
+          signal: exec.signal,
+          caseHandle,
+          parentSnapshot,
+          allowedInputRefs: inputRefs,
+          allowedOutputs: opts.allowedOutputs,
+          limits: opts.limits,
+          caseContentId,
+          policy: policyDoc,
+        })
+        // ── A5 envelope 归一 ──
+        let envelope = null
+        let artifactsOut = []
+        if (!res.ok) {
+          const code = res.dispatch_failure || res.code || 'DISPATCH_FAILED'
+          const detail = res.detail || res.error || (res.stderr ? String(res.stderr).slice(0, 400) : 'dispatch failed')
+          envelope = { status: designDispatchStatus(code), reason_code: code, artifact_refs: [], detail: String(detail).slice(0, 800) }
+        } else {
+          const workerEnvelope = res.result && typeof res.result === 'object'
+            ? (res.result.result && typeof res.result.result === 'object' && res.result.result.envelope
+              ? res.result.result.envelope : (res.result.envelope || null))
+            : null
+          if (!workerEnvelope || typeof workerEnvelope.status !== 'string') {
+            envelope = { status: 'EXECUTION_ERROR', reason_code: 'WORKER_ENVELOPE_INVALID', artifact_refs: [], detail: 'worker 未返回合法 C4 信封' }
+          } else {
+            envelope = {
+              status: workerEnvelope.status,
+              reason_code: typeof workerEnvelope.reason_code === 'string' ? workerEnvelope.reason_code : 'OK',
+              artifact_refs: [],
+              detail: typeof workerEnvelope.detail === 'string' ? workerEnvelope.detail : '',
+            }
+            const objects = (res.committed && Array.isArray(res.committed.objects)) ? res.committed.objects
+              : (res.committed && res.committed.object_path ? [res.committed] : [])
+            if (workerEnvelope.status === 'OK') {
+              const got = new Set(objects.map((o) => o.logical_name))
+              const expected = (opts.allowedOutputs || []).map((o) => o.logical_name)
+              const missing = expected.filter((n) => !got.has(n))
+              if (objects.length === 0 || missing.length > 0) {
+                envelope = { status: 'EXECUTION_ERROR', reason_code: missing.length > 0 ? 'MISSING_OUTPUT' : 'WORKER_EMPTY_RESULT', artifact_refs: [], detail: 'OK 信封但产出缺失: ' + (missing.join(',') || 'empty') }
+              } else {
+                envelope.artifact_refs = objects.map((o) => ({
+                  artifact_id: o.sha256, expected_sha256: o.sha256, relative_path: o.logical_name,
+                }))
+                artifactsOut = objects.map((o) => ({
+                  logical_name: o.logical_name,
+                  artifact_type: o.artifact_type,
+                  sha256: o.sha256,
+                  object_path: o.object_path || null,
+                }))
+              }
+            }
+          }
+        }
+        const extra = { artifacts: artifactsOut }
+        if (envelope.status === 'OK' && caseHandle && opts.op === 'design_chassis_profile') {
+          const ctx = resolveCaseContext(caseHandle)
+          if (ctx.ok) extra.case_context = {
+            snapshot_sha: ctx.snapshot_sha,
+            case_content_id: ctx.case_content_id,
+            flags: ctx.flags,
+            input_state: ctx.input_state,
+            coupling_mode: ctx.coupling_mode,
+          }
+        }
+        const finalized = await finalizeDesignResult({
+          operation: opts.op,
+          envelope: { ...envelope, ...extra },
+          worker: res,
+          inputHashes: [deriveDesignInputHash(opts.op, args)],
+          caseDir,
+          guard: () => gate,
+          stampProvenance: (out) => stampProvenance(opts.name, out),
+          registerScientific: async ({ artifact_refs: refs }) => {
+            for (const ref of refs) {
+              if (caseHandle) {
+                const art = loadArtifact(caseHandle, ref.artifact_id)
+                if (!art.ok) return { ok: false, code: 'REGISTRY_REF_UNRESOLVED', detail: ref.artifact_id.slice(0, 16) }
+              } else if (!existsSync(join(cwd, 'objects', ref.artifact_id + '.json'))) {
+                return { ok: false, code: 'REGISTRY_REF_UNRESOLVED', detail: ref.artifact_id.slice(0, 16) }
+              }
+            }
+            return { ok: true, registered: refs.length }
+          },
+        })
+        const terminalEnvelope = finalized.envelope || envelope
+        if (config.enableLog !== false) {
+          appendLog({
+            kind: 'op', op: opts.op, ok: finalized.ok === true, duration_ms: Date.now() - t0,
+            error: finalized.ok ? undefined : `${terminalEnvelope?.reason_code || finalized.code || 'EXECUTION_ERROR'} ${terminalEnvelope?.detail || finalized.detail || ''}`.slice(0, 300),
+          })
+        }
+        if (!finalized.ok) {
+          const s = terminalEnvelope?.status || finalized.status || 'EXECUTION_ERROR'
+          const c = terminalEnvelope?.reason_code || finalized.code || 'EXECUTION_ERROR'
+          const d = terminalEnvelope?.detail || finalized.detail || '结果信封无效或审计登记失败'
+          const err = new Error(`design ${opts.op} ${s}: ${c} ${d}`)
+          err.status = s; err.code = c
+          err.envelope = terminalEnvelope || undefined
+          err.audit = finalized.audit
+          throw err
+        }
+        const out = {
+          status: finalized.envelope.status,
+          reason_code: finalized.envelope.reason_code,
+          artifact_refs: finalized.envelope.artifact_refs,
+          detail: finalized.envelope.detail,
+        }
+        if (Array.isArray(finalized.envelope.checks)) out.checks = finalized.envelope.checks
+        if (Array.isArray(finalized.envelope.artifacts)) out.artifacts = finalized.envelope.artifacts
+        if (finalized.envelope.case_context) out.case_context = finalized.envelope.case_context
+        if (finalized.envelope._provenance) out._provenance = finalized.envelope._provenance
+        return out
+      } catch (e) {
+        if (e && (e.envelope || e.audit)) throw e
+        if (e && e.status && e.code) throw e
+        const err = new Error(`design ${opts.op} EXECUTION_ERROR: ${e && e.message ? e.message : String(e)}`)
+        err.status = 'EXECUTION_ERROR'; err.code = 'EXECUTION_ERROR'
+        throw err
+      }
     },
   })
 }
@@ -1602,6 +2002,107 @@ function semanticTools(config) {
       },
       op: 'design_casefile_export',
       timeoutMs: 300_000,
+    }),
+    // ============ design 通道：宿主侧三工具（B1-part-1，designHostTool）============
+    // bio_chassis_profile：FASTA（+可选 GFF/GB/segments_tsv 注释）→ genome_ref@1 + host_profile@1。
+    // 门禁：文件哈希必须成功（BLOCKED HASH_FAILED）；坐标体系未声明（BLOCKED
+    // COORD_CONVENTION_UNDECLARED）；重复 contig 名（BLOCKED DUPLICATE_CONTIG_NAME）。
+    // 输出宿主侧证据状态（不声明产品档位；不含 GEM growth 锚点）。触发词：底盘档案、
+    // host profile、chassis profile、宿主画像、GC/密码子统计。
+    designHostTool(config, {
+      name: 'bio_chassis_profile',
+      description:
+        '宿主底盘档案（design 通道 B1-part-1）：Biopython 解析 FASTA（GFF3/GenBank/segments_tsv 注释可选）→ ' +
+        'genome_ref@1 + host_profile@1（GC/密码子/contig 统计 + 注释/条件/parts 证据完整度状态）。' +
+        '门禁逐条 fail-closed：文件哈希不符/缺失 → BLOCKED HASH_FAILED；坐标体系未声明 → BLOCKED ' +
+        'COORD_CONVENTION_UNDECLARED；重复 contig 名 → BLOCKED DUPLICATE_CONTIG_NAME。输出不含 GEM ' +
+        'growth 锚点（consequence 验收）；不声明产品档位。',
+      parameters: {
+        genome_files: { type: 'array', required: true, description: '基因组输入文件列表 [{path, format}]：path 为工作区内绝对路径；format ∈ fasta|gff3|genbank|segments_tsv（至少一个 fasta）', items: { type: 'object', additionalProperties: true } },
+        coord_convention: { type: 'string', enum: ['0-based-half-open', '1-based-inclusive'], required: true, description: '坐标体系（必须显式声明）' },
+        contig_topology: { type: 'object', additionalProperties: true, description: '{contig 名: linear|circular}；缺省 linear' },
+        condition: { type: 'object', additionalProperties: true, description: '培养条件（可空字段显式 null）' },
+        parts_evidence_file: { type: 'object', additionalProperties: true, description: 'parts 证据文件 {path}' },
+        genome_source: { type: 'string', description: '基因组来源标注（默认 user-supplied-genome）' },
+        strict: { type: 'boolean', default: true, description: '严格模式（只改变诊断详略，不放松门禁）' },
+        casefile_dir: { type: 'string', description: 'casefile 目录（可选；绑定后提交输入快照与产物）' },
+      },
+      op: 'design_chassis_profile',
+      allowedOutputs: [
+        { logical_name: 'genome_ref.json', artifact_type: 'genome_ref', required: false },
+        { logical_name: 'host_profile.json', artifact_type: 'host_profile', required: false },
+      ],
+      timeoutMs: 120_000,
+    }),
+    // bio_integration_candidates：host_profile + cassette → integration_candidate@1[]（≤top_n=16）。
+    // ruleset 强制消费 design/integration-ruleset/integration-ruleset-v0.json（unknown_policy=block：
+    // 未知注释/重复/必需性不得默认为通过）；缺资产 → BLOCKED RULESET_UNAVAILABLE；无注释/注释不可信
+    // → NOT_RUN；环状跨 origin 显式处理；不得输出 safe 分类。触发词：整合位点、integration site、
+    // 插入候选、基因组整合。
+    designHostTool(config, {
+      name: 'bio_integration_candidates',
+      description:
+        '基因组整合位点候选（design 通道 B1-part-1）：按正式 integration-ruleset（feature_overlap / ' +
+        'repeat / essentiality / neighborhood / motif 强制 + contextual_stability 提示）对候选窗口逐条评估 → ' +
+        'integration_candidate@1[]（≤top_n）。cassette 序列/长度二分：只有长度 → sequence_identity=unknown ' +
+        '仅初步空间筛选。环状跨 origin 窗口显式处理；origin/表达证据按参数声明。触发词：整合位点候选、' +
+        'integration candidates、插入位点扫描。',
+      parameters: {
+        host_profile: { type: 'object', additionalProperties: true, description: 'host_profile@1 值（或提供 host_profile_ref 解析）' },
+        host_profile_ref: { type: 'object', additionalProperties: true, description: '已登记 host_profile 的 artifactRef {artifact_id,...}（优先于嵌入值）' },
+        genome_ref_value: { type: 'object', additionalProperties: true, description: 'genome_ref@1 值（可随 host_profile_ref 自动解析）' },
+        genome_files: { type: 'array', required: true, description: 'FASTA 列表 [{path, format}]（序列必须与 host_profile.genome_ref 一致）', items: { type: 'object', additionalProperties: true } },
+        cassette: { type: 'object', additionalProperties: true, required: true, description: '{sequence?|payload_length?}（至少其一；sequence_sha256 可选）' },
+        candidates: { type: 'array', description: '显式窗口 [{contig, start, end}]（0-based；环状 end<start 表示跨 origin）', items: { type: 'object', additionalProperties: true } },
+        scan: { type: 'boolean', description: 'scan=true 按 payload 步长全基因组扫描（与 candidates 互斥）' },
+        top_n: { type: 'number', default: 10, description: '输出候选数上限（≤16，dispatch 文件上限）' },
+        ruleset_path: { type: 'string', description: 'ruleset 资产路径（默认 design/integration-ruleset/integration-ruleset-v0.json）' },
+        exclude_rules: { type: 'array', description: '跳过的 rule_id 列表（不计入 coverage）', items: { type: 'string' } },
+        origin_positions: { type: 'object', additionalProperties: true, description: '{contig: 复制起点位置}；环状缺省 0' },
+        essentiality_evidence: { type: 'object', additionalProperties: true, description: '必需性证据 {path}（JSON：genes[]）' },
+        expression_evidence: { type: 'object', additionalProperties: true, description: '表达证据 {path}（JSON：high_expression_genes[]）' },
+        evidence_items: { type: 'array', description: 'evidence_item@1 列表（literature_characterized 仅当 exact 命中）', items: { type: 'object', additionalProperties: true } },
+        strict: { type: 'boolean', default: true },
+        casefile_dir: { type: 'string', description: 'casefile 目录（可选）' },
+      },
+      op: 'design_integration_candidates',
+      allowedOutputs: Array.from({ length: 16 }, (_, i) => ({
+        logical_name: 'integration_candidate-' + String(i + 1).padStart(2, '0') + '.json',
+        artifact_type: 'integration_candidate',
+        required: false,
+      })),
+      timeoutMs: 180_000,
+    }),
+    // bio_circuit_contextualize：circuit + host_profile → expression_scenario@1（+ kinetic_crn_ref@1）。
+    // coupling_mode 仅产耦合草案（不可定量授权）；无证据/无模型 → 只给 rank + risk，禁止绝对表达；
+    // ostir 走可选依赖 + preflight（不可用 → DEPENDENCY_UNAVAILABLE，不静默降级）。触发词：表达情景、
+    // circuit contextualize、元件排名、耦合草案。
+    designHostTool(config, {
+      name: 'bio_circuit_contextualize',
+      description:
+        '回路表达情景化（design 通道 B1-part-1）：circuit components[] + host_profile → expression_scenario@1 ' +
+        '（元件证据查表排名，禁绝对表达——无证据元件只给 rank）。coupling_mode 仅生成耦合草案，不构成定量授权；' +
+        '可选 kinetic_crn_ref@1 封装现有 bio_circuit_compile 输出；ostir_proxy 走可选依赖 preflight（不可用 → ' +
+        'DEPENDENCY_UNAVAILABLE）。触发词：表达情景、元件排名、circuit contextualize、耦合草案。',
+      parameters: {
+        circuit: { type: 'object', additionalProperties: true, required: true, description: '{components: [{component_id, kind, sequence?}], template?, sbol_file?}' },
+        host_profile: { type: 'object', additionalProperties: true, description: 'host_profile@1 值（或 host_profile_ref）' },
+        host_profile_ref: { type: 'object', additionalProperties: true, description: '已登记 host_profile 的 artifactRef {artifact_id,...}' },
+        genome_ref_value: { type: 'object', additionalProperties: true, description: 'genome_ref@1 值（可自动解析）' },
+        coupling_mode: { type: 'string', enum: ['qualitative_direction', 'user_calibrated_bound', 'evidence_calibrated_bound'], default: 'qualitative_direction', description: '耦合模式（仅产草案）' },
+        parts_evidence: { type: 'json', description: '元件证据：数组 [{part_id, evidence_level, source_id?, rank_hint?}] 或 {path}' },
+        ostir_request: { type: 'object', additionalProperties: true, description: '可选 ostir proxy 请求 {sequence, label?}（preflight 失败 → DEPENDENCY_UNAVAILABLE）' },
+        crn_sbml_ref: { type: 'object', additionalProperties: true, description: 'bio_circuit_compile 输出 SBML 的 artifactRef {artifact_id,...}（须已登记）' },
+        strict: { type: 'boolean', default: true },
+        casefile_dir: { type: 'string' },
+      },
+      op: 'design_circuit_contextualize',
+      allowedOutputs: [
+        { logical_name: 'circuit_design.json', artifact_type: 'circuit_design', required: false },
+        { logical_name: 'expression_scenario.json', artifact_type: 'expression_scenario', required: false },
+        { logical_name: 'kinetic_crn_ref.json', artifact_type: 'kinetic_crn_ref', required: false },
+      ],
+      timeoutMs: 180_000,
     }),
   ]
 }

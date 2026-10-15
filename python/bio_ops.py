@@ -52,6 +52,9 @@ from source_audit_tools import op_source_audit
 # 由 python/design_casefile.py 独立 dispatcher 提供，经 TS designTool 通道调用。
 from design_ops import op_design_stage_artifact, op_design_casefile_validate
 from design_casefile import op_design_casefile_export
+# B1-part-1：宿主侧三工具（design_host.py；dispatcher 注册 + OPS 表）
+from design_host import (op_design_chassis_profile, op_design_integration_candidates,
+                         op_design_circuit_contextualize)
 from seq_util import read_seq_input
 socket.setdefaulttimeout(20)
 from retry_utils import retry_on_network_error
@@ -2135,6 +2138,10 @@ OPS = {
     # op_design_casefile_validate 仍在 python/design_ops.py 保留，契约不变）
     'design_casefile_validate': op_design_casefile_validate,
     'design_casefile_export': op_design_casefile_export,
+    # B1-part-1：宿主侧三工具（design_host.py；仅经 designTool 通道，raw 拒绝）
+    'design_chassis_profile': op_design_chassis_profile,
+    'design_integration_candidates': op_design_integration_candidates,
+    'design_circuit_contextualize': op_design_circuit_contextualize,
 }
 
 
