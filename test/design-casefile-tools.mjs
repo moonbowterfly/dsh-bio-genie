@@ -8,7 +8,7 @@
 //  5) export 门禁：validate 未过 → 拒绝导出（INVALID_INPUT/VALIDATE_GATE_FAILED，无产物）。
 // 用例由 A1/A2 生产路径（test/design-casefile-builder.mjs）构建真实 case + 不可变快照。
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -56,7 +56,7 @@ function pythonEval(code, cwd = ROOT) {
   const eProps = ep.properties ?? {}
   check('validate 参数：casefile_dir required', (vp.required ?? []).includes('casefile_dir') && vProps.casefile_dir?.type === 'string')
   check('validate 参数：strict 默认 true', vProps.strict?.default === true)
-  check('export 参数：format 枚举 {zip,report,both}', JSON.stringify(eProps.format?.enum) === JSON.stringify(['zip', 'report', 'both']) && eProps.format?.default === 'both')
+  check('export 参数：format 枚举 + canonical audit_view_id', JSON.stringify(eProps.format?.enum) === JSON.stringify(['zip', 'report', 'both']) && eProps.format?.default === 'both' && eProps.audit_view_id?.type === 'array' && JSON.stringify(eProps.audit_view_id?.default) === JSON.stringify([]))
   check('DESIGN_TOOL_OPS 冻结且恰两 op', Object.isFrozen(DESIGN_TOOL_OPS) && DESIGN_TOOL_OPS.length === 2)
   check('DESIGN_TOOL_OPS ⊆ DESIGN_OPS（design 通道白名单）', DESIGN_TOOL_OPS.every((op) => DESIGN_OPS.has(op)))
 }
@@ -99,13 +99,22 @@ function pythonEval(code, cwd = ROOT) {
   // export 门禁：validate 未过 → 拒绝
   const xGate = await run(tools.design_casefile_export, { casefile_dir: r1.case_dir }, wd)
   check('export r1（validate 未过）→ INVALID_INPUT/VALIDATE_GATE_FAILED 且无产物', xGate.threw && xGate.status === 'INVALID_INPUT' && xGate.code === 'VALIDATE_GATE_FAILED' && xGate.envelope?.artifact_refs?.length === 0, xGate.message)
-  // export OK 态：clean case → 双产物存在
+  // export B4：clean S_n → finalize S_(n+1) → validate → export
   const xOk = await run(tools.design_casefile_export, { casefile_dir: clean.case_dir }, wd)
-  check('export clean → OK 且 2 产物', xOk.threw === false && xOk.value.status === 'OK' && xOk.value.artifact_refs.length === 2, xOk.message)
-  check('产物落盘（report.md + bundle.zip）', xOk.value.artifact_refs.every((p) => existsSync(p)) && xOk.value.artifact_refs[0].endsWith('report.md') && xOk.value.artifact_refs[1].endsWith('bundle.zip'))
-  // receipt / audit overlay 已由 TS 侧写入（appendReceipt）——validate/export 后 HEAD 不变
+  check('export clean → B4 finalized OK、2 产物、S_(n+1)', xOk.threw === false && xOk.value.status === 'OK' && xOk.value.artifact_refs.length === 2 && xOk.value.report_finalized === true && xOk.value.snapshot_sha !== clean.snapshot_sha && /^[0-9a-f]{64}$/.test(xOk.value.report_artifact_id || ''), xOk.message)
+  const finalized = JSON.parse(readFileSync(join(clean.case_dir, 'snapshots', xOk.value.snapshot_sha + '.json'), 'utf8'))
+  const reportEntry = finalized.artifacts.filter((entry) => entry.type === 'case_report@1')
+  const reportBytes = readFileSync(xOk.value.artifact_refs[0])
+  check('产物绑定已提交 raw report.md 工件', xOk.value.artifact_refs.every((p) => existsSync(p)) && xOk.value.artifact_refs[0].endsWith('report.md') && xOk.value.artifact_refs[1].endsWith('bundle.zip') && reportEntry.length === 1 && reportEntry[0].artifact_id === xOk.value.report_artifact_id && reportEntry[0].canonical_path === 'report.md' && readFileSync(join(clean.case_dir, 'objects', reportEntry[0].artifact_id)).equals(reportBytes))
+  // A second pure export is allowed only from S_(n+1), and must not create a
+  // further science snapshot/object.  The report-finalize receipt binds parent.
+  const beforePure = { objects: readdirSync(join(clean.case_dir, 'objects')).sort(), snapshots: readdirSync(join(clean.case_dir, 'snapshots')).sort() }
+  const pure = await run(tools.design_casefile_export, { casefile_dir: clean.case_dir }, wd)
+  const afterPure = { objects: readdirSync(join(clean.case_dir, 'objects')).sort(), snapshots: readdirSync(join(clean.case_dir, 'snapshots')).sort() }
+  const receipts = readFileSync(join(clean.case_dir, 'run_receipt.jsonl'), 'utf8').trim().split('\n').filter(Boolean).map((line) => JSON.parse(line))
+  const finalizeReceipt = receipts.find((event) => event.event === 'committed' && event.report_finalize === true)
   const head = JSON.parse(readFileSync(join(clean.case_dir, 'HEAD.json'), 'utf8'))
-  check('export 后 HEAD 仍指向原快照（科学快照不变）', head.snapshot_sha === clean.snapshot_sha)
+  check('pure export 不改科学快照，finalize parent = S_n', pure.threw === false && pure.value.status === 'OK' && pure.value.report_finalized === false && head.snapshot_sha === xOk.value.snapshot_sha && JSON.stringify(beforePure) === JSON.stringify(afterPure) && finalizeReceipt?.parent_snapshot_sha === clean.snapshot_sha)
 }
 
 // ── 4) unknown op 负例（dispatcher 层，独立于注册路径）────────────────────

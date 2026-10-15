@@ -12,7 +12,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import { ensureEnvironment, venvPython, resolveEnvDir, ensureExtraDeps } from './runtime.js'
 import { runBridge, callBio, spawnPython } from './python.js'
 import { join, resolve, isAbsolute, basename } from 'node:path'
-import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
 import { resolveWorkdir, fallbackWorkspace } from './workdir.js'
 import { cacheGet, cacheSet, throttle } from './throttle.js'
 import { detectDomain, domainById } from './domain-adapter.js'
@@ -28,7 +28,7 @@ import { deriveDesignInputHash, finalizeDesignResult } from './design-envelope.j
 import { dispatchDesignOp } from './design-dispatch.js'
 import { ingestExternalInput } from './design-ingress.js'
 import {
-  commitTransaction, deriveCaseContentId, ensureCaseDir, loadArtifact, loadSnapshot, readHead, resolveCaseContext,
+  appendReceipt, commitReportFinalizeTransaction, commitTransaction, deriveCaseContentId, ensureCaseDir, loadArtifact, loadSnapshot, readHead, resolveCaseContext,
 } from './design-casefile.js'
 import { loadCapabilityPolicy } from './design-capability.js'
 
@@ -148,6 +148,7 @@ export const DESIGN_TOOL_OPS = Object.freeze(['design_casefile_validate', 'desig
 const DESIGN_CASEFILE_PATH = join(import.meta.dirname, '..', 'python', 'design_casefile.py')
 // B1 收口：design_consequence 独立 dispatcher（design_consequence.py；spawn 输出 = 扁平 C4 + ok，同 validate/export 形态）
 const DESIGN_CONSEQUENCE_PATH = join(import.meta.dirname, '..', 'python', 'design_consequence.py')
+const H64 = /^[0-9a-f]{64}$/
 
 function designTool(config, opts) {
   if (!DESIGN_OPS.has(opts.op)) {
@@ -289,6 +290,281 @@ function designTool(config, opts) {
       }
       if (Array.isArray(finalized.envelope.checks)) out.checks = finalized.envelope.checks
       if (finalized.envelope._provenance) out._provenance = finalized.envelope._provenance
+      return out
+    },
+  })
+}
+
+function parseCasefileEnvelope(response) {
+  if (response && typeof response === 'object' && typeof response.status === 'string') return response
+  try {
+    const parsed = JSON.parse(String(response?.stdout || '').trim())
+    return parsed && typeof parsed === 'object' && typeof parsed.status === 'string' ? parsed : null
+  } catch {
+    return null
+  }
+}
+
+function normalizeAuditViewId(value) {
+  const auditViewId = value === undefined ? [] : value
+  if (!Array.isArray(auditViewId)) return { ok: false, code: 'INVALID_AUDIT_VIEW_ID', detail: 'audit_view_id must be an array' }
+  if (auditViewId.length > 1024) return { ok: false, code: 'INVALID_AUDIT_VIEW_ID', detail: 'audit_view_id too long' }
+  const seen = new Set()
+  for (const id of auditViewId) {
+    if (typeof id !== 'string' || !H64.test(id) || seen.has(id)) {
+      return { ok: false, code: 'INVALID_AUDIT_VIEW_ID', detail: 'audit_view_id requires unique lowercase sha256 ids' }
+    }
+    seen.add(id)
+  }
+  const ordered = [...auditViewId]
+  if (ordered.some((id, index) => id !== ordered.slice().sort()[index])) {
+    return { ok: false, code: 'AUDIT_VIEW_NOT_CANONICAL', detail: 'audit_view_id must use ASCII lexical hash order' }
+  }
+  return { ok: true, auditViewId: ordered }
+}
+
+function casefileWorkerEnv(gate, stagingDir = '') {
+  return {
+    DSH_DESIGN_STAGING: stagingDir,
+    DSH_DESIGN_DISPATCH_ID: '',
+    DSH_DESIGN_PACKET: '',
+    DSH_DESIGN_PACKET_FIXED: PACKET_DIR,
+    DSH_DESIGN_EXPECT_INDEX_SHA: gate.index_sha256 || '',
+    DSH_DESIGN_EXPECT_MANIFEST_SHA: gate.manifest_sha256 || '',
+    DSH_DESIGN_ACCEPTANCE_ID: gate.acceptance_id || '',
+  }
+}
+
+function casefileEnvelope(status, reasonCode, detail, extra = {}) {
+  return { status, reason_code: reasonCode, artifact_refs: [], detail, ...extra }
+}
+
+/**
+ * B4 public export wrapper.
+ *
+ * A not-yet-finalized HEAD first takes the deliberately narrow path
+ * S_n -> Python render-to-TS-staging -> TS report transaction -> validate
+ * S_(n+1) -> Python pure export(S_(n+1)).  An already finalized HEAD only
+ * takes the last validate/export portion.  No receipt is read to form the
+ * audit view; the caller supplies its canonical ordered hash array directly.
+ */
+function designCasefileExportTool(config) {
+  const op = 'design_casefile_export'
+  const callTimeout = 300_000
+  return defineTool({
+    name: op,
+    description:
+      'design casefile 导出：对未收口快照执行确定性 report-finalize 事务（S_n → 含 report.md 的 S_(n+1)）→ 精确 validate → export；' +
+      'audit_view_id 为 canonical 有序 audit-record hash 数组。导出产物只写 export 侧，不改变已完成的科学快照。',
+    parameters: {
+      casefile_dir: { type: 'string', required: true, description: 'casefile 根目录，必须在工作区内且已存在' },
+      format: { type: 'string', enum: ['zip', 'report', 'both'], default: 'both', description: '导出格式' },
+      audit_view_id: { type: 'array', default: [], items: { type: 'string' }, description: 'canonical ASCII-ordered audit-record hash array；[] 表示显式无审计引用' },
+      expected_parent_snapshot_sha: { type: 'string', description: '可选 S_n CAS 绑定；不符即拒绝 finalize/export' },
+    },
+    timeoutMs: callTimeout + BOOT_WAIT_MS,
+    output: {
+      schema: { type: 'object', additionalProperties: true },
+      render: (_args, value) => [{ type: 'text', text: JSON.stringify(value, null, 2) }],
+    },
+    async execute(args, exec) {
+      if (exec.signal.aborted) throw new Error('aborted')
+      const cwd = resolveWorkdir(exec)
+      const raw = typeof args.casefile_dir === 'string' ? args.casefile_dir : ''
+      const caseDir = isAbsolute(raw) ? resolve(raw) : resolve(cwd, raw)
+      const rel = caseDir === cwd ? '' : (caseDir.startsWith(cwd + '\\') || caseDir.startsWith(cwd + '/') ? caseDir.slice(cwd.length + 1) : null)
+      if (rel === null || rel.startsWith('..') || !existsSync(caseDir)) {
+        const err = new Error('casefile_dir 必须在工作区内且已存在')
+        err.status = 'OUT_OF_DOMAIN'
+        err.code = 'OUT_OF_DOMAIN'
+        throw err
+      }
+      const gate = verifyDesignPacket()
+      if (!gate.ok) {
+        const terminal = await finalizeDesignResult({
+          operation: op,
+          worker: null,
+          inputHashes: [deriveDesignInputHash(op, args)],
+          caseDir,
+          guard: () => gate,
+        })
+        const err = new Error(`design gate 拒绝：${terminal.code || gate.code} ${gate.detail || ''}`)
+        err.status = 'DEPENDENCY_UNAVAILABLE'
+        err.code = terminal.code || gate.code
+        err.audit = terminal.audit
+        throw err
+      }
+      await throttle(op)
+      const py = await requireEnv(config)
+      const t0 = Date.now()
+      let envelope = null
+      let worker = null
+      let finalizedSnapshot = null
+      let reportArtifactId = null
+      let reportFinalized = false
+      const auditView = normalizeAuditViewId(args.audit_view_id)
+      try {
+        if (args.format !== undefined && !['zip', 'report', 'both'].includes(args.format)) {
+          envelope = casefileEnvelope('INVALID_INPUT', 'INVALID_FORMAT', 'format must be zip/report/both')
+        } else if (!auditView.ok) {
+          envelope = casefileEnvelope('INVALID_INPUT', auditView.code, auditView.detail)
+        } else if (args.expected_parent_snapshot_sha !== undefined
+          && (typeof args.expected_parent_snapshot_sha !== 'string' || !H64.test(args.expected_parent_snapshot_sha))) {
+          envelope = casefileEnvelope('INVALID_INPUT', 'REPORT_PARENT_INVALID', 'expected_parent_snapshot_sha must be lowercase sha256')
+        } else {
+          const handle = {
+            caseDir,
+            objectsDir: join(caseDir, 'objects'),
+            snapshotsDir: join(caseDir, 'snapshots'),
+          }
+          const head = readHead(caseDir)
+          if (!head.ok || !H64.test(head.snapshot_sha || '')) {
+            envelope = casefileEnvelope('INVALID_INPUT', head.ok ? 'SNAPSHOT_MISSING' : 'HEAD_UNREADABLE', 'casefile HEAD must select an immutable snapshot')
+          } else if (args.expected_parent_snapshot_sha !== undefined && args.expected_parent_snapshot_sha !== head.snapshot_sha) {
+            envelope = casefileEnvelope('INVALID_INPUT', 'PARENT_SNAPSHOT_STALE', 'HEAD does not match expected parent snapshot')
+          } else {
+            const sourceSnapshot = head.snapshot_sha
+            const source = loadSnapshot(handle.snapshotsDir, sourceSnapshot)
+            if (!source.ok || !Array.isArray(source.manifest?.artifacts)) {
+              envelope = casefileEnvelope('INVALID_INPUT', 'SNAPSHOT_UNREADABLE', 'source snapshot manifest unavailable')
+            } else {
+              const reports = source.manifest.artifacts.filter((entry) => entry && entry.type === 'case_report@1')
+              if (reports.length > 1) {
+                envelope = casefileEnvelope('INVALID_INPUT', 'REPORT_FINALIZE_STATE_INVALID', 'source snapshot has multiple case reports')
+              } else if (reports.length === 1) {
+                finalizedSnapshot = sourceSnapshot
+                reportArtifactId = reports[0].artifact_id
+              } else {
+                mkdirSync(join(caseDir, 'staging'), { recursive: true })
+                const stagingDir = mkdtempSync(join(caseDir, 'staging', 'report-finalize-'))
+                worker = await spawnPython(py, DESIGN_CASEFILE_PATH, {
+                  op,
+                  args: {
+                    casefile_dir: caseDir,
+                    _stage_report: true,
+                    source_snapshot_sha: sourceSnapshot,
+                    audit_view_id: auditView.auditViewId,
+                  },
+                }, {
+                  cwd,
+                  timeoutMs: callTimeout,
+                  signal: exec.signal,
+                  env: casefileWorkerEnv(gate, stagingDir),
+                })
+                const staged = parseCasefileEnvelope(worker)
+                if (!staged || staged.status !== 'OK') {
+                  envelope = staged || casefileEnvelope('EXECUTION_ERROR', 'REPORT_STAGE_WORKER_INVALID', 'report render worker returned no C4 envelope')
+                } else if (staged.source_snapshot_sha !== sourceSnapshot || !H64.test(staged.report_sha256 || '')) {
+                  envelope = casefileEnvelope('INVALID_INPUT', 'REPORT_STAGE_BINDING_INVALID', 'staged report did not bind the captured source snapshot')
+                } else {
+                  const stagedPath = join(stagingDir, 'report.md')
+                  if (!existsSync(stagedPath)) {
+                    envelope = casefileEnvelope('EXECUTION_ERROR', 'REPORT_STAGE_MISSING', 'staged report file missing')
+                  } else {
+                    const transaction = commitReportFinalizeTransaction(handle, {
+                      reportBytes: readFileSync(stagedPath),
+                      expectHead: sourceSnapshot,
+                    })
+                    if (!transaction.ok) {
+                      envelope = casefileEnvelope('INVALID_INPUT', transaction.code || 'REPORT_FINALIZE_FAILED', 'report-finalize transaction rejected')
+                    } else if (transaction.report_artifact_id !== staged.report_sha256) {
+                      envelope = casefileEnvelope('EXECUTION_ERROR', 'REPORT_HASH_BINDING_INVALID', 'staged report hash changed before commit')
+                    } else {
+                      finalizedSnapshot = transaction.snapshot_sha
+                      reportArtifactId = transaction.report_artifact_id
+                      reportFinalized = true
+                    }
+                  }
+                }
+              }
+              if (!envelope && finalizedSnapshot && typeof reportArtifactId === 'string') {
+                worker = await spawnPython(py, DESIGN_CASEFILE_PATH, {
+                  op: 'design_casefile_validate',
+                  args: { casefile_dir: caseDir, snapshot_sha: finalizedSnapshot },
+                }, {
+                  cwd,
+                  timeoutMs: callTimeout,
+                  signal: exec.signal,
+                  env: casefileWorkerEnv(gate),
+                })
+                const validation = parseCasefileEnvelope(worker)
+                if (!validation || validation.status !== 'OK' || validation.snapshot_sha !== finalizedSnapshot) {
+                  envelope = validation || casefileEnvelope('EXECUTION_ERROR', 'REPORT_VALIDATE_WORKER_INVALID', 'final snapshot validation returned no bound C4 envelope')
+                } else {
+                  worker = await spawnPython(py, DESIGN_CASEFILE_PATH, {
+                    op,
+                    args: { casefile_dir: caseDir, format: args.format || 'both', snapshot_sha: finalizedSnapshot },
+                  }, {
+                    cwd,
+                    timeoutMs: callTimeout,
+                    signal: exec.signal,
+                    env: casefileWorkerEnv(gate),
+                  })
+                  envelope = parseCasefileEnvelope(worker)
+                  if (!envelope || envelope.status !== 'OK') {
+                    envelope = envelope || casefileEnvelope('EXECUTION_ERROR', 'EXPORT_WORKER_INVALID', 'pure export worker returned no C4 envelope')
+                  } else if (envelope.snapshot_sha !== finalizedSnapshot || envelope.report_artifact_id !== reportArtifactId) {
+                    envelope = casefileEnvelope('EXECUTION_ERROR', 'EXPORT_SNAPSHOT_BINDING_INVALID', 'pure export did not preserve finalized snapshot binding')
+                  } else {
+                    const receipt = appendReceipt(caseDir, {
+                      event: 'exported',
+                      at: new Date().toISOString(),
+                      snapshot_sha: finalizedSnapshot,
+                      report_artifact_id: reportArtifactId,
+                      format: args.format || 'both',
+                      artifact_refs: envelope.artifact_refs,
+                    })
+                    if (!receipt.ok) {
+                      envelope = casefileEnvelope('EXECUTION_ERROR', 'EXPORT_RECEIPT_FAILED', 'export receipt append failed')
+                    } else {
+                      envelope.report_finalized = reportFinalized
+                      envelope.audit_view_id = auditView.auditViewId
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      } catch {
+        envelope = casefileEnvelope('EXECUTION_ERROR', 'REPORT_FINALIZE_INTERNAL_ERROR', 'report-finalize wrapper failed')
+      }
+
+      const finalized = await finalizeDesignResult({
+        operation: op,
+        envelope,
+        worker,
+        inputHashes: [deriveDesignInputHash(op, args)],
+        caseDir,
+        guard: () => gate,
+        stampProvenance: (out) => stampProvenance(op, out),
+      })
+      const terminalEnvelope = finalized.envelope || envelope
+      const duration = Date.now() - t0
+      if (config.enableLog !== false) {
+        appendLog({
+          kind: 'op', op, ok: finalized.ok === true, duration_ms: duration,
+          error: finalized.ok ? undefined : `${terminalEnvelope?.reason_code || finalized.code || 'EXECUTION_ERROR'} ${terminalEnvelope?.detail || finalized.detail || ''}`.slice(0, 300),
+        })
+      }
+      if (!finalized.ok) {
+        const err = new Error(`design ${op} ${terminalEnvelope?.status || finalized.status || 'EXECUTION_ERROR'}: ${terminalEnvelope?.reason_code || finalized.code || 'EXECUTION_ERROR'} ${terminalEnvelope?.detail || finalized.detail || ''}`)
+        err.status = terminalEnvelope?.status || finalized.status || 'EXECUTION_ERROR'
+        err.code = terminalEnvelope?.reason_code || finalized.code || 'EXECUTION_ERROR'
+        err.envelope = terminalEnvelope || undefined
+        err.audit = finalized.audit
+        throw err
+      }
+      const out = {
+        status: finalized.envelope.status,
+        reason_code: finalized.envelope.reason_code,
+        artifact_refs: finalized.envelope.artifact_refs,
+        detail: finalized.envelope.detail,
+      }
+      for (const key of ['checks', 'snapshot_sha', 'report_artifact_id', 'report_finalized', 'audit_view_id', '_provenance']) {
+        if (finalized.envelope[key] !== undefined) out[key] = finalized.envelope[key]
+      }
+      if (finalized.audit_write?.event?.audit_record_id) out.audit_record_id = finalized.audit_write.event.audit_record_id
       return out
     },
   })
@@ -2014,21 +2290,7 @@ function semanticTools(config) {
       op: 'design_casefile_validate',
       timeoutMs: 300_000,
     }),
-    designTool(config, {
-      name: 'design_casefile_export',
-      description:
-        'design casefile 导出（正式工具级，B1-part-2）：validate 门禁（未过 → 拒绝导出，非零退出）→ ' +
-        'report.md（含证据分级与假设清单；禁含 case_instance_id/workdir/临时路径/run UUID/真实时间/stderr/bundle 路径/snapshot_sha；' +
-        '可含 case_content_id/policy_hash/artifact IDs/claim IDs）+ bundle.zip（全工件 + 哈希清单，解压可重验）；' +
-        '不可重放项列出；同一快照确定性输出。导出产物为导出侧产物，不改变科学快照。' +
-        '触发词：export casefile、导出 case、报告导出、bundle。',
-      parameters: {
-        casefile_dir: { type: 'string', required: true, description: 'casefile 根目录（绝对路径，或相对工作区；须在工作区内且已存在）' },
-        format: { type: 'string', enum: ['zip', 'report', 'both'], default: 'both', description: '导出格式（默认 both：report.md + bundle.zip）' },
-      },
-      op: 'design_casefile_export',
-      timeoutMs: 300_000,
-    }),
+    designCasefileExportTool(config),
     // ============ design 通道：design_consequence（B1 收口批次）============
     // 独立 designTool 路径（D5.5）；opts.op ↔ bio_ops.OPS 双向验收见
     // test/design-consequence-tools.mjs。门禁（BLOCKED/NOT_RUN/INVALID_INPUT）exit 0

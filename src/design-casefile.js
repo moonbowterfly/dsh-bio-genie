@@ -21,7 +21,7 @@ import {
   readdirSync, realpathSync, renameSync, rmSync, unlinkSync, writeFileSync, writeSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { isAbsolute, join, relative, resolve } from 'node:path'
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { PACKET_DIR } from './design-gate.js'
 import { deriveAnnotationsForArtifact, validateDesignArtifact } from './design-validate.js'
 import { loadCapabilityPolicy, resolveOperation } from './design-capability.js'
@@ -100,6 +100,56 @@ export function canonicalizeViaPacket(text, annotations) {
 }
 
 const H64 = /^[0-9a-f]{64}$/
+const CASE_REPORT_TYPE = 'case_report@1'
+const MAX_CASE_REPORT_BYTES = 16 * 1024 * 1024
+
+/**
+ * `case_report@1` is intentionally a narrow raw-byte exception to the packet
+ * JSON artifact path.  The frozen case_manifest schema already enumerates the
+ * type, while report.md itself must remain Markdown bytes so that its content
+ * hash is the report identity.  Keep this validator local and restrictive:
+ * it is not a generic escape hatch for unknown artifact types.
+ */
+function reportForbiddenProblems(text, { caseDir = null, sourceSnapshotSha = null } = {}) {
+  const problems = []
+  const normalized = text.replace(/\\/g, '/').toLowerCase()
+  const add = (code) => { if (!problems.includes(code)) problems.push(code) }
+  if (/\bcase_instance_id\b/i.test(text)) add('REPORT_FORBIDDEN_CASE_INSTANCE_ID')
+  if (caseDir) {
+    const roots = [caseDir, dirname(dirname(dirname(caseDir)))]
+    for (const root of roots) {
+      const candidate = String(root).replace(/\\/g, '/').toLowerCase()
+      if (candidate && normalized.includes(candidate)) add('REPORT_FORBIDDEN_WORKDIR')
+    }
+    const instance = basename(caseDir)
+    if (instance) {
+      const escaped = instance.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      if (new RegExp(`(^|[^A-Za-z0-9._-])${escaped}($|[^A-Za-z0-9._-])`, 'i').test(text)) add('REPORT_FORBIDDEN_CASE_INSTANCE_ID')
+    }
+  }
+  if (/(?:^|[\\/])(tmp|temp)(?:[\\/]|$)/i.test(text)) add('REPORT_FORBIDDEN_TEMP_PATH')
+  if (/\b[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/i.test(text)) add('REPORT_FORBIDDEN_RUN_UUID')
+  if (/\b\d{4}-\d{2}-\d{2}\b/.test(text)) add('REPORT_FORBIDDEN_REAL_TIME')
+  if (/\bstderr\b/i.test(text)) add('REPORT_FORBIDDEN_STDERR')
+  if (/\bbundle\.zip\b/i.test(text) || /(?:^|[\\/])exports(?:[\\/]|$)/i.test(text)) add('REPORT_FORBIDDEN_BUNDLE_PATH')
+  if (/\bsnapshot_sha\b/i.test(text) || (sourceSnapshotSha && text.includes(sourceSnapshotSha))) add('REPORT_FORBIDDEN_SNAPSHOT_SHA')
+  return problems
+}
+
+/** Validate raw UTF-8/LF report bytes before they can enter a snapshot. */
+export function validateCaseReportBytes(reportBytes, { caseDir = null, sourceSnapshotSha = null } = {}) {
+  const bytes = Buffer.isBuffer(reportBytes) ? reportBytes : Buffer.from(reportBytes || '')
+  if (bytes.length === 0 || bytes.length > MAX_CASE_REPORT_BYTES) {
+    return { ok: false, code: 'CASE_REPORT_SIZE_INVALID', size: bytes.length }
+  }
+  const text = bytes.toString('utf8')
+  if (!Buffer.from(text, 'utf8').equals(bytes)) return { ok: false, code: 'CASE_REPORT_NOT_UTF8' }
+  if (text.includes('\r') || !text.endsWith('\n')) return { ok: false, code: 'CASE_REPORT_LINE_ENDING_INVALID' }
+  if (!text.startsWith('# 设计 casefile 最终报告\n')) return { ok: false, code: 'CASE_REPORT_HEADER_INVALID' }
+  const problems = reportForbiddenProblems(text, { caseDir, sourceSnapshotSha })
+  if (problems.length) return { ok: false, code: problems[0], problems }
+  return { ok: true, text, sha256: sha256hex(bytes) }
+}
 
 /**
  * case_content_id 派生（derivation v1）：
@@ -554,6 +604,147 @@ export function commitTransaction(handle, { caseContentId = null, policy = null,
     if (!rc.ok) return { ok: false, code: rc.code, step: 6, txid: id }
     return { ok: true, snapshot_sha: ws.snapshot_sha, parent: headSha, txid: id, published: fresh.map((s) => s.sha) }
   }, { op: 'commit' })
+}
+
+/**
+ * Commit the sole raw-byte scientific artifact admitted by B4.
+ *
+ * `case_report@1` is deliberately not routed through `commitTransaction`:
+ * the frozen packet manifests reserve that type but do not provide a JSON
+ * schema for Markdown.  This narrow transaction has the same lock/CAS/object/
+ * snapshot/receipt ordering as the ordinary transaction and accepts exactly
+ * one validated `report.md`; it is not a generic binary-artifact escape hatch.
+ *
+ * The report's inputs are always the complete ordered artifact-id set of the
+ * immutable parent snapshot.  Callers may supply that set as a binding check,
+ * but cannot substitute a subset or add receipt-derived values.
+ */
+export function commitReportFinalizeTransaction(handle, {
+  reportBytes,
+  expectHead,
+  sourceArtifactIds = undefined,
+  txid = null,
+  limits = null,
+} = {}) {
+  const L = { ...CASE_LIMITS, ...(limits || {}) }
+  const { caseDir, objectsDir, snapshotsDir } = handle || {}
+  const id = txid || randomUUID()
+  if (!caseDir || !objectsDir || !snapshotsDir) return { ok: false, code: 'CASE_HANDLE_INVALID', step: 0, txid: id }
+  if (typeof expectHead !== 'string' || !H64.test(expectHead)) {
+    return { ok: false, code: 'REPORT_PARENT_INVALID', step: 0, txid: id }
+  }
+  const bytes = Buffer.isBuffer(reportBytes) ? reportBytes : Buffer.from(reportBytes || '')
+  return withCaseLock(caseDir, () => {
+    const head = readHead(caseDir)
+    if (!head.ok) return { ok: false, code: 'HEAD_UNREADABLE', step: 0, txid: id }
+    if (head.snapshot_sha !== expectHead) {
+      return { ok: false, code: 'HEAD_CAS_MISMATCH', step: 0, txid: id, current: head.snapshot_sha, expected: expectHead }
+    }
+    const snap = loadSnapshot(snapshotsDir, expectHead)
+    if (!snap.ok) return { ok: false, code: 'SNAPSHOT_UNREADABLE', step: 0, txid: id, detail: snap.detail }
+    const baseArtifacts = Array.isArray(snap.manifest.artifacts) ? snap.manifest.artifacts : []
+    if (baseArtifacts.length + 1 > L.maxArtifactsPerSnapshot) {
+      return { ok: false, code: 'MANIFEST_TOO_MANY_ARTIFACTS', step: 0, txid: id }
+    }
+    if (baseArtifacts.some((entry) => entry && entry.type === CASE_REPORT_TYPE)) {
+      return { ok: false, code: 'REPORT_ALREADY_FINALIZED', step: 0, txid: id }
+    }
+    const parentIds = baseArtifacts.map((entry) => entry && entry.artifact_id).sort()
+    if (parentIds.some((artifactId) => typeof artifactId !== 'string' || !H64.test(artifactId))) {
+      return { ok: false, code: 'REPORT_PARENT_MANIFEST_INVALID', step: 0, txid: id }
+    }
+    if (sourceArtifactIds !== undefined) {
+      if (!Array.isArray(sourceArtifactIds)
+        || sourceArtifactIds.some((artifactId) => typeof artifactId !== 'string' || !H64.test(artifactId))) {
+        return { ok: false, code: 'REPORT_INPUT_BINDING_INVALID', step: 0, txid: id }
+      }
+      const supplied = sourceArtifactIds.slice().sort()
+      if (new Set(supplied).size !== supplied.length
+        || supplied.length !== parentIds.length
+        || supplied.some((artifactId, index) => artifactId !== parentIds[index])) {
+        return { ok: false, code: 'REPORT_INPUT_BINDING_INVALID', step: 0, txid: id }
+      }
+    }
+    const report = validateCaseReportBytes(bytes, { caseDir, sourceSnapshotSha: expectHead })
+    if (!report.ok) return { ok: false, code: report.code, step: 2, txid: id, problems: report.problems }
+    if (bytes.length > L.maxObjectBytes) {
+      return { ok: false, code: 'OBJECT_TOO_LARGE', step: 1, txid: id, size: bytes.length }
+    }
+    const reportId = report.sha256
+    if (baseArtifacts.some((entry) => entry && entry.artifact_id === reportId)) {
+      return { ok: false, code: 'REPORT_ARTIFACT_ID_COLLISION', step: 2, txid: id, report_artifact_id: reportId }
+    }
+
+    // 1) stage the already TS-rechecked bytes in the transaction namespace.
+    const stagingDir = join(caseDir, 'staging', id)
+    mkdirSync(stagingDir, { recursive: true })
+    writeFileSync(join(stagingDir, reportId), bytes)
+
+    // 2) raw report validation above is the schema-equivalent narrow gate.
+    // 3) publish content-addressed object, refusing a non-identical collision.
+    const objectPath = join(objectsDir, reportId)
+    if (existsSync(objectPath)) {
+      if (!readFileSync(objectPath).equals(bytes)) {
+        return { ok: false, code: 'OBJECT_HASH_COLLISION', step: 3, txid: id, sha: reportId }
+      }
+    } else {
+      atomicWriteBytes(objectPath, bytes)
+    }
+
+    const reportEntry = {
+      artifact_id: reportId,
+      type: CASE_REPORT_TYPE,
+      inputs: parentIds,
+      producer: 'report-finalize',
+      schema_major: '1',
+      canonical_path: 'report.md',
+    }
+    const manifest = {
+      schema_version: '1.0',
+      case_content_id: snap.manifest.case_content_id,
+      artifacts: [...baseArtifacts, reportEntry],
+      policy: snap.manifest.policy,
+    }
+    // 4) immutable snapshot (the frozen manifest schema explicitly permits
+    // case_report@1 even though its raw bytes use this local narrow validator).
+    const ws = writeSnapshot({ snapshotsDir, manifest, validate: (m) => validateDesignArtifact('case_manifest', m) })
+    if (!ws.ok) return { ok: false, code: ws.code, step: 4, txid: id, problems: ws.problems }
+    const manifestBytes = readFileSync(ws.path)
+    if (manifestBytes.length > L.maxManifestBytes) {
+      if (!ws.existed) {
+        try { unlinkSync(ws.path) } catch { /* best effort */ }
+      }
+      return { ok: false, code: 'MANIFEST_TOO_LARGE', step: 4, txid: id, size: manifestBytes.length }
+    }
+    // 5) CAS only after the complete target snapshot is durable.
+    const wh = writeHeadAtomic(caseDir, ws.snapshot_sha, { expect: expectHead })
+    if (!wh.ok) {
+      if (!ws.existed) {
+        try { unlinkSync(ws.path) } catch { /* best effort */ }
+      }
+      return { ok: false, code: wh.code, step: 5, txid: id }
+    }
+    // 6) receipt records the committed science transition.  Runtime fields
+    // live only here and can never be rendered into report.md.
+    const rc = appendReceipt(caseDir, {
+      event: 'committed',
+      txid: id,
+      snapshot_sha: ws.snapshot_sha,
+      parent_snapshot_sha: expectHead,
+      at: new Date().toISOString(),
+      artifacts: [{ artifact_id: reportId, type: CASE_REPORT_TYPE }],
+      report_finalize: true,
+    }, { limits: L })
+    if (!rc.ok) return { ok: false, code: rc.code, step: 6, txid: id }
+    return {
+      ok: true,
+      snapshot_sha: ws.snapshot_sha,
+      parent: expectHead,
+      txid: id,
+      report_artifact_id: reportId,
+      published: [reportId],
+    }
+  }, { op: 'report-finalize' })
 }
 
 /**

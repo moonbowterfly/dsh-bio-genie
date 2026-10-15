@@ -268,10 +268,17 @@ function receiptSafeRefs(refs) {
  */
 export function appendAuditOverlay(caseDir, result, { operation, now = new Date().toISOString(), limits = null } = {}) {
   if (!result || !result.audit || !result.audit.audit_only) return fail('AUDIT_OVERLAY_INVALID', 'missing audit-only result')
+  // The receipt event intentionally contains a real timestamp, so it cannot
+  // itself be the stable audit-record identity used by report-finalize.  Hash
+  // only the canonical audit payload and persist that identifier alongside the
+  // receipt event.  A report receives the caller-selected IDs; it never reads
+  // this mutable append-only file to discover them.
+  const auditRecordId = auditOverlayId(result.audit)
   const event = {
     event: 'audit_overlay',
     at: now,
     operation,
+    audit_record_id: auditRecordId,
     audit: result.audit,
     // Retain worker-declared paths/checks as receipt evidence without making
     // them valid artifactRefs or scientific graph inputs.
@@ -416,7 +423,18 @@ export async function finalizeDesignResult({
   }
 }
 
-/** Stable audit identity helper for tests/report builders; not an artifact id. */
+/**
+ * Stable audit-record identity for report-finalize's explicit audit view.
+ * `stableInputJson` sorts object keys recursively while preserving array
+ * order, unlike JSON.stringify's construction-order-dependent output.
+ */
 export function auditOverlayId(audit) {
-  return createHash('sha256').update(JSON.stringify(audit)).digest('hex')
+  try {
+    return createHash('sha256').update(stableInputJson(audit), 'utf8').digest('hex')
+  } catch {
+    // buildAuditOverlay has already constrained a normal audit payload.  Keep
+    // this fallback deterministic for defensive programmatic misuse rather
+    // than allowing an exception to suppress receipt evidence.
+    return createHash('sha256').update('INVALID_AUDIT_RECORD', 'utf8').digest('hex')
+  }
 }

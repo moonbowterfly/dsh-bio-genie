@@ -11,6 +11,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { commitReportFinalizeTransaction } from '../src/design-casefile.js'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
 const BUILDER = join(ROOT, 'test', 'design-casefile-builder.mjs')
@@ -39,9 +40,9 @@ const ENV_PACKET = () => ({
   DSH_DESIGN_PACKET: '',
   DSH_DESIGN_PACKET_FIXED: join(ROOT, 'design', 'packet'),
 })
-function spawnWorker(worker, payload, cwd) {
+function spawnWorker(worker, payload, cwd, extraEnv = {}) {
   return spawnSync(VENV, ['-I', join(ROOT, 'python', worker)], {
-    input: JSON.stringify(payload), encoding: 'utf8', timeout: 240_000, env: ENV_PACKET(), cwd,
+    input: JSON.stringify(payload), encoding: 'utf8', timeout: 240_000, env: { ...ENV_PACKET(), ...extraEnv }, cwd,
   })
 }
 // zip 清单 + 安全提取 + 逐项复核（python zipfile，输出 ASCII JSON）
@@ -80,17 +81,29 @@ function inspectZip(zipPath, outDir) {
   return JSON.parse(r.stdout.trim())
 }
 
-// ── 主链路：clean case → validate OK → export → bundle.zip ───────────────
+// ── 主链路：clean case → validate OK → finalize（B4）→ export → bundle.zip ─
 const wd = workdir('archive-')
 const clean = buildCase('clean', join(wd, 'case'))
 const v = spawnWorker('design_casefile.py', { op: 'design_casefile_validate', args: { casefile_dir: clean.case_dir } }, wd)
 const ve = JSON.parse(v.stdout.trim() || '{}')
 check('前置：clean case validate OK', v.status === 0 && ve.status === 'OK', v.stdout.slice(0, 160))
 
+// B4：渲染 stage → TS 本地 finalize 事务 → 纯导出（S_(n+1)）
+const stageDir = join(clean.case_dir, 'staging', 'archive-b4-stage')
+mkdirSync(stageDir, { recursive: true })
+const s = spawnWorker('design_casefile.py', { op: 'design_casefile_export', args: { casefile_dir: clean.case_dir, _stage_report: true, source_snapshot_sha: clean.snapshot_sha, audit_view_id: [] } }, wd, { DSH_DESIGN_STAGING: stageDir })
+const se = JSON.parse(s.stdout.trim() || '{}')
+check('前置：stage 报告渲染 OK + report.md', s.status === 0 && se.status === 'OK' && existsSync(join(stageDir, 'report.md')), s.stdout.slice(0, 160))
+const tx = commitReportFinalizeTransaction(
+  { caseDir: clean.case_dir, objectsDir: join(clean.case_dir, 'objects'), snapshotsDir: join(clean.case_dir, 'snapshots') },
+  { reportBytes: readFileSync(join(stageDir, 'report.md')), expectHead: clean.snapshot_sha },
+)
+check('前置：finalize 事务 OK + S_(n+1)', tx.ok === true && /^[0-9a-f]{64}$/.test(tx.snapshot_sha || ''), JSON.stringify(tx).slice(0, 160))
+
 const x = spawnWorker('design_casefile.py', { op: 'design_casefile_export', args: { casefile_dir: clean.case_dir, format: 'both' } }, wd)
 const xe = JSON.parse(x.stdout.trim() || '{}')
 check('前置：export OK + 2 产物', x.status === 0 && xe.status === 'OK' && Array.isArray(xe.artifact_refs) && xe.artifact_refs.length === 2, x.stdout.slice(0, 160))
-const exportRoot = join(wd, 'exports', clean.snapshot_sha.slice(0, 12))
+const exportRoot = join(wd, 'exports', tx.snapshot_sha.slice(0, 12))
 const zipPath = typeof xe.artifact_refs[0] === 'string'
   ? xe.artifact_refs.find((p) => String(p).endsWith('bundle.zip'))
   : join(exportRoot, 'bundle.zip')
@@ -145,7 +158,7 @@ check('② 解压全部落地于全新目录（extracted 数 == 非 hash 条目�
 {
   const snapshot = JSON.parse(readFileSync(join(fresh, 'snapshot.json'), 'utf8'))
   const arts = snapshot.artifacts || []
-  const aid = arts.map((a) => a.artifact_id).filter(Boolean)
+  const aid = arts.filter((a) => a.type !== 'case_report@1').map((a) => a.artifact_id).filter(Boolean)
   const types = new Set(arts.map((a) => a.type))
   const report = readFileSync(join(fresh, 'report.md'), 'utf8')
   const tokens = new Set(report.match(/[0-9a-f]{64}/g) || [])

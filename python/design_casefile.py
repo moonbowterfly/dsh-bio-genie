@@ -35,6 +35,7 @@
 import hashlib
 import json
 import os
+import re
 import sys
 import zipfile
 
@@ -61,6 +62,105 @@ CHECKS = [
 VALIDATOR_PASS = "PASS"
 VALIDATOR_FAIL = "FAIL"
 VALIDATOR_SKIP = "SKIP"
+
+H64_RE = re.compile(r"^[0-9a-f]{64}$")
+CASE_REPORT_TYPE = "case_report@1"
+CASE_REPORT_HEADER = "# 设计 casefile 最终报告\n"
+MAX_CASE_REPORT_BYTES = 16 * 1024 * 1024
+
+
+def _report_forbidden_codes(text, case_dir=None, source_snapshot_sha=None):
+    """Return stable B4 rejection codes for runtime entropy in report bytes."""
+    codes = []
+
+    def add(code):
+        if code not in codes:
+            codes.append(code)
+
+    normalized = text.replace("\\", "/").lower()
+    if re.search(r"\bcase_instance_id\b", text, flags=re.IGNORECASE):
+        add("REPORT_FORBIDDEN_CASE_INSTANCE_ID")
+    if case_dir:
+        case_abs = os.path.abspath(case_dir)
+        roots = [case_abs]
+        # <workdir>/result/design/<case> -> <workdir>
+        try:
+            roots.append(os.path.dirname(os.path.dirname(os.path.dirname(case_abs))))
+        except Exception:  # noqa: BLE001
+            pass
+        for root in roots:
+            candidate = os.path.abspath(root).replace("\\", "/").lower()
+            if candidate and candidate in normalized:
+                add("REPORT_FORBIDDEN_WORKDIR")
+        case_name = os.path.basename(case_abs)
+        if case_name and re.search(r"(^|[^A-Za-z0-9._-])" + re.escape(case_name) + r"($|[^A-Za-z0-9._-])", text, flags=re.IGNORECASE):
+            add("REPORT_FORBIDDEN_CASE_INSTANCE_ID")
+    if re.search(r"(?:^|[\\/])(tmp|temp)(?:[\\/]|$)", text, flags=re.IGNORECASE):
+        add("REPORT_FORBIDDEN_TEMP_PATH")
+    if re.search(r"\b[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b", text, flags=re.IGNORECASE):
+        add("REPORT_FORBIDDEN_RUN_UUID")
+    if re.search(r"\b\d{4}-\d{2}-\d{2}\b", text):
+        add("REPORT_FORBIDDEN_REAL_TIME")
+    if re.search(r"\bstderr\b", text, flags=re.IGNORECASE):
+        add("REPORT_FORBIDDEN_STDERR")
+    if re.search(r"\bbundle\.zip\b", text, flags=re.IGNORECASE) or re.search(r"(?:^|[\\/])exports(?:[\\/]|$)", text, flags=re.IGNORECASE):
+        add("REPORT_FORBIDDEN_BUNDLE_PATH")
+    if re.search(r"\bsnapshot_sha\b", text, flags=re.IGNORECASE) or (source_snapshot_sha and source_snapshot_sha in text):
+        add("REPORT_FORBIDDEN_SNAPSHOT_SHA")
+    return codes
+
+
+def _validate_case_report_bytes(data, case_dir=None, source_snapshot_sha=None):
+    """Validate the sole raw-byte artifact admitted by B4.
+
+    The frozen packet has no JSON schema for `case_report@1`, so both the
+    Python validator and the TS transaction enforce this exact, narrow byte
+    contract.  It is intentionally not a generic unknown-artifact bypass.
+    """
+    if not isinstance(data, (bytes, bytearray)):
+        return False, "CASE_REPORT_BYTES_INVALID", "report bytes required", None
+    data = bytes(data)
+    if len(data) == 0 or len(data) > MAX_CASE_REPORT_BYTES:
+        return False, "CASE_REPORT_SIZE_INVALID", "report byte length invalid", None
+    try:
+        text = data.decode("utf-8")
+    except Exception as exc:  # noqa: BLE001
+        return False, "CASE_REPORT_NOT_UTF8", "report is not utf-8: " + str(exc)[:80], None
+    if text.encode("utf-8") != data:
+        return False, "CASE_REPORT_NOT_UTF8", "report utf-8 round-trip mismatch", None
+    if "\r" in text or not text.endswith("\n"):
+        return False, "CASE_REPORT_LINE_ENDING_INVALID", "report must use LF and end with LF", None
+    if not text.startswith(CASE_REPORT_HEADER):
+        return False, "CASE_REPORT_HEADER_INVALID", "report header invalid", None
+    codes = _report_forbidden_codes(text, case_dir=case_dir, source_snapshot_sha=source_snapshot_sha)
+    if codes:
+        return False, codes[0], ",".join(codes), None
+    return True, None, None, text
+
+
+def _canonical_audit_view(value):
+    """Validate the v0.6 wire form: lexicographically ordered H64 array.
+
+    Receipt-sequence ordering would require an immutable receipt prefix index,
+    which this casefile does not have.  The direct hash-list form is therefore
+    canonical ASCII lexical order and never consults the mutable receipt tail.
+    """
+    if not isinstance(value, list):
+        return None, "INVALID_AUDIT_VIEW_ID", "audit_view_id must be an array"
+    if len(value) > 1024:
+        return None, "INVALID_AUDIT_VIEW_ID", "audit_view_id too long"
+    out = []
+    seen = set()
+    for item in value:
+        if not isinstance(item, str) or not H64_RE.fullmatch(item):
+            return None, "INVALID_AUDIT_VIEW_ID", "audit record id must be lowercase sha256"
+        if item in seen:
+            return None, "INVALID_AUDIT_VIEW_ID", "duplicate audit record id"
+        seen.add(item)
+        out.append(item)
+    if out != sorted(out):
+        return None, "AUDIT_VIEW_NOT_CANONICAL", "audit_view_id must use ASCII lexical hash order"
+    return out, None, None
 
 
 def _packet_root():
@@ -162,6 +262,11 @@ def _object_verify(ctx, root, case_dir, artifact_id, artifact_type):
     if not artifact_type.endswith("@1"):
         return False, [("OBJECT_TYPE_INVALID", "artifact type not @1: " + str(artifact_type))], None
     stem = artifact_type[:-2]
+    if artifact_type == CASE_REPORT_TYPE:
+        ok, code, detail, _text = _validate_case_report_bytes(data, case_dir=case_dir)
+        if not ok:
+            return False, [(code, "report object invalid: " + detail)], stem
+        return True, [], stem
     try:
         text = data.decode("utf-8")
     except Exception as exc:  # noqa: BLE001
@@ -195,6 +300,9 @@ def _artifact_index(case_dir, manifest):
             data = _read_file_bytes(obj_path, 128 * 1024 * 1024)
         except Exception:  # noqa: BLE001
             continue  # 缺失/不可读由 MANIFEST_COMPLETE / MANIFEST_DISK_HASH 检出
+        if atype == CASE_REPORT_TYPE:
+            index[aid] = {"type": atype, "value": None, "stem": "case_report", "raw": data}
+            continue
         try:
             value = json.loads(data.decode("utf-8"))
         except Exception:  # noqa: BLE001
@@ -219,8 +327,12 @@ def _resolve_ref(index, ref):
     return index.get(ref["artifact_id"])
 
 
-def _run_checks(case_dir, root, ctx):
-    """逐检查项验证；返回 (checks, overall_ok, first_fail_code)。"""
+def _run_checks(case_dir, root, ctx, snapshot_sha=None):
+    """Validate HEAD by default, or one immutable explicit snapshot.
+
+    `snapshot_sha` is used by report-finalize after its TS transaction so the
+    validate/export pair cannot silently switch to a newer mutable HEAD.
+    """
     checks = []
     fail_codes = []
 
@@ -229,57 +341,87 @@ def _run_checks(case_dir, root, ctx):
         if status == VALIDATOR_FAIL:
             fail_codes.append(code or check_id)
 
-    # ── 基础：HEAD → 快照绑定 ──────────────────────────────────────────
+    # ── 基础：HEAD / explicit immutable snapshot → snapshot binding ────
     head_ok = False
+    requested_snapshot = snapshot_sha
     snapshot_sha = None
     manifest = None
-    head_path = os.path.join(case_dir, "HEAD.json")
-    if not os.path.exists(head_path):
-        add("SNAPSHOT_BINDING", VALIDATOR_FAIL, "HEAD.json 不存在（尚无已提交快照，无法绑定不可变 snapshot）", "SNAPSHOT_MISSING")
-    else:
-        try:
-            with open(head_path, encoding="utf-8") as fh:
-                head = json.load(fh)
-        except Exception as exc:  # noqa: BLE001
-            head = None
-            add("SNAPSHOT_BINDING", VALIDATOR_FAIL, "HEAD.json 不可读: " + str(exc)[:120], "SNAPSHOT_UNREADABLE")
-        if head is not None:
-            snapshot_sha = head.get("snapshot_sha")
-            if not isinstance(snapshot_sha, str) or len(snapshot_sha) != 64:
-                add("SNAPSHOT_BINDING", VALIDATOR_FAIL, "HEAD snapshot_sha 非法（非 64-hex）", "SNAPSHOT_SHA_INVALID")
+    if requested_snapshot is not None:
+        if not isinstance(requested_snapshot, str) or not H64_RE.fullmatch(requested_snapshot):
+            add("SNAPSHOT_BINDING", VALIDATOR_FAIL, "explicit snapshot sha invalid", "SNAPSHOT_SHA_INVALID")
+        else:
+            snapshot_sha = requested_snapshot
+            manifest, problems = _load_snapshot(case_dir, root, ctx, snapshot_sha)
+            if manifest is None:
+                code, detail = problems[0]
+                add("SNAPSHOT_BINDING", VALIDATOR_FAIL, detail, code)
             else:
-                manifest, problems = _load_snapshot(case_dir, root, ctx, snapshot_sha)
-                if manifest is None:
-                    code, detail = problems[0]
-                    add("SNAPSHOT_BINDING", VALIDATOR_FAIL, detail, code)
+                head_ok = True
+                add("SNAPSHOT_BINDING", VALIDATOR_PASS, "explicit immutable snapshot binding verified")
+    else:
+        head_path = os.path.join(case_dir, "HEAD.json")
+        if not os.path.exists(head_path):
+            add("SNAPSHOT_BINDING", VALIDATOR_FAIL, "HEAD.json 不存在（尚无已提交快照，无法绑定不可变 snapshot）", "SNAPSHOT_MISSING")
+        else:
+            try:
+                with open(head_path, encoding="utf-8") as fh:
+                    head = json.load(fh)
+            except Exception as exc:  # noqa: BLE001
+                head = None
+                add("SNAPSHOT_BINDING", VALIDATOR_FAIL, "HEAD.json 不可读: " + str(exc)[:120], "SNAPSHOT_UNREADABLE")
+            if head is not None:
+                snapshot_sha = head.get("snapshot_sha")
+                if not isinstance(snapshot_sha, str) or not H64_RE.fullmatch(snapshot_sha):
+                    add("SNAPSHOT_BINDING", VALIDATOR_FAIL, "HEAD snapshot_sha 非法（非 64-hex）", "SNAPSHOT_SHA_INVALID")
                 else:
-                    head_ok = True
-                    add("SNAPSHOT_BINDING", VALIDATOR_PASS, "快照绑定成功（HEAD → snapshots/<sha>.json，字节 canonical，嵌入 hash 复核一致）")
+                    manifest, problems = _load_snapshot(case_dir, root, ctx, snapshot_sha)
+                    if manifest is None:
+                        code, detail = problems[0]
+                        add("SNAPSHOT_BINDING", VALIDATOR_FAIL, detail, code)
+                    else:
+                        head_ok = True
+                        add("SNAPSHOT_BINDING", VALIDATOR_PASS, "快照绑定成功（HEAD → snapshots/<sha>.json，字节 canonical，嵌入 hash 复核一致）")
 
     index = {}
     if head_ok:
         v = dv.validate_with_ctx(ctx, "case_manifest", manifest)
-        if not v["ok"]:
-            first = (v["errors"] or [{}])[0]
-            add("MANIFEST_COMPLETE", VALIDATOR_FAIL, "manifest schema 违规: " + str(first.get("code", "?")) + "@" + str(first.get("path", "?")), "MANIFEST_SCHEMA_VIOLATION")
         # ── MANIFEST_COMPLETE ──────────────────────────────────────────
         entries = manifest.get("artifacts") or []
+        manifest_problem = None
         seen = set()
         dup = None
-        for entry in entries:
-            aid = entry.get("artifact_id")
-            if aid in seen:
-                dup = aid
-                break
-            seen.add(aid)
-        if dup:
-            add("MANIFEST_COMPLETE", VALIDATOR_FAIL, "manifest 重复 artifact_id: " + dup[:12], "MANIFEST_DUPLICATE_ARTIFACT")
-        else:
+        if not v["ok"]:
+            first = (v["errors"] or [{}])[0]
+            manifest_problem = ("manifest schema 违规: " + str(first.get("code", "?")) + "@" + str(first.get("path", "?")), "MANIFEST_SCHEMA_VIOLATION")
+        if manifest_problem is None:
+            for entry in entries:
+                aid = entry.get("artifact_id")
+                if aid in seen:
+                    dup = aid
+                    break
+                seen.add(aid)
+            if dup:
+                manifest_problem = ("manifest 重复 artifact_id: " + str(dup)[:12], "MANIFEST_DUPLICATE_ARTIFACT")
+        if manifest_problem is None:
             missing = [e.get("artifact_id") for e in entries if not os.path.exists(os.path.join(case_dir, "objects", str(e.get("artifact_id"))))]
             if missing:
-                add("MANIFEST_COMPLETE", VALIDATOR_FAIL, "缺 manifest 条目（磁盘无对象）: " + missing[0][:12] + "（共 %d 条）" % len(missing), "MANIFEST_ENTRY_MISSING")
-            else:
-                add("MANIFEST_COMPLETE", VALIDATOR_PASS, "%d 条 manifest 条目均在磁盘有对应对象" % len(entries))
+                manifest_problem = ("缺 manifest 条目（磁盘无对象）: " + str(missing[0])[:12] + "（共 %d 条）" % len(missing), "MANIFEST_ENTRY_MISSING")
+        if manifest_problem is None:
+            reports = [e for e in entries if e.get("type") == CASE_REPORT_TYPE]
+            if len(reports) > 1:
+                manifest_problem = ("snapshot contains multiple case reports", "CASE_REPORT_MULTIPLE")
+            elif reports:
+                report = reports[0]
+                expected_inputs = sorted(e.get("artifact_id") for e in entries if e is not report)
+                actual_inputs = report.get("inputs")
+                if (report.get("canonical_path") != "report.md" or report.get("producer") != "report-finalize"
+                        or report.get("schema_major") != "1" or not isinstance(actual_inputs, list)
+                        or actual_inputs != expected_inputs):
+                    manifest_problem = ("case report binding metadata invalid", "CASE_REPORT_BINDING_INVALID")
+        if manifest_problem:
+            add("MANIFEST_COMPLETE", VALIDATOR_FAIL, manifest_problem[0], manifest_problem[1])
+        else:
+            add("MANIFEST_COMPLETE", VALIDATOR_PASS, "%d 条 manifest 条目均在磁盘有对应对象" % len(entries))
 
         index, idx_problems = _artifact_index(case_dir, manifest)
 
@@ -315,6 +457,15 @@ def _run_checks(case_dir, root, ctx):
                 schema_fail = schema_fail or (aid or "?") + ": 类型非法"
                 continue
             obj_path = os.path.join(case_dir, "objects", aid)
+            if atype == CASE_REPORT_TYPE:
+                try:
+                    data = _read_file_bytes(obj_path, MAX_CASE_REPORT_BYTES)
+                    ok_report, report_code, report_detail, _text = _validate_case_report_bytes(data, case_dir=case_dir)
+                except Exception as exc:  # noqa: BLE001
+                    ok_report, report_code, report_detail = False, "CASE_REPORT_UNREADABLE", str(exc)[:80]
+                if not ok_report:
+                    schema_fail = schema_fail or (aid[:12] + ": " + report_code + " " + report_detail)
+                continue
             try:
                 data = _read_file_bytes(obj_path, 128 * 1024 * 1024)
                 tree = json.loads(data.decode("utf-8"))
@@ -475,6 +626,9 @@ def op_design_casefile_validate(args):
     strict = args.get("strict", True)
     if not isinstance(strict, bool):
         return _envelope("INVALID_INPUT", "INVALID_STRICT", [], "strict 必须为布尔值")
+    explicit_snapshot = args.get("snapshot_sha")
+    if explicit_snapshot is not None and (not isinstance(explicit_snapshot, str) or not H64_RE.fullmatch(explicit_snapshot)):
+        return _envelope("INVALID_INPUT", "SNAPSHOT_SHA_INVALID", [], "snapshot_sha must be lowercase sha256")
     root = _packet_root()
     idp = _identity_problems(root)
     if idp:
@@ -483,17 +637,18 @@ def op_design_casefile_validate(args):
     if ctx is None:
         return _envelope("DEPENDENCY_UNAVAILABLE", "PACKET_UNVERIFIED", [], errs0[0].get("detail", "packet load failed"))
     try:
-        checks, overall_ok, first_fail = _run_checks(case_dir, root, ctx)
+        checks, overall_ok, first_fail = _run_checks(case_dir, root, ctx, snapshot_sha=explicit_snapshot)
     except Exception as exc:  # noqa: BLE001
         return _envelope("EXECUTION_ERROR", "INTERNAL_ERROR", [], "validate 内部异常: " + str(exc)[:160])
-    snapshot_sha = None
-    try:
-        head_path = os.path.join(case_dir, "HEAD.json")
-        if os.path.exists(head_path):
-            with open(head_path, encoding="utf-8") as fh:
-                snapshot_sha = json.load(fh).get("snapshot_sha")
-    except Exception:  # noqa: BLE001
-        pass
+    snapshot_sha = explicit_snapshot
+    if snapshot_sha is None:
+        try:
+            head_path = os.path.join(case_dir, "HEAD.json")
+            if os.path.exists(head_path):
+                with open(head_path, encoding="utf-8") as fh:
+                    snapshot_sha = json.load(fh).get("snapshot_sha")
+        except Exception:  # noqa: BLE001
+            pass
     env = _envelope(
         "OK" if overall_ok else "INVALID_INPUT",
         "OK" if overall_ok else (first_fail or "VALIDATION_FAILED"),
@@ -512,7 +667,7 @@ def op_design_casefile_validate(args):
     return env
 
 
-def _report_md(case_dir, manifest, index, by_type, checks, snapshot_sha):
+def _legacy_report_md(case_dir, manifest, index, by_type, checks, snapshot_sha):
     """确定性 report.md（禁含：case_instance_id/真实 workdir/临时路径/run UUID/真实时间/
     stderr 原文/bundle 输出路径/snapshot_sha）。所有内容由快照数据派生，无运行时熵。"""
     lines = []
@@ -632,7 +787,7 @@ def _report_md(case_dir, manifest, index, by_type, checks, snapshot_sha):
     return "\n".join(lines) + "\n"
 
 
-def _build_bundle(case_dir, manifest, index, report_text, out_zip_path):
+def _legacy_build_bundle(case_dir, manifest, index, report_text, out_zip_path):
     """bundle.zip：snapshot.json + objects/<id> + report.md + hashes.sha256；确定性。
     hashes.sha256 覆盖 zip 内全部其他条目（可独立复核）；条目按名排序、固定时间戳、STORE。"""
     entries = {}  # relpath -> bytes
@@ -700,7 +855,7 @@ def op_design_casefile_export(args):
     else:
         return _envelope("EXECUTION_ERROR", "SNAPSHOT_MISSING", [], "无 HEAD snapshot，无法导出")
     by_type = _by_type(index)
-    report_text = _report_md(case_dir, manifest, index, by_type, checks, snapshot_sha)
+    report_text = _legacy_report_md(case_dir, manifest, index, by_type, checks, snapshot_sha)
     export_root = os.path.join(os.path.dirname(case_dir), "exports", snapshot_sha[:12])
     os.makedirs(export_root, exist_ok=True)
     artifact_refs = []
@@ -711,13 +866,297 @@ def op_design_casefile_export(args):
         artifact_refs.append(report_path)
     if fmt in ("zip", "both"):
         bundle_path = os.path.join(export_root, "bundle.zip")
-        _build_bundle(case_dir, manifest, index, report_text, bundle_path)
+        _legacy_build_bundle(case_dir, manifest, index, report_text, bundle_path)
         artifact_refs.append(bundle_path)
     env = _envelope("OK", "OK", artifact_refs,
                     "export 完成：report.md + bundle.zip（%d 个工件 + 哈希清单；不可重放项已列于报告）" % len(index))
     env["checks"] = checks
     if snapshot_sha:
         env["snapshot_sha"] = snapshot_sha
+    return env
+
+
+def _load_packet_context_or_envelope():
+    """Load the frozen packet once for a B4 private render or pure export."""
+    root = _packet_root()
+    identity = _identity_problems(root)
+    if identity:
+        return None, None, _envelope("DEPENDENCY_UNAVAILABLE", "PACKET_IDENTITY_MISMATCH", [], "identity: " + identity[0])
+    ctx, errors = dv.load_packet_context(root)
+    if ctx is None:
+        return None, None, _envelope("DEPENDENCY_UNAVAILABLE", "PACKET_UNVERIFIED", [], errors[0].get("detail", "packet load failed"))
+    return root, ctx, None
+
+
+def _read_target_snapshot(args, case_dir):
+    """Select an explicit immutable target, falling back to one HEAD read."""
+    target = args.get("snapshot_sha")
+    if target is not None:
+        if not isinstance(target, str) or not H64_RE.fullmatch(target):
+            return None, _envelope("INVALID_INPUT", "SNAPSHOT_SHA_INVALID", [], "snapshot_sha must be lowercase sha256")
+        return target, None
+    try:
+        with open(os.path.join(case_dir, "HEAD.json"), encoding="utf-8") as fh:
+            target = json.load(fh).get("snapshot_sha")
+    except Exception as exc:  # noqa: BLE001
+        return None, _envelope("INVALID_INPUT", "SNAPSHOT_MISSING", [], "HEAD unavailable: " + str(exc)[:120])
+    if not isinstance(target, str) or not H64_RE.fullmatch(target):
+        return None, _envelope("INVALID_INPUT", "SNAPSHOT_SHA_INVALID", [], "HEAD snapshot sha invalid")
+    return target, None
+
+
+def _report_md_b4(manifest, index, by_type, checks, audit_view_id):
+    """Render deterministic B4 report bytes from immutable S_n data only.
+
+    The report intentionally prints only IDs, fixed vocabularies and counts.
+    Free producer/source/solver strings could carry runtime entropy through an
+    otherwise valid scientific object and are therefore not report fields.
+    """
+    lines = [CASE_REPORT_HEADER.rstrip("\n"), ""]
+    lines.append("- case_content_id: " + str(manifest.get("case_content_id", "")))
+    lines.append("- policy_hash: " + str((manifest.get("policy") or {}).get("policy_hash", "")))
+    source_entries = [entry for entry in (manifest.get("artifacts") or []) if entry.get("type") != CASE_REPORT_TYPE]
+    lines.append("- artifact_count: %d" % len(source_entries))
+    lines.append("")
+
+    lines.append("## 审计视图")
+    lines.append("")
+    if audit_view_id:
+        for audit_id in audit_view_id:
+            lines.append("- audit_record_id: " + audit_id)
+    else:
+        lines.append("- audit_record_id: none")
+    lines.append("")
+
+    lines.append("## 验证摘要")
+    lines.append("")
+    lines.append("| check_id | status | required |")
+    lines.append("| --- | --- | --- |")
+    for check in sorted(checks, key=lambda item: item["check_id"]):
+        lines.append("| %s | %s | %s |" % (check["check_id"], check["status"], "yes" if check["required"] else "no"))
+    lines.append("")
+
+    lines.append("## 工件清单")
+    lines.append("")
+    lines.append("| artifact_id | type | inputs |")
+    lines.append("| --- | --- | --- |")
+    entry_by_id = {entry.get("artifact_id"): entry for entry in source_entries}
+    for artifact_id, info in sorted(index.items(), key=lambda item: (item[1]["type"], item[0])):
+        if info["type"] == CASE_REPORT_TYPE:
+            continue
+        entry = entry_by_id.get(artifact_id) or {}
+        lines.append("| %s | %s | %s |" % (artifact_id, info["type"], ",".join(sorted(entry.get("inputs") or []))))
+    lines.append("")
+
+    lines.append("## 证据分级")
+    lines.append("")
+    evidence = by_type.get("evidence_item@1", [])
+    if evidence:
+        lines.append("| artifact_id | match_grade |")
+        lines.append("| --- | --- |")
+        for artifact_id, info in evidence:
+            lines.append("| %s | %s |" % (artifact_id, (info["value"] or {}).get("match_grade", "")))
+    else:
+        lines.append("（无 evidence_item@1 工件）")
+    lines.append("")
+
+    lines.append("## 假设清单")
+    lines.append("")
+    cards = by_type.get("condition_card@1", [])
+    profiles = by_type.get("coupling_profile@1", [])
+    if cards or profiles:
+        lines.append("| artifact_id | category | item_count |")
+        lines.append("| --- | --- | --- |")
+        for artifact_id, _info in cards:
+            lines.append("| %s | condition_card@1 | 1 |" % artifact_id)
+        for artifact_id, info in profiles:
+            count = len([rule for rule in (info["value"] or {}).get("rules") or [] if isinstance(rule, dict)])
+            lines.append("| %s | coupling_profile@1 | %d |" % (artifact_id, count))
+    else:
+        lines.append("（无 condition_card@1 或 coupling_profile@1 工件）")
+    lines.append("")
+
+    lines.append("## 结论记录（claims）")
+    lines.append("")
+    claim_id_re = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
+    registered_claims = []
+    for artifact_id, info in by_type.get("claim@1", []):
+        claim_id = (info["value"] or {}).get("claim_id")
+        if isinstance(claim_id, str) and claim_id_re.fullmatch(claim_id):
+            registered_claims.append((claim_id, artifact_id))
+    if registered_claims:
+        lines.append("| claim_id | artifact_id |")
+        lines.append("| --- | --- |")
+        for claim_id, artifact_id in sorted(registered_claims):
+            lines.append("| %s | %s |" % (claim_id, artifact_id))
+        lines.append("")
+        lines.append("仅呈现已注册 claim@1 标识；不由运行记录推断科学状态。")
+    else:
+        lines.append("（无可渲染已注册 claim@1；运行记录中的 target 不被提升为科学结论）")
+    lines.append("")
+
+    lines.append("## 不可重放项清单")
+    lines.append("")
+    nonreplay = []
+    for artifact_type in ("consequence_run@1", "gem_card_raw@1"):
+        for artifact_id, _info in by_type.get(artifact_type, []):
+            nonreplay.append((artifact_id, artifact_type))
+    lines.append("| artifact_id | category |")
+    lines.append("| --- | --- |")
+    if nonreplay:
+        for artifact_id, artifact_type in sorted(nonreplay):
+            lines.append("| %s | %s |" % (artifact_id, artifact_type))
+    else:
+        lines.append("| none | none |")
+    return "\n".join(lines) + "\n"
+
+
+def _stage_report_finalize(args):
+    """Private render phase: write report.md only into TS-owned staging."""
+    case_dir = args.get("casefile_dir")
+    if not isinstance(case_dir, str) or not case_dir:
+        return _envelope("INVALID_INPUT", "INVALID_CASEFILE_DIR", [], "casefile_dir required")
+    case_dir = os.path.abspath(case_dir)
+    if not os.path.isdir(case_dir):
+        return _envelope("INVALID_INPUT", "INVALID_CASEFILE_DIR", [], "casefile_dir missing")
+    source_snapshot_sha = args.get("source_snapshot_sha")
+    if not isinstance(source_snapshot_sha, str) or not H64_RE.fullmatch(source_snapshot_sha):
+        return _envelope("INVALID_INPUT", "REPORT_PARENT_INVALID", [], "source_snapshot_sha must be lowercase sha256")
+    if "audit_view_id" not in args:
+        return _envelope("INVALID_INPUT", "INVALID_AUDIT_VIEW_ID", [], "audit_view_id required")
+    audit_view_id, audit_code, audit_detail = _canonical_audit_view(args.get("audit_view_id"))
+    if audit_code:
+        return _envelope("INVALID_INPUT", audit_code, [], audit_detail)
+    staging_dir = os.environ.get("DSH_DESIGN_STAGING")
+    staging_root = os.path.realpath(os.path.join(case_dir, "staging"))
+    staging_real = os.path.realpath(staging_dir) if staging_dir else ""
+    try:
+        contained = bool(staging_real) and os.path.commonpath([staging_root, staging_real]) == staging_root
+    except ValueError:
+        contained = False
+    if not contained or not os.path.isdir(staging_real) or os.path.islink(staging_dir):
+        return _envelope("INVALID_INPUT", "STAGING_DIR_INVALID", [], "TS-owned staging directory required")
+    root, ctx, error = _load_packet_context_or_envelope()
+    if error:
+        return error
+    try:
+        checks, overall_ok, first_fail = _run_checks(case_dir, root, ctx, snapshot_sha=source_snapshot_sha)
+    except Exception as exc:  # noqa: BLE001
+        return _envelope("EXECUTION_ERROR", "INTERNAL_ERROR", [], "report render failed: " + str(exc)[:160])
+    if not overall_ok:
+        return _envelope("INVALID_INPUT", "VALIDATE_GATE_FAILED", [], "source snapshot validation failed: " + str(first_fail or "?"), checks)
+    manifest, problems = _load_snapshot(case_dir, root, ctx, source_snapshot_sha)
+    if manifest is None:
+        return _envelope("EXECUTION_ERROR", "SNAPSHOT_UNREADABLE", [], problems[0][1] if problems else "source snapshot unavailable")
+    if any(entry.get("type") == CASE_REPORT_TYPE for entry in manifest.get("artifacts") or []):
+        return _envelope("INVALID_INPUT", "REPORT_ALREADY_FINALIZED", [], "source snapshot already has case_report@1", checks)
+    index, _problems = _artifact_index(case_dir, manifest)
+    report_bytes = _report_md_b4(manifest, index, _by_type(index), checks, audit_view_id).encode("utf-8")
+    valid, code, detail, _text = _validate_case_report_bytes(report_bytes, case_dir=case_dir, source_snapshot_sha=source_snapshot_sha)
+    if not valid:
+        return _envelope("INVALID_INPUT", code, [], detail, checks)
+    report_id = hashlib.sha256(report_bytes).hexdigest()
+    staged_path = os.path.join(staging_real, "report.md")
+    if os.path.lexists(staged_path):
+        return _envelope("INVALID_INPUT", "STAGING_REPORT_EXISTS", [], "fresh report staging target required", checks)
+    try:
+        with open(staged_path, "xb") as fh:
+            fh.write(report_bytes)
+            fh.flush()
+            os.fsync(fh.fileno())
+    except Exception as exc:  # noqa: BLE001
+        return _envelope("EXECUTION_ERROR", "STAGING_WRITE_FAILED", [], "report staging write failed: " + str(exc)[:120], checks)
+    env = _envelope("OK", "OK", [{"artifact_id": report_id, "expected_sha256": report_id, "relative_path": "report.md"}], "deterministic report staged", checks)
+    env["source_snapshot_sha"] = source_snapshot_sha
+    env["report_sha256"] = report_id
+    env["audit_view_id"] = audit_view_id
+    return env
+
+
+def _build_bundle_b4(case_dir, manifest, index, report_bytes, out_zip_path):
+    """Build deterministic export bytes from the already-committed report."""
+    entries = {}
+    snap_path = os.path.join(case_dir, "snapshots", str(manifest.get("snapshot_sha", "")) + ".json")
+    with open(snap_path, "rb") as fh:
+        entries["snapshot.json"] = fh.read()
+    for artifact_id in sorted(index.keys()):
+        with open(os.path.join(case_dir, "objects", artifact_id), "rb") as fh:
+            entries["objects/" + artifact_id] = fh.read()
+    entries["report.md"] = bytes(report_bytes)
+    entries["hashes.sha256"] = ("\n".join(
+        "%s  %s" % (hashlib.sha256(entries[rel]).hexdigest(), rel)
+        for rel in sorted(entries.keys())
+    ) + "\n").encode("utf-8")
+    with zipfile.ZipFile(out_zip_path, "w", compression=zipfile.ZIP_STORED, allowZip64=True) as zf:
+        for rel in sorted(entries.keys()):
+            info = zipfile.ZipInfo(rel, date_time=(1980, 1, 1, 0, 0, 0))
+            info.compress_type = zipfile.ZIP_STORED
+            info.external_attr = (0o644 << 16)
+            zf.writestr(info, entries[rel])
+    return sorted(entries.keys())
+
+
+def op_design_casefile_export(args):
+    """B4 pure export, plus its private TS-owned report render prephase."""
+    if args.get("_stage_report") is True:
+        return _stage_report_finalize(args)
+    if "_stage_report" in args:
+        return _envelope("INVALID_INPUT", "STAGE_MODE_INVALID", [], "_stage_report must be true when supplied")
+    case_dir = args.get("casefile_dir")
+    if not isinstance(case_dir, str) or not case_dir:
+        return _envelope("INVALID_INPUT", "INVALID_CASEFILE_DIR", [], "casefile_dir required")
+    case_dir = os.path.abspath(case_dir)
+    if not os.path.isdir(case_dir):
+        return _envelope("INVALID_INPUT", "INVALID_CASEFILE_DIR", [], "casefile_dir missing")
+    fmt = args.get("format", "both")
+    if fmt not in ("zip", "report", "both"):
+        return _envelope("INVALID_INPUT", "INVALID_FORMAT", [], "format must be zip/report/both")
+    snapshot_sha, target_error = _read_target_snapshot(args, case_dir)
+    if target_error:
+        return target_error
+    root, ctx, error = _load_packet_context_or_envelope()
+    if error:
+        return error
+    try:
+        checks, overall_ok, first_fail = _run_checks(case_dir, root, ctx, snapshot_sha=snapshot_sha)
+    except Exception as exc:  # noqa: BLE001
+        return _envelope("EXECUTION_ERROR", "INTERNAL_ERROR", [], "export internal error: " + str(exc)[:160])
+    if not overall_ok:
+        return _envelope("INVALID_INPUT", "VALIDATE_GATE_FAILED", [], "validation failed: " + str(first_fail or "?"), checks)
+    manifest, problems = _load_snapshot(case_dir, root, ctx, snapshot_sha)
+    if manifest is None:
+        return _envelope("EXECUTION_ERROR", "SNAPSHOT_UNREADABLE", [], problems[0][1] if problems else "snapshot unavailable", checks)
+    reports = [entry for entry in manifest.get("artifacts") or [] if entry.get("type") == CASE_REPORT_TYPE]
+    if len(reports) != 1:
+        return _envelope("INVALID_INPUT", "REPORT_FINALIZE_REQUIRED", [], "immutable snapshot must contain exactly one finalized report", checks)
+    report_id = reports[0].get("artifact_id")
+    if not isinstance(report_id, str) or not H64_RE.fullmatch(report_id):
+        return _envelope("INVALID_INPUT", "REPORT_FINALIZE_REQUIRED", [], "finalized report artifact id invalid", checks)
+    try:
+        report_bytes = _read_file_bytes(os.path.join(case_dir, "objects", report_id), MAX_CASE_REPORT_BYTES)
+    except Exception as exc:  # noqa: BLE001
+        return _envelope("INVALID_INPUT", "REPORT_FINALIZE_REQUIRED", [], "finalized report unreadable: " + str(exc)[:80], checks)
+    if hashlib.sha256(report_bytes).hexdigest() != report_id:
+        return _envelope("INVALID_INPUT", "OBJECT_HASH_MISMATCH", [], "finalized report hash mismatch", checks)
+    valid, code, detail, _text = _validate_case_report_bytes(report_bytes, case_dir=case_dir)
+    if not valid:
+        return _envelope("INVALID_INPUT", code, [], detail, checks)
+    index, _problems = _artifact_index(case_dir, manifest)
+    export_root = os.path.join(os.path.dirname(case_dir), "exports", snapshot_sha[:12])
+    os.makedirs(export_root, exist_ok=True)
+    artifact_refs = []
+    if fmt in ("report", "both"):
+        report_path = os.path.join(export_root, "report.md")
+        with open(report_path, "wb") as fh:
+            fh.write(report_bytes)
+        artifact_refs.append(report_path)
+    if fmt in ("zip", "both"):
+        bundle_path = os.path.join(export_root, "bundle.zip")
+        _build_bundle_b4(case_dir, manifest, index, report_bytes, bundle_path)
+        artifact_refs.append(bundle_path)
+    env = _envelope("OK", "OK", artifact_refs, "export completed from finalized immutable report (%d objects)" % len(index), checks)
+    env["snapshot_sha"] = snapshot_sha
+    env["report_artifact_id"] = report_id
     return env
 
 

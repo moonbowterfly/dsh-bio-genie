@@ -15,6 +15,7 @@ import shutil
 import subprocess
 import sys
 import zipfile
+from pathlib import Path
 
 import pytest
 
@@ -32,17 +33,22 @@ ENV_BASE = {
     "DSH_DESIGN_ACCEPTANCE_ID": "",
 }
 
+sys.path.insert(0, os.path.join(REPO, "python"))
+import design_casefile as dcf  # noqa: E402
+
 CHECK_IDS = [
     "SNAPSHOT_BINDING", "MANIFEST_COMPLETE", "MANIFEST_DISK_HASH", "SCHEMA",
     "R1_CRN_NEQ_GEM", "R2_SCORE_NEQ_BOUND", "R3_PROXY_NEQ_CAPACITY", "DAG_ACYCLIC",
 ]
 
 
-def run_op(op, args):
+def run_op(op, args, extra_env=None):
     """spawn design_casefile.py 独立 dispatcher；返回 (exit_code, envelope)。"""
     req = json.dumps({"op": op, "args": args})
     env = dict(os.environ)
     env.update(ENV_BASE)
+    if extra_env:
+        env.update(extra_env)
     proc = subprocess.run(
         [PYTHON, "-I", DISPATCHER],
         input=req.encode("utf-8"),
@@ -86,6 +92,67 @@ def fresh_case(built_cases, mode, tmp_path):
         "case_dir": dst,
         "snapshot_sha": src["snapshot_sha"],
         "ids": src["ids"],
+    }
+
+
+def stage_report(case, audit_view_id=None, source_snapshot_sha=None, name="b4-stage"):
+    """Run the actual Python private render phase into a TS-shaped staging dir."""
+    source_snapshot_sha = source_snapshot_sha or case["snapshot_sha"]
+    audit_view_id = [] if audit_view_id is None else audit_view_id
+    stage_dir = os.path.join(case["case_dir"], "staging", name)
+    os.makedirs(stage_dir, exist_ok=False)
+    code, envl = run_op(
+        "design_casefile_export",
+        {
+            "casefile_dir": case["case_dir"],
+            "_stage_report": True,
+            "source_snapshot_sha": source_snapshot_sha,
+            "audit_view_id": audit_view_id,
+        },
+        {"DSH_DESIGN_STAGING": stage_dir},
+    )
+    return code, envl, stage_dir
+
+
+def commit_staged_report(case, parent_snapshot_sha, staged_path):
+    """Exercise the real TS-only B4 transaction without giving Python write authority."""
+    module_uri = Path(os.path.join(REPO, "src", "design-casefile.js")).as_uri()
+    script = """
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { commitReportFinalizeTransaction } from %s
+const [caseDir, parent, reportPath] = process.argv.slice(1)
+const result = commitReportFinalizeTransaction({
+  caseDir,
+  objectsDir: join(caseDir, 'objects'),
+  snapshotsDir: join(caseDir, 'snapshots'),
+}, { reportBytes: readFileSync(reportPath), expectHead: parent })
+process.stdout.write(JSON.stringify(result))
+""" % json.dumps(module_uri)
+    proc = subprocess.run(
+        ["node", "--input-type=module", "-e", script, case["case_dir"], parent_snapshot_sha, staged_path],
+        capture_output=True,
+        cwd=REPO,
+        timeout=180,
+    )
+    assert proc.returncode == 0, proc.stderr.decode("utf-8", "replace")
+    return json.loads(proc.stdout.decode("utf-8") or "{}")
+
+
+def finalize_case(case, audit_view_id=None):
+    """B4 test helper: Python render-only stage then TS commit S_n → S_(n+1)."""
+    parent = case["snapshot_sha"]
+    code, envl, stage_dir = stage_report(case, audit_view_id=audit_view_id, source_snapshot_sha=parent)
+    assert envelope_ok(code, envl), envl
+    staged_path = os.path.join(stage_dir, "report.md")
+    tx = commit_staged_report(case, parent, staged_path)
+    assert tx.get("ok") is True, tx
+    return {
+        "parent_snapshot_sha": parent,
+        "snapshot_sha": tx["snapshot_sha"],
+        "report_artifact_id": tx["report_artifact_id"],
+        "report_bytes": open(staged_path, "rb").read(),
+        "stage_envelope": envl,
     }
 
 
@@ -255,19 +322,23 @@ def test_envelope_contract_keys(built_cases, tmp_path):
 
 # ── export：门禁 / report.md 禁含可含 / bundle 可重验 / 确定性 / 不改快照 ──
 
-def _export(case, fmt="both"):
-    code, envl = run_op("design_casefile_export", {"casefile_dir": case["case_dir"], "format": fmt})
+def _export(case, fmt="both", snapshot_sha=None):
+    args = {"casefile_dir": case["case_dir"], "format": fmt}
+    if snapshot_sha is not None:
+        args["snapshot_sha"] = snapshot_sha
+    code, envl = run_op("design_casefile_export", args)
     return code, envl
 
 
-def test_export_clean(built_cases, tmp_path):
+def test_export_requires_finalized_report(built_cases, tmp_path):
+    """The standalone Python exporter is pure: it cannot advance S_n itself."""
     case = fresh_case(built_cases, "clean", tmp_path)
+    head_before = open(os.path.join(case["case_dir"], "HEAD.json"), "rb").read()
     code, envl = _export(case)
-    assert envelope_ok(code, envl)
-    assert len(envl["artifact_refs"]) == 2
-    report, bundle = envl["artifact_refs"]
-    assert report.endswith("report.md") and os.path.exists(report)
-    assert bundle.endswith("bundle.zip") and os.path.exists(bundle)
+    assert code != 0 and envl["status"] == "INVALID_INPUT"
+    assert envl["reason_code"] == "REPORT_FINALIZE_REQUIRED"
+    assert envl["artifact_refs"] == []
+    assert open(os.path.join(case["case_dir"], "HEAD.json"), "rb").read() == head_before
 
 
 def test_export_gate_refused_on_invalid(built_cases, tmp_path):
@@ -281,30 +352,45 @@ def test_export_gate_refused_on_invalid(built_cases, tmp_path):
     assert status_of(envl, "MANIFEST_DISK_HASH")["status"] == "FAIL"
 
 
-def test_export_report_forbidden_fields(built_cases, tmp_path):
-    """R-3 自动化断言：report.md 禁含字段出现 → FAIL。"""
+def test_report_forbidden_fields_rejected_before_commit(built_cases, tmp_path):
+    """All eight B4 entropy classes are rejected by both Python and TS gates."""
     case = fresh_case(built_cases, "clean", tmp_path)
-    code, envl = _export(case)
+    code, envl, stage_dir = stage_report(case)
     assert envelope_ok(code, envl)
-    report = envl["artifact_refs"][0]
-    text = open(report, encoding="utf-8").read()
-    bundle_dir = os.path.dirname(envl["artifact_refs"][1])
-    checks = {
-        "case_instance_id (目录名)": "validate-case" in text,
-        "真实 workdir": case["workdir"] in text,
-        "临时路径/tmp|temp": bool(re.search(r"[/\\](tmp|temp)[/\\]", text)),
-        "run UUID v4": bool(re.search(r"[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}", text)),
-        "真实时间 (ISO 日期)": bool(re.search(r"\d{4}-\d{2}-\d{2}", text)),
-        "stderr 原文": "stderr" in text,
-        "bundle 输出路径": bundle_dir in text,
-        "snapshot_sha": case["snapshot_sha"] in text,
+    base = open(os.path.join(stage_dir, "report.md"), "rb").read()
+    head_path = os.path.join(case["case_dir"], "HEAD.json")
+    objects_dir = os.path.join(case["case_dir"], "objects")
+    snapshots_dir = os.path.join(case["case_dir"], "snapshots")
+    before_head = open(head_path, "rb").read()
+    before_objects = sorted(os.listdir(objects_dir))
+    before_snapshots = sorted(os.listdir(snapshots_dir))
+    mutations = {
+        "REPORT_FORBIDDEN_CASE_INSTANCE_ID": "\ncase\n",
+        "REPORT_FORBIDDEN_WORKDIR": "\n" + case["workdir"] + "\n",
+        "REPORT_FORBIDDEN_TEMP_PATH": "\nC:/temp/report-work\n",
+        "REPORT_FORBIDDEN_RUN_UUID": "\n01234567-89ab-4cde-8fab-0123456789ab\n",
+        "REPORT_FORBIDDEN_REAL_TIME": "\n2026-10-15\n",
+        "REPORT_FORBIDDEN_STDERR": "\nstderr raw worker text\n",
+        "REPORT_FORBIDDEN_BUNDLE_PATH": "\nexports/final/bundle.zip\n",
+        "REPORT_FORBIDDEN_SNAPSHOT_SHA": "\n" + case["snapshot_sha"] + "\n",
     }
-    bad = [k for k, v in checks.items() if v]
-    assert not bad, "report 含禁含字段: " + json.dumps(bad)
+    for index, (expected, suffix) in enumerate(mutations.items()):
+        mutated = base + suffix.encode("utf-8")
+        py_ok, py_code, _detail, _text = dcf._validate_case_report_bytes(mutated, case_dir=case["case_dir"], source_snapshot_sha=case["snapshot_sha"])
+        assert not py_ok and py_code == expected
+        path = os.path.join(stage_dir, "mut-%02d.md" % index)
+        with open(path, "wb") as fh:
+            fh.write(mutated)
+        tx = commit_staged_report(case, case["snapshot_sha"], path)
+        assert tx.get("ok") is False and tx.get("code") == expected, tx
+        assert open(head_path, "rb").read() == before_head
+        assert sorted(os.listdir(objects_dir)) == before_objects
+        assert sorted(os.listdir(snapshots_dir)) == before_snapshots
 
 
 def test_export_report_allowed_fields(built_cases, tmp_path):
     case = fresh_case(built_cases, "clean", tmp_path)
+    finalize_case(case)
     code, envl = _export(case)
     assert envelope_ok(code, envl)
     text = open(envl["artifact_refs"][0], encoding="utf-8").read()
@@ -317,11 +403,16 @@ def test_export_report_allowed_fields(built_cases, tmp_path):
 
 
 def test_export_report_deterministic(built_cases, tmp_path):
-    """R-5：同输入同字节输出（report 无运行时熵）。"""
-    case = fresh_case(built_cases, "clean", tmp_path)
-    code1, envl1 = _export(case)
-    code2, envl2 = _export(case)
+    """R4/R-5：同一 (S_n, audit_view) 的 report 字节确定；同快照导出字节稳定。"""
+    case_a = fresh_case(built_cases, "clean", tmp_path / "a")
+    case_b = fresh_case(built_cases, "clean", tmp_path / "b")
+    fin_a = finalize_case(case_a)
+    fin_b = finalize_case(case_b)
+    assert fin_a["report_bytes"] == fin_b["report_bytes"], "report 字节不一致（存在运行时熵）"
+    code1, envl1 = _export(case_a)
+    code2, envl2 = _export(case_a)
     assert envelope_ok(code1, envl1) and envelope_ok(code2, envl2)
+    assert envl1["snapshot_sha"] == fin_a["snapshot_sha"] and envl2["snapshot_sha"] == fin_a["snapshot_sha"]
     text1 = open(envl1["artifact_refs"][0], "rb").read()
     text2 = open(envl2["artifact_refs"][0], "rb").read()
     assert text1 == text2, "report 字节不一致（存在运行时熵）"
@@ -335,6 +426,7 @@ def test_export_report_deterministic(built_cases, tmp_path):
 def test_export_bundle_hash_list_independent_verify(built_cases, tmp_path):
     """解压可重验：哈希清单可独立复核（含全部工件 + snapshot.json + report.md）。"""
     case = fresh_case(built_cases, "clean", tmp_path)
+    finalize_case(case)
     code, envl = _export(case)
     assert envelope_ok(code, envl)
     bundle = envl["artifact_refs"][1]
@@ -353,8 +445,9 @@ def test_export_bundle_hash_list_independent_verify(built_cases, tmp_path):
 
 
 def test_export_does_not_change_snapshot(built_cases, tmp_path):
-    """export 产物为导出侧产物，不改变科学快照。"""
+    """finalize 后的纯导出为导出侧产物，不改变科学快照（R5）。"""
     case = fresh_case(built_cases, "clean", tmp_path)
+    fin = finalize_case(case)
     snap = os.path.join(case["case_dir"], "snapshots", case["snapshot_sha"] + ".json")
     head = os.path.join(case["case_dir"], "HEAD.json")
     objects = os.path.join(case["case_dir"], "objects")
@@ -363,6 +456,7 @@ def test_export_does_not_change_snapshot(built_cases, tmp_path):
     objs_before = sorted(os.listdir(objects))
     code, envl = _export(case)
     assert envelope_ok(code, envl)
+    assert envl["snapshot_sha"] == fin["snapshot_sha"]
     assert open(snap, "rb").read() == snap_before
     assert open(head, encoding="utf-8").read() == head_before
     assert sorted(os.listdir(objects)) == objs_before
@@ -370,15 +464,19 @@ def test_export_does_not_change_snapshot(built_cases, tmp_path):
 
 def test_export_format_report_only(built_cases, tmp_path):
     case = fresh_case(built_cases, "clean", tmp_path)
+    fin = finalize_case(case)
     code, envl = _export(case, fmt="report")
     assert envelope_ok(code, envl)
+    assert envl["snapshot_sha"] == fin["snapshot_sha"]
     assert len(envl["artifact_refs"]) == 1 and envl["artifact_refs"][0].endswith("report.md")
 
 
 def test_export_format_zip_only(built_cases, tmp_path):
     case = fresh_case(built_cases, "clean", tmp_path)
+    fin = finalize_case(case)
     code, envl = _export(case, fmt="zip")
     assert envelope_ok(code, envl)
+    assert envl["snapshot_sha"] == fin["snapshot_sha"]
     assert len(envl["artifact_refs"]) == 1 and envl["artifact_refs"][0].endswith("bundle.zip")
 
 

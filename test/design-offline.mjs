@@ -10,11 +10,12 @@
 // spawn 差异披露：A6 worker 不用 -I（-E 会忽略 PYTHONPATH 使哨兵不载入）；
 // 其余语义（信封提取、exit）与设计通道 worker 契约一致。
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { commitReportFinalizeTransaction } from '../src/design-casefile.js'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
 const BUILDER = join(ROOT, 'test', 'design-casefile-builder.mjs')
@@ -128,7 +129,7 @@ const env = offlineEnv(guard)
   check('design 通道零 fetch（worker + design js 无网络 import）', hits.length === 0, hits.join(','))
 }
 
-// ── 4) 断网 E2E（guard env）：stage → validate → export（+ consequence/iML1515）──
+// ── 4) 断网 E2E（guard env）：stage → validate → finalize → export（+ consequence/iML1515）──
 {
   const wd = workdir('offline-e2e-')
   const clean = buildCase('clean', join(wd, 'case'))
@@ -140,10 +141,30 @@ const env = offlineEnv(guard)
   check('E2E validate checks 8/8 PASS（断网下完整重验）',
     Array.isArray(ve.checks) && ve.checks.length === 8 && ve.checks.every((c) => c.status === 'PASS'), v.stdout.slice(0, 160))
 
+  // B4 语义：纯导出要求目标快照已含 finalize 报告——未 finalize 先验 fail-closed
+  const x0 = spawnWorker('design_casefile.py', { op: 'design_casefile_export', args: { casefile_dir: clean.case_dir, format: 'both' } }, env)
+  const x0e = JSON.parse(x0.stdout.trim() || '{}')
+  check('E2E export 未 finalize（guard env）→ REPORT_FINALIZE_REQUIRED（fail-closed）',
+    x0e.status === 'INVALID_INPUT' && x0e.reason_code === 'REPORT_FINALIZE_REQUIRED' && Array.isArray(x0e.artifact_refs) && x0e.artifact_refs.length === 0, x0.stdout.slice(0, 160))
+
+  // 断网渲染 stage → TS 本地 finalize 事务（离线等价）→ 断网纯导出
+  const stageDir = join(clean.case_dir, 'staging', 'offline-b4-stage')
+  mkdirSync(stageDir, { recursive: true })
+  const s = spawnWorker('design_casefile.py', { op: 'design_casefile_export', args: { casefile_dir: clean.case_dir, _stage_report: true, source_snapshot_sha: clean.snapshot_sha, audit_view_id: [] } }, { ...env, DSH_DESIGN_STAGING: stageDir })
+  const se = JSON.parse(s.stdout.trim() || '{}')
+  check('E2E stage 报告渲染（guard env）→ OK + report.md',
+    s.status === 0 && se.status === 'OK' && existsSync(join(stageDir, 'report.md')), s.stdout.slice(0, 160))
+  const tx = commitReportFinalizeTransaction(
+    { caseDir: clean.case_dir, objectsDir: join(clean.case_dir, 'objects'), snapshotsDir: join(clean.case_dir, 'snapshots') },
+    { reportBytes: readFileSync(join(stageDir, 'report.md')), expectHead: clean.snapshot_sha },
+  )
+  check('E2E finalize 事务（TS 本地，离线等价）→ OK + S_(n+1)',
+    tx.ok === true && /^[0-9a-f]{64}$/.test(tx.snapshot_sha || ''), JSON.stringify(tx).slice(0, 160))
+
   const x = spawnWorker('design_casefile.py', { op: 'design_casefile_export', args: { casefile_dir: clean.case_dir, format: 'both' } }, env)
   const xe = JSON.parse(x.stdout.trim() || '{}')
   check('E2E export（guard env）→ OK + 2 产物（zip + report）',
-    v.status === 0 && xe.status === 'OK' && Array.isArray(xe.artifact_refs) && xe.artifact_refs.length === 2, x.stdout.slice(0, 160))
+    x.status === 0 && xe.status === 'OK' && Array.isArray(xe.artifact_refs) && xe.artifact_refs.length === 2, x.stdout.slice(0, 160))
 }
 
 if (IML_AVAILABLE) {
