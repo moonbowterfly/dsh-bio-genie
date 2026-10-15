@@ -1,0 +1,65 @@
+{
+  "manifest_id": "design-prompt-fixtures@1",
+  "fixture_version": "prompt-fixtures@1",
+  "spec_refs": [
+    "genie-synbio-design-spec-v0.2-2026-10-12.md#9 (A3：真实 dsh 跑四类固定 prompt — 本批只做 fixtures 部分)",
+    "genie-synbio-design-spec-v0.3-2026-10-12.md#9 (A3 强化：prompt fixture 版本化 + 配置 hash 冻结 + 禁止点名新工具/skill + 预期 terminal state 预登记)"
+  ],
+  "config_fingerprint": {
+    "dsh_version": {
+      "value": "0.6.48",
+      "source": "package.json#version"
+    },
+    "preset": {
+      "name": "bio-genie",
+      "digest_sha256": "2d764504fa4cefe7d0472739b9b4bd4366acadea2c98b0b1adca4ccc893e106e",
+      "source": "preset/bio-genie/preset.yml + preset/bio-genie/agent.cordis.yml（按相对名排序逐文件 sha256 后再拼接哈希）"
+    },
+    "model": {
+      "value": null,
+      "source": "桌面端运行时模型配置（不在仓库内；客户端注入 model 名）",
+      "pending": true,
+      "note": "模型随用户桌面端配置变化，无法在仓库内固化；A3 实跑批在运行环境读取实际 model 值并回填此字段（不得编造）"
+    },
+    "skill_registry_digest": {
+      "value": "2327d3fd6e0d1e9c11bdf1eb20165302506c82a7f6d59d1448ddcb3e80057de5",
+      "source": "src/skills.js#SKILL_MANIFEST + GUIDE_MANIFEST（name/category 规范化 JSON 的 sha256；含主 skill dsh-bio-genie）"
+    }
+  },
+  "config_hash": {
+    "value": "38c635227b19cc66b46e12d45f215e4c84e8de952d912c9050d986516e334742",
+    "canonical_fields": ["fixture_version", "dsh_version", "preset", "skill_registry_digest"],
+    "note": "仅对可固化字段取规范化 JSON（键排序）算 sha256；model 为 pending 不参与"
+  },
+  "status_vocab_source": "design/failure-matrix.json#expected_status_vocab（= design_host.py TOOL_STATES 六词）",
+  "fixtures": [
+    {
+      "fixture_id": "prompt-01-complete-case",
+      "category": "complete-reference-case",
+      "file": "design/prompt-fixtures/prompt-01-complete-case.md",
+      "expected_status": "OK",
+      "expected_reason": "OK"
+    },
+    {
+      "fixture_id": "prompt-02-missing-medium",
+      "category": "missing-medium",
+      "file": "design/prompt-fixtures/prompt-02-missing-medium.md",
+      "expected_status": "INVALID_INPUT",
+      "expected_reason": "INVALID_INPUT"
+    },
+    {
+      "fixture_id": "prompt-03-gem-strain-mismatch",
+      "category": "gem-strain-mismatch",
+      "file": "design/prompt-fixtures/prompt-03-gem-strain-mismatch.md",
+      "expected_status": "BLOCKED",
+      "expected_reason": "BLOCKED"
+    },
+    {
+      "fixture_id": "prompt-04-structural-only",
+      "category": "structural-only",
+      "file": "design/prompt-fixtures/prompt-04-structural-only.md",
+      "expected_status": "BLOCKED",
+      "expected_reason": "BLOCKED"
+    }
+  ]
+}
