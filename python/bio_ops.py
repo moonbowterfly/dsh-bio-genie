@@ -67,6 +67,7 @@ from plot_toolkit import (op_plot_gene_structure, op_plot_gene_locations,
                           op_plot_gene_density)
 from plot_toolkit2 import (op_plot_heatmap, op_plot_venn, op_plot_upset,
                            op_plot_enrichment, op_plot_domains)
+from collinearity import op_collinearity
 socket.setdefaulttimeout(20)
 from retry_utils import retry_on_network_error
 
@@ -2103,6 +2104,8 @@ OPS = {
     'plot_upset': op_plot_upset,
     'plot_enrichment': op_plot_enrichment,
     'plot_domains': op_plot_domains,
+    # ---- 共线性分析（DAGchainer 链化 + 置换检验）----
+    'collinearity': op_collinearity,
     'entrez_search': op_entrez_search,
     'entrez_fetch': op_entrez_fetch,
     'enrichr': op_enrichr,

@@ -2,7 +2,7 @@
 language: none
 ---
 
-# 工具全参考（92 个）
+# 工具全参考（93 个）
 
 > 每个工具：功能 → 参数（★=必填）→ 返回关键字段 → 典型触发词。**选工具第一优先，`bio_python` 执行器第二优先**。
 
@@ -197,6 +197,15 @@ stats 返回：`{by_type, per_seqid_top, gene_length_stats{count, mean, min, max
 同域名同色（Okabe-Ito 调色板）；域盒上下错位排列避免遮挡。
 
 > 全部绘图工具：`lang=zh`（默认）自动配置中文字体；输出默认 300dpi PNG+SVG（可用 `formats` 增补 PDF）。
+
+### 共线性分析
+
+**bio_collinearity** — 共线性/同线性分析（DAGchainer 链化 + 置换检验）
+`prefix`（读 `<prefix>.gff` 与 `<prefix>.blast`）或显式 `gff` + `blast`。
+参数：`match_score`（默认 50）、`match_size`（5）、`gap_penalty`（-1）、`e_value`（1e-5）、`max_gaps`（25）、`overlap_window`（5）、`in_synteny`（0=种内+种间默认 / 1=仅种内 / 2=仅种间）、`output_file`。
+输入：GFF 4 列（物种前缀/gene/start/end；同物种内基因唯一）+ BLAST outfmt 6（取第 11 列 E-value）。
+输出：`.collinearity` 交换格式（参数快照 + 统计 + 块头 `## Alignment i: score= e_value= N= mol_pair plus/minus` + 锚点行），可被生态下游工具直接消费。
+返回：`{n_genes, n_anchors, n_mol_pairs, n_blocks, n_collinear_genes, percentage, top_blocks[], output_file}`。
 
 ### 比对与系统发育
 

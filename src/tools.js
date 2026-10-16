@@ -1865,6 +1865,32 @@ function semanticTools(config) {
       op: 'plot_domains',
       timeoutMs: 300_000,
     }),
+    // ---- 共线性分析 ----
+    bioTool(config, {
+      name: 'bio_collinearity',
+      description:
+        '共线性/同线性分析：GFF（4 列：物种前缀/gene/start/end）+ BLAST（outfmt 6）→ 共线性块。' +
+        '输出 .collinearity 交换格式（含块评分/置换检验 E-value/锚点明细）。' +
+        '参数：prefix（读 <prefix>.gff 与 <prefix>.blast）或显式 gff+blast；' +
+        'match_score(默认50)/match_size(5)/gap_penalty(-1)/e_value(1e-5)/max_gaps(25)/' +
+        'overlap_window(5)/in_synteny(0=种内+种间，1=仅种内，2=仅种间)。' +
+        '触发词：共线性、同线性、synteny、collinearity、共线块、比较基因组。',
+      parameters: {
+        prefix: { type: 'string', description: '前缀路径（自动读 <prefix>.gff 与 <prefix>.blast）' },
+        gff: { type: 'string', description: 'GFF 路径（4 列 Tab：sp#/gene/start/end）' },
+        blast: { type: 'string', description: 'BLAST 路径（outfmt 6，≥11 列，取第 11 列 E-value）' },
+        match_score: { type: 'number', description: '锚点基础分（默认 50）' },
+        match_size: { type: 'number', description: '块最少锚点数（默认 5）' },
+        gap_penalty: { type: 'number', description: '缺口罚分（默认 -1）' },
+        e_value: { type: 'number', description: '显著性阈值（默认 1e-5）' },
+        max_gaps: { type: 'number', description: '最大允许缺口（基因数，默认 25）' },
+        overlap_window: { type: 'number', description: '锚点折叠窗口（默认 5）' },
+        in_synteny: { type: 'number', description: '0=种内+种间（默认）/1=仅种内/2=仅种间' },
+        output_file: { type: 'string', description: '输出路径（默认 <prefix>.collinearity）' },
+      },
+      op: 'collinearity',
+      timeoutMs: 600_000,
+    }),
     // ---- BLAST / 多序列比对 / 系统发育 ----
     bioTool(config, {
       name: 'bio_blast_search',
