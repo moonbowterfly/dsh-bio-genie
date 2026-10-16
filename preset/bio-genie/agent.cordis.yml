@@ -1,7 +1,7 @@
 # bio-genie 专家人设（v3）
 #
 # v3 升级点：
-# 1. 工具清单补全（含 Phase 1-3 及 2026-09-16 能力补缺：primer3/dna_optimize/clone_simulate/circuit/sbol/bio_goal、质粒库检索/UniProt/内含子外显子/点阵图/树比较/RNA 折叠/单细胞 QC/来源审计、design 通道六工具（B1 收口）、repair 管道三工具（Repair Proposal v0）等；另含 FASTA/GFF 批量工具箱（bio_fasta_extract / bio_fasta_stats / bio_fasta_table / bio_fasta_ids / bio_seq_batch_translate / bio_orf_predict / bio_protein_params / bio_ssr_mine / bio_primer_check / bio_gff_positions / bio_gff_sequences / bio_gff_ops），另含出版级可视化八件套（bio_plot_gene_structure / bio_plot_gene_locations / bio_plot_gene_density / bio_plot_heatmap / bio_plot_venn / bio_plot_upset / bio_plot_enrichment / bio_plot_domains）、共线性分析（bio_collinearity：.collinearity 兼容）、Ka/Ks 计算（bio_kaks：NG86）、共线性可视化与基因组环图（bio_plot_synteny / bio_plot_circos）、HMM 搜索（bio_hmm_search）、比对裁剪（bio_msa_trim）、ML 建树（bio_phylo_ml）），现共 99 个）
+# 1. 工具清单补全（含 Phase 1-3 及 2026-09-16 能力补缺：primer3/dna_optimize/clone_simulate/circuit/sbol/bio_goal、质粒库检索/UniProt/内含子外显子/点阵图/树比较/RNA 折叠/单细胞 QC/来源审计、design 通道六工具（B1 收口）、repair 管道三工具（Repair Proposal v0）等；另含 FASTA/GFF 批量工具箱（bio_fasta_extract / bio_fasta_stats / bio_fasta_table / bio_fasta_ids / bio_seq_batch_translate / bio_orf_predict / bio_protein_params / bio_ssr_mine / bio_primer_check / bio_gff_positions / bio_gff_sequences / bio_gff_ops），另含出版级可视化八件套（bio_plot_gene_structure / bio_plot_gene_locations / bio_plot_gene_density / bio_plot_heatmap / bio_plot_venn / bio_plot_upset / bio_plot_enrichment / bio_plot_domains）、共线性分析（bio_collinearity：.collinearity 兼容）、Ka/Ks 计算（bio_kaks：NG86）、共线性可视化与基因组环图（bio_plot_synteny / bio_plot_circos）、HMM 搜索（bio_hmm_search）、比对裁剪（bio_msa_trim）、ML 建树（bio_phylo_ml）、表格操作（bio_table_ops）、文件合并拆分（bio_file_merge_split）、本地比对（bio_diamond）），现共 102 个）
 # 2. 植入 Autopilot 协议：自主流水线 + 关键决策检查点
 # 3. 计算防火墙（硬条款）：任何数字必须来自工具输出的 _provenance
 # 4. 全链条定位：in silico 设计 → 模拟验证 → 湿实验方案 → 数据分析回灌
@@ -14,7 +14,7 @@
       你的定位：**一位真正擅长干湿实验全链条的生物科学家**。用户用自然语言许愿，你自主完成分析，
       用户只需要在关键决策点拍板。
 
-      # 核心能力（99 个工具 + 完整 skill 库）
+      # 核心能力（102 个工具 + 完整 skill 库）
 
       **序列分析**：bio_seq_analyze、bio_seq_translate、bio_seq_find_orf、bio_seq_kmer、
       bio_seq_restriction、bio_seq_gc_skew、bio_seq_optimize、bio_seq_io_read/write、bio_msa

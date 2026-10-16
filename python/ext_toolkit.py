@@ -262,3 +262,102 @@ def op_phylo_ml(args):
         'output_prefix': prefix,
         'binary': {'path': exe, 'source': info['source'], 'version': info['version']},
     }
+
+
+# ============================================================================
+# DIAMOND（本地蛋白比对）
+# ============================================================================
+
+def _resolve_dmnd(prefix):
+    """解析 diamond 实际生成的库文件（-d 值含/不含 .dmnd 后缀两种行为都覆盖）。"""
+    cands = [prefix if prefix.lower().endswith('.dmnd') else prefix + '.dmnd',
+             prefix + '.dmnd' if not prefix.lower().endswith('.dmnd') else prefix]
+    for cand in cands:
+        if cand.lower().endswith('.dmnd') and os.path.isfile(cand):
+            return cand
+    return None
+
+
+def op_diamond(args):
+    """本地蛋白比对（DIAMOND 引擎，二进制自举）：makedb / blastp。"""
+    action = str(args.get('action') or 'blastp').lower()
+    threads = str(args.get('threads') or '4')
+    info = ensure_binary('diamond')
+    exe = info['path']
+
+    if action == 'makedb':
+        src = args.get('input')
+        if not src or not os.path.isfile(src):
+            raise ValueError('makedb 需要 input（蛋白 FASTA 路径）；收到：%s' % src)
+        out = args.get('output_file') or (os.path.splitext(src)[0] + '.dmnd')
+        cmd = [exe, 'makedb', '--in', os.path.abspath(src), '-d', os.path.abspath(out),
+               '--threads', threads]
+        proc = subprocess.run(cmd, capture_output=True, timeout=int(args.get('timeout_s') or 1800))
+        log = ((proc.stdout or b'') + (proc.stderr or b'')).decode('utf-8', 'replace')
+        db_file = _resolve_dmnd(os.path.abspath(out))
+        if proc.returncode != 0 or not db_file:
+            raise RuntimeError('DIAMOND makedb 失败（rc=%d）：%s' % (proc.returncode, log.strip()[-400:]))
+        m = re.search(r'Database sequences?\s+(\d+)', log)
+        return {
+            'action': 'makedb',
+            'db_file': db_file,
+            'n_sequences': int(m.group(1)) if m else None,
+            'binary': {'path': exe, 'source': info['source'], 'version': info['version']},
+        }
+
+    if action == 'blastp':
+        query = args.get('query')
+        db = args.get('db')
+        if not query or not os.path.isfile(query):
+            raise ValueError('blastp 需要 query（蛋白 FASTA）；收到：%s' % query)
+        if not db or not os.path.isfile(db):
+            raise ValueError('blastp 需要 db（.dmnd 库或 FASTA——后者将自动建临时库）；收到：%s' % db)
+        e_max = float(args.get('e_value_max') if args.get('e_value_max') is not None else 1e-5)
+        topk = int(args.get('max_target_seqs') or 25)
+        out = args.get('output_file') or (os.path.splitext(query)[0] + '.diamond.tsv')
+
+        db_file = db
+        if not db.lower().endswith('.dmnd'):
+            temp_db = db + '.auto'
+            db_file = _resolve_dmnd(temp_db)
+            if not db_file:
+                sub = subprocess.run([exe, 'makedb', '--in', os.path.abspath(db), '-d', os.path.abspath(temp_db),
+                                      '--threads', threads], capture_output=True, timeout=1800)
+                db_file = _resolve_dmnd(temp_db)
+                if sub.returncode != 0 or not db_file:
+                    err = ((sub.stdout or b'') + (sub.stderr or b'')).decode('utf-8', 'replace')
+                    raise RuntimeError('自动建库失败：%s' % err.strip()[-300:])
+
+        cmd = [exe, 'blastp', '-q', os.path.abspath(query), '-d', os.path.abspath(db_file),
+               '-o', os.path.abspath(out), '-e', str(e_max), '-k', str(topk),
+               '--threads', threads, '--outfmt', '6', 'qseqid', 'sseqid', 'pident',
+               'length', 'evalue', 'bitscore', '--quiet']
+        proc = subprocess.run(cmd, capture_output=True, timeout=int(args.get('timeout_s') or 1800))
+        log = ((proc.stdout or b'') + (proc.stderr or b'')).decode('utf-8', 'replace')
+        if proc.returncode != 0:
+            raise RuntimeError('DIAMOND blastp 失败（rc=%d）：%s' % (proc.returncode, log.strip()[-400:]))
+        hits = []
+        if os.path.isfile(out):
+            with open(out, 'r', encoding='utf-8', errors='replace') as fh:
+                for ln in fh:
+                    parts = ln.rstrip('\r\n').split('\t')
+                    if len(parts) < 6:
+                        continue
+                    hits.append({
+                        'qseqid': parts[0], 'sseqid': parts[1],
+                        'pident': float(parts[2]), 'length': int(parts[3]),
+                        'evalue': float(parts[4]), 'bitscore': float(parts[5]),
+                    })
+        hits.sort(key=lambda h: h['evalue'])
+        return {
+            'action': 'blastp',
+            'query': os.path.abspath(query),
+            'db_file': os.path.abspath(db_file),
+            'e_value_max': e_max,
+            'n_hits': len(hits),
+            'hits': hits[:200],
+            'output_file': os.path.abspath(out),
+            'binary': {'path': exe, 'source': info['source'], 'version': info['version']},
+        }
+
+    raise ValueError('action 仅支持 makedb / blastp；收到：%s' % action)

@@ -2,7 +2,7 @@
 language: none
 ---
 
-# 工具全参考（99 个）
+# 工具全参考（103 个）
 
 > 每个工具：功能 → 参数（★=必填）→ 返回关键字段 → 典型触发词。**选工具第一优先，`bio_python` 执行器第二优先**。
 
@@ -238,6 +238,24 @@ stats 返回：`{by_type, per_seqid_top, gene_length_stats{count, mean, min, max
 `alignment_file` 或 `alignment`（内容）、`model`（默认 MFP=自动模型选择）、`bootstrap`（超快自助次数，默认 1000；0=不跑）、`threads`（默认 AUTO）、`seed`、`output_prefix`。
 返回：`{best_model, bootstrap, tree_newick, report_excerpt, output_prefix, binary}`。
 说明：模型选择 + UFBoot 一步到位；大数据集请适当调大 timeout 感知预期（工具层 timeoutMs=900s）。
+
+## 表格 / 文件 / 域图 / 本地比对（批次 E）
+
+**bio_table_ops** — 表格行列操作（TSV/CSV/空白分隔自动嗅探）
+`action ★`、`input ★` + 按 action 取参：`columns`（select/drop_dup）、`column`/`op`/`value`（filter）、`column`/`numeric`/`reverse`（sort）、`n`（head）、`input2`/`key`/`key2`/`how`（join）。
+返回：`{rows_in, rows_out, columns_out, output_file, preview}`。
+
+**bio_file_merge_split** — FASTA/表格文件合并拆分
+`action ★`（split_fasta / merge_fasta / split_table / merge_table）、`input`/`inputs`、`chunk_size`/`rows_per_file`、`dedup_id`、`out_dir`/`output_file`。
+返回：拆分 → `{n_sequences|rows, n_files, out_dir, files[]}`；合并 → `{n_sequences_in/out | rows_out, output_file}`。
+
+**bio_plot_domains** — 蛋白域结构图
+`input ★`（域注释表：protein/start/end/name [, color]）、`sort`（none/length/name）、`width`/`row_height`、`title`、`output_file`。
+返回：`{n_proteins, n_domains, domain_names[], proteins[], files[]}`。每蛋白一行、域色块 + 图例。
+
+**bio_diamond** — 本地蛋白比对（DIAMOND 引擎，首次调用自动获取）
+`action ★`（makedb / blastp）、`input`（makedb：FASTA）、`query`/`db`（blastp；db 可为 .dmnd 或 FASTA——自动建临时库）、`e_value_max`（默认 1e-5）、`max_target_seqs`（默认 25）、`threads`。
+返回：makedb → `{db_file, n_sequences}`；blastp → `{n_hits, hits[{qseqid, sseqid, pident, length, evalue, bitscore}], output_file}`。
 
 ### 比对与系统发育
 

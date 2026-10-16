@@ -464,6 +464,12 @@ def op_plot_domains(args):
     if not order:
         raise ValueError('没有解析到任何结构域记录')
     max_prot = int(args.get('max_proteins') or 25)
+    sort_by = str(args.get('sort') or 'none').lower()
+    if sort_by == 'length':
+        order.sort(key=lambda p: prots[p]['len'] or max(b for (_, b, _) in prots[p]['domains']),
+                   reverse=True)
+    elif sort_by == 'name':
+        order.sort()
     order = order[:max_prot]
 
     # 域名字 -> 颜色（Okabe-Ito 循环）
@@ -511,6 +517,7 @@ def op_plot_domains(args):
         'n_proteins': n,
         'n_domain_types': len(names),
         'domain_types': names[:30],
+        'proteins': order[:50],
         'files': paths,
         'output_file': paths[0] if paths else None,
     }

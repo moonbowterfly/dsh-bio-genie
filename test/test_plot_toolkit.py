@@ -203,6 +203,9 @@ check('domains n_proteins=2', r['n_proteins'] == 2, str(r['n_proteins']))
 check('domains types>=4', r['n_domain_types'] >= 4, str(r['n_domain_types']))
 ok, det = png_ok(r['files'][0])
 check('domains png valid', ok, det)
+r = pt2.op_plot_domains({'table': DOM, 'sort': 'length', 'output_file': os.path.join(OUT, 'dom2.png')})
+check('domains sort=length 不炸且序可用', r['n_proteins'] == 2 and len(r.get('proteins', [])) == 2,
+      str(r.get('proteins')))
 
 # ---------------------------------------------------------------- summary
 print()

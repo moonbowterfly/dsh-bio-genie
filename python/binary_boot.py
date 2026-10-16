@@ -44,6 +44,14 @@ BINARIES = {
         'version_args': ['--version'],
         'note': '上游 release 无 digest——sha256 为本机实测核验值',
     },
+    'diamond': {
+        'version': '2.2.8',
+        'url': 'https://github.com/bbuchfink/diamond/releases/download/v2.2.8/diamond-windows.zip',
+        'sha256': '8035ece14562e13576da6e9583c74ab1aaff9d0c96086d93ab337e95cd288ce1',
+        'exe': 'diamond.exe',
+        'version_args': ['--version'],
+        'note': 'zip 为平铺结构（无子目录）',
+    },
 }
 
 

@@ -1858,6 +1858,7 @@ function semanticTools(config) {
         domain_col: { type: 'string', description: '域名列（默认自动识别）' },
         length_col: { type: 'string', description: '蛋白长度列（可选）' },
         max_proteins: { type: 'number', description: '最多蛋白数（默认 25）' },
+        sort: { type: 'string', enum: ['none', 'length', 'name'], description: '蛋白排序（默认 none）' },
         title: { type: 'string', description: '图标题' },
         lang: { type: 'string', enum: ['zh', 'en'], description: '标签语言（默认 zh）' },
         output_file: { type: 'string', description: '输出路径（默认 domains.png）' },
@@ -1997,6 +1998,70 @@ function semanticTools(config) {
         output_prefix: { type: 'string', description: '输出前缀（默认 <输入名>.iqtree）' },
       },
       op: 'phylo_ml',
+      timeoutMs: 900_000,
+    }),
+    // ---- 批次 E：表格 / 文件 / 域图 / 本地比对 ----
+    bioTool(config, {
+      name: 'bio_table_ops',
+      description:
+        '表格行列操作（TSV/CSV/空白分隔自动嗅探）：action=select（列选择）/ filter（条件过滤）/' +
+        'sort（排序）/ drop_dup（去重）/ head（前 N 行）/ transpose（转置）/ join（按 key 连接两表）。' +
+        '触发词：表格筛选、表格排序、去重、转置、表格合并。',
+      parameters: {
+        action: { type: 'string', enum: ['select', 'filter', 'sort', 'drop_dup', 'head', 'transpose', 'join'], required: true, description: '操作类型' },
+        input: { type: 'string', required: true, description: '表格文件路径' },
+        input2: { type: 'string', description: 'join：第二张表' },
+        columns: { type: 'array', items: { type: 'string' }, description: 'select/drop_dup：列名或下标清单' },
+        column: { type: 'string', description: 'filter/sort：目标列名或下标' },
+        op: { type: 'string', enum: ['eq', 'ne', 'contains', 'regex', 'gt', 'ge', 'lt', 'le'], description: 'filter 比较符（默认 eq）' },
+        value: { type: 'string', description: 'filter 比较值' },
+        key: { type: 'string', description: 'join：左表连接列' },
+        key2: { type: 'string', description: 'join：右表连接列（默认同 key）' },
+        how: { type: 'string', enum: ['inner', 'left'], description: 'join 方式（默认 inner）' },
+        numeric: { type: 'boolean', description: 'sort：数值排序（默认 true）' },
+        reverse: { type: 'boolean', description: 'sort：降序' },
+        n: { type: 'number', description: 'head：行数（默认 10）' },
+        has_header: { type: 'boolean', description: '首行为表头（默认 true）' },
+        output_file: { type: 'string', description: '输出路径' },
+      },
+      op: 'table_ops',
+      timeoutMs: 300_000,
+    }),
+    bioTool(config, {
+      name: 'bio_file_merge_split',
+      description:
+        'FASTA/表格文件合并拆分：split_fasta（按条数分块）/ merge_fasta（多文件拼接+可选 ID 去重）/' +
+        'split_table（按行数切块，保留表头）/ merge_table（纵向拼接）。触发词：拆分FASTA、合并文件、分块。',
+      parameters: {
+        action: { type: 'string', enum: ['split_fasta', 'merge_fasta', 'split_table', 'merge_table'], required: true, description: '操作类型' },
+        input: { type: 'string', description: '拆分：源文件' },
+        inputs: { type: 'array', items: { type: 'string' }, description: '合并：文件路径列表' },
+        chunk_size: { type: 'number', description: 'split_fasta：每文件序列数（默认 100）' },
+        rows_per_file: { type: 'number', description: 'split_table：每文件行数（默认 1000）' },
+        dedup_id: { type: 'boolean', description: 'merge_fasta：按序列 ID 去重' },
+        out_dir: { type: 'string', description: '拆分输出目录' },
+        output_file: { type: 'string', description: '合并输出路径' },
+      },
+      op: 'file_merge_split',
+      timeoutMs: 600_000,
+    }),
+    bioTool(config, {
+      name: 'bio_diamond',
+      description:
+        '本地蛋白比对（DIAMOND 引擎，首次调用自动获取，零手动安装——适合远程 BLAST 不便的大库搜索）：' +
+        'action=makedb（FASTA→.dmnd 库）/ blastp（query × 库 → E-value 排序命中表）。' +
+        '触发词：本地BLAST、序列比对、同源搜索、DIAMOND。',
+      parameters: {
+        action: { type: 'string', enum: ['makedb', 'blastp'], required: true, description: 'makedb（建库）/ blastp（比对）' },
+        input: { type: 'string', description: 'makedb：蛋白 FASTA 路径' },
+        query: { type: 'string', description: 'blastp：查询蛋白 FASTA' },
+        db: { type: 'string', description: 'blastp：.dmnd 库（或 FASTA，自动建临时库）' },
+        e_value_max: { type: 'number', description: 'E-value 上限（默认 1e-5）' },
+        max_target_seqs: { type: 'number', description: '每查询最多命中（默认 25）' },
+        threads: { type: 'number', description: '线程数（默认 4）' },
+        output_file: { type: 'string', description: '输出路径' },
+      },
+      op: 'diamond',
       timeoutMs: 900_000,
     }),
     // ---- BLAST / 多序列比对 / 系统发育 ----
