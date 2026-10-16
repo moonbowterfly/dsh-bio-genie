@@ -1909,6 +1909,44 @@ function semanticTools(config) {
       op: 'kaks',
       timeoutMs: 300_000,
     }),
+    // ---- 共线性可视化 / 基因组环图 ----
+    bioTool(config, {
+      name: 'bio_plot_synteny',
+      description:
+        '共线性可视化：读 .collinearity + GFF，双物种条带连线图（bands）或点阵图（dotplot）。' +
+        'species_pair 指定物种前缀对（默认取块数最多者）。触发词：共线性图、synteny图、' +
+        '同线性可视化、染色体比对图。',
+      parameters: {
+        collinearity: { type: 'string', required: true, description: '.collinearity 文件路径' },
+        gff: { type: 'string', required: true, description: 'GFF 路径（4 列：sp#/gene/start/end，用于染色体长度）' },
+        view: { type: 'string', enum: ['bands', 'dotplot'], description: '视图：bands（默认）或 dotplot' },
+        species_pair: { type: 'string', description: '物种前缀对，如 "at&os"（默认自动取块数最多的对）' },
+        max_lines: { type: 'number', description: '最多绘制块数（默认 200）' },
+        width: { type: 'number', description: '图宽英寸' },
+        height: { type: 'number', description: '图高英寸' },
+        title: { type: 'string', description: '图标题' },
+        lang: { type: 'string', enum: ['zh', 'en'], description: '标签语言（默认 zh）' },
+        output_file: { type: 'string', description: '输出路径（默认 synteny.png）' },
+      },
+      op: 'plot_synteny',
+      timeoutMs: 300_000,
+    }),
+    bioTool(config, {
+      name: 'bio_plot_circos',
+      description:
+        '基因组环图（circos 风格）：染色体弧 + 基因密度轨道（极坐标）。' +
+        '触发词：环图、circos图、基因组概览、染色体环。',
+      parameters: {
+        gff: { type: 'string', required: true, description: 'GFF 路径（4 列：sp#/gene/start/end）' },
+        window: { type: 'number', description: '密度窗口 bp（默认 500000）' },
+        width: { type: 'number', description: '图尺寸英寸（默认 8）' },
+        title: { type: 'string', description: '图标题' },
+        lang: { type: 'string', enum: ['zh', 'en'], description: '标签语言（默认 zh）' },
+        output_file: { type: 'string', description: '输出路径（默认 circos.png）' },
+      },
+      op: 'plot_circos',
+      timeoutMs: 300_000,
+    }),
     // ---- BLAST / 多序列比对 / 系统发育 ----
     bioTool(config, {
       name: 'bio_blast_search',

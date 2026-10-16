@@ -69,6 +69,7 @@ from plot_toolkit2 import (op_plot_heatmap, op_plot_venn, op_plot_upset,
                            op_plot_enrichment, op_plot_domains)
 from collinearity import op_collinearity
 from kaks import op_kaks
+from plot_toolkit3 import op_plot_synteny, op_plot_circos
 socket.setdefaulttimeout(20)
 from retry_utils import retry_on_network_error
 
@@ -2109,6 +2110,9 @@ OPS = {
     'collinearity': op_collinearity,
     # ---- Ka/Ks（NG86）----
     'kaks': op_kaks,
+    # ---- 共线性可视化 / 基因组环图（C4）----
+    'plot_synteny': op_plot_synteny,
+    'plot_circos': op_plot_circos,
     'entrez_search': op_entrez_search,
     'entrez_fetch': op_entrez_fetch,
     'enrichr': op_enrichr,

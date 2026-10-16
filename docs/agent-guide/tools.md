@@ -2,7 +2,7 @@
 language: none
 ---
 
-# 工具全参考（94 个）
+# 工具全参考（96 个）
 
 > 每个工具：功能 → 参数（★=必填）→ 返回关键字段 → 典型触发词。**选工具第一优先，`bio_python` 执行器第二优先**。
 
@@ -213,6 +213,14 @@ stats 返回：`{by_type, per_seqid_top, gene_length_stats{count, mean, min, max
 返回：`{S, N, Sd, Nd, pS, pN, Ks, Ka, omega, interpretation, Ks_reason?, Ka_reason?, codons_used, codons_excluded}`。
 哨兵约定：pS/pN ≥ 0.75（饱和）或 Ks==0 时对应字段为 `null`（`Ks_reason` 说明）；生态兼容语义 = `-2`。
 注意：成对 omega 为平均选择压力；位点级正选择需位点模型（codeml M1a/M2a、M7/M8）。
+
+**bio_plot_synteny** — 共线性可视化（双物种）
+`collinearity ★`（.collinearity 文件）、`gff ★`（4 列，用于染色体长度）、`view`（bands 条带连线 / dotplot 点阵）、`species_pair`（物种前缀对，如 "at&os"；默认自动取块数最多的对）、`max_lines`（默认 200）、`width`/`height`、`title`、`output_file`。
+返回：`{species_pair, view, n_blocks_drawn, chroms, files[]}`。
+
+**bio_plot_circos** — 基因组环图（极坐标）
+`gff ★`、`window`（密度窗口 bp，默认 500000）、`width`、`title`、`output_file`。
+返回：`{n_chroms, total_bp, window, chroms[], files[]}`。染色体弧（按长度比例）+ 内圈基因密度轨道。
 
 ### 比对与系统发育
 
