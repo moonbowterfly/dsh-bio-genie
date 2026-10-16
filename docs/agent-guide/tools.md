@@ -2,7 +2,7 @@
 language: none
 ---
 
-# 工具全参考（93 个）
+# 工具全参考（94 个）
 
 > 每个工具：功能 → 参数（★=必填）→ 返回关键字段 → 典型触发词。**选工具第一优先，`bio_python` 执行器第二优先**。
 
@@ -206,6 +206,13 @@ stats 返回：`{by_type, per_seqid_top, gene_length_stats{count, mean, min, max
 输入：GFF 4 列（物种前缀/gene/start/end；同物种内基因唯一）+ BLAST outfmt 6（取第 11 列 E-value）。
 输出：`.collinearity` 交换格式（参数快照 + 统计 + 块头 `## Alignment i: score= e_value= N= mol_pair plus/minus` + 锚点行），可被生态下游工具直接消费。
 返回：`{n_genes, n_anchors, n_mol_pairs, n_blocks, n_collinear_genes, percentage, top_blocks[], output_file}`。
+
+**bio_kaks** — Ka/Ks（dN/dS）计算（NG86 + Jukes-Cantor）
+`sequence1 ★` / `sequence2 ★`（CDS 内容或文件路径）、`label1` / `label2`、`protein_aln`（可选：两行蛋白比对文本）。
+流程：蛋白比对（内部 BLOSUM62 或给定）→ 回译密码子对齐 → NG86 位点/替换计数（多碱基差异路径平均）→ JC 校正。
+返回：`{S, N, Sd, Nd, pS, pN, Ks, Ka, omega, interpretation, Ks_reason?, Ka_reason?, codons_used, codons_excluded}`。
+哨兵约定：pS/pN ≥ 0.75（饱和）或 Ks==0 时对应字段为 `null`（`Ks_reason` 说明）；生态兼容语义 = `-2`。
+注意：成对 omega 为平均选择压力；位点级正选择需位点模型（codeml M1a/M2a、M7/M8）。
 
 ### 比对与系统发育
 

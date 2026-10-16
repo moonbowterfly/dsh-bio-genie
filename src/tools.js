@@ -1891,6 +1891,24 @@ function semanticTools(config) {
       op: 'collinearity',
       timeoutMs: 600_000,
     }),
+    // ---- Ka/Ks ----
+    bioTool(config, {
+      name: 'bio_kaks',
+      description:
+        'Ka/Ks（dN/dS）计算（NG86 + Jukes-Cantor）：一对 CDS → Ka/Ks/omega + 选择压力判读。' +
+        '蛋白比对（自动或 protein_aln 给定）→ 密码子对齐 → 位点/替换计数（多碱基差异路径平均）。' +
+        '哨兵约定：pS/pN 饱和（≥0.75）或 Ks=0 时对应字段为 null（生态兼容 -2 语义）。' +
+        '触发词：Ka/Ks、dN/dS、选择压力、同义非同义、omega、纯化选择。',
+      parameters: {
+        sequence1: { type: 'string', required: true, description: 'CDS 1（DNA 内容或 FASTA 文件路径）' },
+        sequence2: { type: 'string', required: true, description: 'CDS 2（DNA 内容或 FASTA 文件路径）' },
+        label1: { type: 'string', description: '序列 1 标签' },
+        label2: { type: 'string', description: '序列 2 标签' },
+        protein_aln: { type: 'string', description: '可选：预先算好的蛋白比对（两行文本）' },
+      },
+      op: 'kaks',
+      timeoutMs: 300_000,
+    }),
     // ---- BLAST / 多序列比对 / 系统发育 ----
     bioTool(config, {
       name: 'bio_blast_search',

@@ -12,7 +12,7 @@
     },
     "preset": {
       "name": "bio-genie",
-      "digest_sha256": "810fd1f3ab79d5f550fc10f2844cad55fb29e34571a40f8424bb7ad0b16fd24d",
+      "digest_sha256": "9409802416638b5d74f7c226f86f7f2154854a5dd19e1547c72fe75d7b41612b",
       "source": "preset/bio-genie/preset.yml + preset/bio-genie/agent.cordis.yml（按相对名排序逐文件 sha256 后再拼接哈希）"
     },
     "model": {
