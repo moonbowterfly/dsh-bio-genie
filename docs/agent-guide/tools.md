@@ -2,7 +2,7 @@
 language: none
 ---
 
-# 工具全参考（96 个）
+# 工具全参考（99 个）
 
 > 每个工具：功能 → 参数（★=必填）→ 返回关键字段 → 典型触发词。**选工具第一优先，`bio_python` 执行器第二优先**。
 
@@ -221,6 +221,23 @@ stats 返回：`{by_type, per_seqid_top, gene_length_stats{count, mean, min, max
 **bio_plot_circos** — 基因组环图（极坐标）
 `gff ★`、`window`（密度窗口 bp，默认 500000）、`width`、`title`、`output_file`。
 返回：`{n_chroms, total_bp, window, chroms[], files[]}`。染色体弧（按长度比例）+ 内圈基因密度轨道。
+
+## 外部工具链（批次 D）
+
+**bio_hmm_search** — HMM 轮廓搜索/建库（HMMER 引擎，纯 pip 依赖）
+`action ★`（build / search）、`msa`（build：对齐 FASTA）、`hmm`（search：.hmm 文件或目录）、`sequences`（search：目标 FASTA）、`e_value_max`（默认 0.01）、`top`（默认 50）、`output_file`。
+返回：build → `{n_sequences, alignment_length, hmm_file}`；search → `{n_hits, hits[{hmm, target, evalue, score, bias, description}]}`（按 E-value 排序）。
+说明：首次调用经第二层依赖机制安装 pyhmmer（无需外部程序）；单 HMM 建库后可直接搜索。
+
+**bio_msa_trim** — 多序列比对裁剪（trimAl 引擎，首次调用自动获取）
+`input ★`、`method`（automated1 默认 / gappyout / strict / gt）、`gt`（method=gt 时的比例阈值）、`output_file`。
+返回：`{sequences, columns_before, columns_after, columns_removed, output_file, binary}`。
+说明：二进制钉 v1.5.0（v1.5.1 的官方 Windows 构建在部分环境无法启动），自举到插件私有目录。
+
+**bio_phylo_ml** — ML 最大似然建树（IQ-TREE2 引擎，首次调用自动获取）
+`alignment_file` 或 `alignment`（内容）、`model`（默认 MFP=自动模型选择）、`bootstrap`（超快自助次数，默认 1000；0=不跑）、`threads`（默认 AUTO）、`seed`、`output_prefix`。
+返回：`{best_model, bootstrap, tree_newick, report_excerpt, output_prefix, binary}`。
+说明：模型选择 + UFBoot 一步到位；大数据集请适当调大 timeout 感知预期（工具层 timeoutMs=900s）。
 
 ### 比对与系统发育
 

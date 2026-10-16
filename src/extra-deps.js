@@ -26,6 +26,8 @@ export const EXTRA_DEPS = {
   // pyparsing>=3.1 是防冲突护栏：pydna 的传递依赖会把 pyparsing 降到 2.4.7，
   // 破坏 matplotlib（_fontconfig_pattern 需要 pyparsing3 的 one_of）。
   clone_simulate: ['pydna', 'pyparsing>=3.1'],
+  // 批次 D：HMM 搜索（HMMER 的 pip 实现；Windows abi3 wheel 可用）
+  hmm_search: ['pyhmmer>=0.12'],
   // Phase 3 基因回路建模：biocrnpyler 必须 --no-deps（fa2-modified 需 C++ 编译，
   // 无 Windows wheel；fa2 只用于力导向布局，缺失不影响编译/仿真）
   circuit_compile: ['biocrnpyler', 'python-libsbml', 'bokeh', 'networkx', 'bioscrape'],

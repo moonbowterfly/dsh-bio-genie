@@ -22,7 +22,7 @@
 |------|------|
 | 🪄 **许愿式分析（Wish Coding）** | 说人话就能分析：*"这条序列的 GC 含量和 EcoRI 酶切位点？"* |
 | 🧩 **全功能覆盖** | `bio_python` 执行器可运行任意 Biopython 代码（比对、PDB、Phylo、motif、BLAST…），配合 22 个领域/研究 skill 配方 |
-| ⚡ **高频语义化工具** | 82 个固定参数工具（GC 含量、翻译、限制酶、k-mer、文件 IO、BLAST、多序列比对、系统发育树、Entrez 检索、通路富集、PubMed 文献、参考基因组、Addgene 质粒库检索、UniProt 蛋白知识库、内含子外显子、点阵图、树比较、RNA 二级结构、来源审计、单细胞 QC、出版级绘图、机器学习、DNA 设计、Primer3 引物/多约束 DNA 优化/克隆模拟/SBOL 标准化/生产包络线/CRISPR 向导设计/编辑验证/合成可行性检查、基因回路编译/动力学仿真、差异表达/GSEA、FASTA/GFF 批量工具箱、出版级可视化八件套、共线性分析、Ka/Ks 计算、共线性可视化）+ 5 个执行器/元工具（bio_python / bio_env / bio_log / bio_memory / bio_goal）——省 token、输出稳定、参数有校验 |
+| ⚡ **高频语义化工具** | 85 个固定参数工具（GC 含量、翻译、限制酶、k-mer、文件 IO、BLAST、多序列比对、系统发育树、Entrez 检索、通路富集、PubMed 文献、参考基因组、Addgene 质粒库检索、UniProt 蛋白知识库、内含子外显子、点阵图、树比较、RNA 二级结构、来源审计、单细胞 QC、出版级绘图、机器学习、DNA 设计、Primer3 引物/多约束 DNA 优化/克隆模拟/SBOL 标准化/生产包络线/CRISPR 向导设计/编辑验证/合成可行性检查、基因回路编译/动力学仿真、差异表达/GSEA、FASTA/GFF 批量工具箱、出版级可视化八件套、共线性分析、Ka/Ks 计算、共线性可视化、HMM/建树工具链）+ 5 个执行器/元工具（bio_python / bio_env / bio_log / bio_memory / bio_goal）——省 token、输出稳定、参数有校验 |
 | 📦 **零安装** | 自动下载隔离的 Python 环境（uv + venv + Biopython 绘图栈）到 `$DSH_HOME/dsh-bio-genie/`，不污染系统 |
 | 🇨🇳 **网络自动适配** | 默认直连官方源，任一环节失败自动切换国内镜像（uv→清华 PyPI、CPython→npmmirror、PyPI 包→清华镜像），无需任何配置 |
 | 🛡️ **环境隔离** | Python 子进程以 `-I`（isolated）模式运行，不受宿主 PYTHONPATH 污染 |
@@ -188,6 +188,9 @@ cp -r src index.js cordis.patch.yml package.json skills prompts python docs \
 | `bio_kaks` | Ka/Ks（dN/dS）计算（NG86+JC 校正；饱和/零值哨兵；选择压力判读） | Ka/Ks、dN/dS、选择压力、omega |
 | `bio_plot_synteny` | 共线性可视化（.collinearity → 双物种条带连线图/点阵图） | 共线性图、synteny图、同线性可视化 |
 | `bio_plot_circos` | 基因组环图（染色体弧+基因密度轨道，极坐标） | 环图、circos图、基因组概览 |
+| `bio_hmm_search` | HMM 轮廓搜索/建库（HMMER 引擎，pip 依赖） | HMM搜索、家族鉴定、domain搜索 |
+| `bio_msa_trim` | 比对裁剪（trimAl 引擎，自动获取） | 比对裁剪、trimAl、去除gap列 |
+| `bio_phylo_ml` | ML 建树（IQ-TREE2 引擎，自动获取；模型选择+超快自助） | ML建树、最大似然树、IQ-TREE |
 
 ### 序列类型自动判断
 
@@ -237,13 +240,13 @@ X 与 gap 在翻译时按未知碱基处理（Biopython 标准行为），含 X/
 
 ### 它是什么
 
-- **人设源文件**（`preset/bio-genie/`：`preset.yml` + `agent.cordis.yml` + `skills/`）——覆盖 base persona，告诉 AI「你手头有 96 个工具 + 52 个 skill」；`cordis.patch.yml` 的 preset 段由 `scripts/build-preset-patch.mjs` 从此目录生成（单一数据源，勿手改生成物）。
+- **人设源文件**（`preset/bio-genie/`：`preset.yml` + `agent.cordis.yml` + `skills/`）——覆盖 base persona，告诉 AI「你手头有 99 个工具 + 52 个 skill」；`cordis.patch.yml` 的 preset 段由 `scripts/build-preset-patch.mjs` 从此目录生成（单一数据源，勿手改生成物）。
 - **入门口诀**（`skills/dsh-bio-genie-expert.md`）——一个 meta-skill：「先看工作区 → 二选一（语义化工具 / `bio_python`） → 失败按 ACR 三层修 → 报告带可追溯链」。
 - **一键安装**：0.2.0+ 由插件自带的 preset 声明直接提供（装完即有，零后置动作）；0.1.x 由 `postinstall` 钩子把 preset 复制到 `~/.dsh/.agent-presets/bio-genie/`（需先批准构建脚本，见上文）。
 
 ### 它**不是**
 
-- ❌ **不接管 96 个工具**——所有 `bio_*` / `design_*` 工具仍由本插件的 `cordis.patch.yml` 注入，preset **不重声明**任何工具，避免冲突。
+- ❌ **不接管 99 个工具**——所有 `bio_*` / `design_*` 工具仍由本插件的 `cordis.patch.yml` 注入，preset **不重声明**任何工具，避免冲突。
 - ❌ **不抢默认人设**——安装后「生物基因精灵」出现在 dsh 预设选择器里；用户**主动选择**才激活。`agent-presets.default` 不会被改成 `bio-genie`。
 - ❌ **不破坏其他插件**——presets 与 plugins 是 dsh 的两个独立 seam，共存不冲突。
 

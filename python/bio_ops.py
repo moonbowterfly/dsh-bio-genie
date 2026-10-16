@@ -70,6 +70,7 @@ from plot_toolkit2 import (op_plot_heatmap, op_plot_venn, op_plot_upset,
 from collinearity import op_collinearity
 from kaks import op_kaks
 from plot_toolkit3 import op_plot_synteny, op_plot_circos
+from ext_toolkit import op_hmm_search, op_msa_trim, op_phylo_ml
 socket.setdefaulttimeout(20)
 from retry_utils import retry_on_network_error
 
@@ -2113,6 +2114,10 @@ OPS = {
     # ---- 共线性可视化 / 基因组环图（C4）----
     'plot_synteny': op_plot_synteny,
     'plot_circos': op_plot_circos,
+    # ---- 外部工具链（批次 D）----
+    'hmm_search': op_hmm_search,
+    'msa_trim': op_msa_trim,
+    'phylo_ml': op_phylo_ml,
     'entrez_search': op_entrez_search,
     'entrez_fetch': op_entrez_fetch,
     'enrichr': op_enrichr,

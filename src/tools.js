@@ -1947,6 +1947,58 @@ function semanticTools(config) {
       op: 'plot_circos',
       timeoutMs: 300_000,
     }),
+    // ---- 外部工具链（批次 D：HMM / 比对裁剪 / ML 建树）----
+    bioTool(config, {
+      name: 'bio_hmm_search',
+      description:
+        'HMM 轮廓搜索（HMMER 引擎，纯 pip 依赖无需外部安装）：' +
+        'action=build 从对齐 FASTA 构建 HMM；action=search 用 HMM（.hmm 文件或目录）搜索蛋白序列，' +
+        '返回命中（E-value/score/bias）。触发词：HMM搜索、hmmsearch、轮廓搜索、家族鉴定、domain搜索。',
+      parameters: {
+        action: { type: 'string', enum: ['build', 'search'], required: true, description: 'build（建 HMM）/ search（搜索）' },
+        msa: { type: 'string', description: 'build：对齐 FASTA 文件路径' },
+        hmm: { type: 'string', description: 'search：.hmm 文件路径或含 .hmm 的目录' },
+        sequences: { type: 'string', description: 'search：目标蛋白 FASTA 文件路径' },
+        e_value_max: { type: 'number', description: 'E-value 上限（默认 0.01）' },
+        top: { type: 'number', description: '返回最多命中数（默认 50）' },
+        output_file: { type: 'string', description: 'build：HMM 输出路径（默认 <msa名>.hmm）' },
+      },
+      op: 'hmm_search',
+      timeoutMs: 600_000,
+    }),
+    bioTool(config, {
+      name: 'bio_msa_trim',
+      description:
+        '多序列比对裁剪（trimAl 引擎，首次调用自动获取，零手动安装）：' +
+        'method=automated1（默认）/ gappyout / strict，或 gt 阈值（gt 参数）。' +
+        '返回裁剪前后列数与保留序列数。触发词：比对裁剪、trimAl、去除gap列、修剪比对。',
+      parameters: {
+        input: { type: 'string', required: true, description: '输入对齐文件路径（FASTA 格式）' },
+        method: { type: 'string', enum: ['automated1', 'gappyout', 'strict', 'gt'], description: '裁剪方法（默认 automated1）' },
+        gt: { type: 'number', description: 'method=gt 时的最小列占位比例（0-1）' },
+        output_file: { type: 'string', description: '输出路径（默认 <输入名>.trimmed.fa）' },
+      },
+      op: 'msa_trim',
+      timeoutMs: 900_000,
+    }),
+    bioTool(config, {
+      name: 'bio_phylo_ml',
+      description:
+        'ML 最大似然系统发育树（IQ-TREE2 引擎，首次调用自动获取）：' +
+        '模型选择（MFP 默认）+ 超快自助（bootstrap，默认 1000；0=不跑）。' +
+        '返回 Newick 树 + 最佳模型 + 报告摘录。触发词：ML建树、最大似然树、IQ-TREE、进化树。',
+      parameters: {
+        alignment_file: { type: 'string', description: '对齐文件路径（FASTA/Phylip）' },
+        alignment: { type: 'string', description: '或直接给对齐内容（FASTA 文本）' },
+        model: { type: 'string', description: '替换模型（默认 MFP=自动选择）' },
+        bootstrap: { type: 'number', description: '超快自助次数（默认 1000；0=不跑）' },
+        threads: { type: 'string', description: '线程（默认 AUTO）' },
+        seed: { type: 'number', description: '随机种子（可复现）' },
+        output_prefix: { type: 'string', description: '输出前缀（默认 <输入名>.iqtree）' },
+      },
+      op: 'phylo_ml',
+      timeoutMs: 900_000,
+    }),
     // ---- BLAST / 多序列比对 / 系统发育 ----
     bioTool(config, {
       name: 'bio_blast_search',
