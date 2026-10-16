@@ -14,7 +14,7 @@
   - `genie-synbio-design-FREEZE-v1.0-arch-FINAL-2026-10-13.md`、`P0A-WORK-ORDER.md` C 节（iML1515 sha `9c772d44…` 属 reference bundle 资产清单）
 - 领域惯例引用：大肠杆菌同源重组（recA 依赖 HR）最小同源臂长度、oriC/DnaA box 调控区尺度、Chi 位点（GCTGGTGG）重组热点——均为分子生物学教科书级事实（见 §2/§4/§5 具体条）。
 
-> 原则：位点评估规则集的语义边界 = 「给定 annotation、窗口和证据下未触发排除规则的候选」；mandatory 规则必须全知且通过才能给 `screened_candidate`，未知一律不默认通过（规格链 F29 冻结语义）。数值不必照抄 corpus 样例，但每个取值必须有依据；弱依据标注「待裁定」。
+> 原则：位点评估规则集的语义边界 = 「给定 annotation、窗口和证据下未触发排除规则的候选」；mandatory 规则必须全知且通过才能给 `screened_candidate`，未知一律不默认通过（规格链 F29 冻结语义）。数值不必沿用 corpus 样例，但每个取值必须有依据；弱依据标注「待裁定」。
 
 ---
 

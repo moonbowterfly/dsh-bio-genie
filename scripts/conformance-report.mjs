@@ -12,7 +12,7 @@
 //
 // 退出码：0 = 双端全等（PASS）；1 = 任一不一致 / 任一运行失败（FAIL，fail-closed）。
 //
-// 对比语义（复刻既有资产）：
+// 对比语义（对齐既有资产）：
 //   schema corpus 批跑：src/design-validate.js --batch（TS/ajv）
 //                        python/design_validate.py --batch（PY/jsonschema）——同 test/design-validation.mjs
 //   c14n corpus 批跑：  design/packet/impl/c14n.mjs --batch（node）

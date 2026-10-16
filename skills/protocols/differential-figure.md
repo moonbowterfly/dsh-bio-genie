@@ -15,7 +15,7 @@ language: python
 > 配方登记：src/skills.js PROTOCOL rugs 决策树已含 bio-proto-pub-figure；
 > 本协议补差异分析专用层。
 
-## 一图流（agent 照抄）
+## 一图流（agent 直接套用）
 
 ```python
 from figurelib.setup_style import setup_style

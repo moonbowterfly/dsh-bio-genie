@@ -8,7 +8,7 @@
 - 规格：`D:/Program/sharespace/genie-synbio-design-spec-v0.4-2026-10-12.md` §C4（FBA/FVA 后果强制携带 `numeric_policy_ref`）、§C6（`numeric_policy@1` 被每条 quantitative coupling rule 与 `consequence_run@1` 引用）
 - 生态核对源：`D:\Program\Github\dsh-bio-gem`（gem 插件，cobra 分析栈）
 
-> 原则：数值不必照抄 corpus 样例，但每个取值必须有依据；生态可查的默认值以对齐生态为优先依据；方向/跨零语义取保守侧。
+> 原则：数值不必沿用 corpus 样例，但每个取值必须有依据；生态可查的默认值以对齐生态为优先依据；方向/跨零语义取保守侧。
 
 ---
 
@@ -27,7 +27,7 @@ DEFAULT_FRACTION = 0.9999
 
 该值是 gem 插件 `gem_fluxscan`（README 已锁定语义："FVA 区间+pFBA 点值；条件对比区间分离判定，overlap=伪影禁止引用"）在所有条件对比与 C58 实测中使用的 `fraction_of_optimum` 默认值。spec §C6 中 `numeric_policy@1` 服务于 quantitative coupling rule 与 `consequence_run@1`，二者消费的正是同一类 FVA 定量路径，因此对齐该默认值是强依据。
 
-**与样例的关系**：corpus npo-01 用 `0.99`——它是冻结 corpus 的最小 valid 样例（测试值），不是生态事实；本资产以生态实测默认 `0.9999` 为准（任务允许"数值不必照抄"）。
+**与样例的关系**：corpus npo-01 用 `0.99`——它是冻结 corpus 的最小 valid 样例（测试值），不是生态事实；本资产以生态实测默认 `0.9999` 为准（任务允许"数值不必沿用"）。
 
 **保守性论证**：`fraction_of_optimum` 越大，FVA 可行域越贴近最优解、区间越窄。0.9999 > 0.99，方向/分离判定基于更紧的区间，误报"分离/方向"的概率更低（次优解空间的伪影更少进入区间端点），符合"保守"取向；同时与 gem 生态既有计算口径完全一致，避免资产与插件默认不一致导致的数值漂移。
 

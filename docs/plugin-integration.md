@@ -47,7 +47,7 @@ GET  /api/dsh-bio-gem/integration/v1/jobs/:id     # 任务状态（批次 2 预�
 ### 2.2 信封（与 genie 面板 RPC 同规格）
 
 成功 `{ ok: true, value: {...} }`；失败 `{ ok: false, code: "<machine-readable>", message: "<human>" }`。
-所有端点必须挂 **loopback-only 守卫**（照抄 genie `isLoopbackRequest` 的三层校验：
+所有端点必须挂 **loopback-only 守卫**（对齐 genie `isLoopbackRequest` 的三层校验：
 127.0.0.1/localhost、sec-fetch-site、origin），非 loopback 一律 403。
 
 ### 2.3 `health`（协商端点）
