@@ -2,7 +2,7 @@
 language: none
 ---
 
-# 工具全参考（84 个）
+# 工具全参考（92 个）
 
 > 每个工具：功能 → 参数（★=必填）→ 返回关键字段 → 典型触发词。**选工具第一优先，`bio_python` 执行器第二优先**。
 
@@ -111,6 +111,7 @@ language: none
 | input ★ | 输入 FASTA 文件路径 |
 | ids / id_file | 要提取的 ID 列表 / 每行一个 ID 的文件（可同用，去重合并） |
 | regions | 坐标区域数组，如 `["chr1:100-200"]`（1-based 闭区间） |
+| region_table | TSV 区域表（文件路径或文本；3 列 seqid/start/end 或 4 列 name/seqid/start/end——表格复制坐标场景） |
 | filter | 条件过滤：`{min_len, max_len, min_gc, max_gc, id_regex}` |
 | id_match | ID 匹配方式：`exact`（默认）/ first_word / contains |
 | longest | `true` 时按 ID 分组（竖线/点/空白前）取最长序列 |
@@ -162,6 +163,40 @@ simplify 默认截到首个空白/竖线/点之前（`geneA.1`→`geneA`）；re
 **bio_gff_ops** — GFF 统计/过滤/区域提取
 `gff ★`、`action`（stats 默认 / filter / extract_region）、`types`/`seqids`/`region`/`attr_regex`（过滤条件）、`output_file`。
 stats 返回：`{by_type, per_seqid_top, gene_length_stats{count, mean, min, max, n50}}`。
+
+### 出版级可视化
+
+**bio_plot_gene_structure** — 基因结构图
+`gff ★`、`ids`（指定基因）、`max_genes`（默认 20）、`width`、`title`、`lang`（zh/en）、`output_file`。
+返回：`{n_genes, genes[{id, exons, length_bp}], files[]}`。外显子盒+内含子线+链方向标记；输出 300dpi PNG + 可编辑文本 SVG。
+
+**bio_plot_gene_locations** — 基因位置图
+`gff ★`、`chroms`、`ids`（高亮）、`width`、`max_labels`（默认 30）、`title`、`output_file`。
+每条染色体一条比例条带 + 基因刻度；ids 中基因红点高亮并标注。
+
+**bio_plot_gene_density** — 基因密度图
+`gff ★`、`window`（默认 100000 bp）、`chroms`、`per_mb`（默认 false=计数）、`width`、`output_file`。
+返回 `{window, chroms[{chrom, bins, genes}], files[]}`。
+
+**bio_plot_heatmap** — 聚类热图
+`matrix ★`（TSV/CSV）、`cluster_rows/cluster_cols`（默认 true）、`scale`（none/row/col）、`cmap`（默认 RdBu_r；rainbow/jet 色系直接报错）、`width/height`、`output_file`。
+行/列 average-linkage 层次聚类 + 树状图；色标范围按 2-98 百分位裁剪。
+
+**bio_plot_venn** — Venn 图（2-3 组）
+`groups`（数组的数组）或 `group_files`（每行一个元素）、`labels`、`title`、`output_file`。>3 组报错并提示改用 UpSet。
+
+**bio_plot_upset** — UpSet 图
+`groups` / `group_files`、`labels`、`top_n`（默认 20）、`min_size`、`include_singletons`、`output_file`。支持 2-12 组；交集按规模排序。
+
+**bio_plot_enrichment** — 富集条形图
+`table ★`、`term_col/p_col/count_col`（默认按列名自动识别）、`top_n`（默认 20）、`output_file`。
+按 -log10(p) 排序横向条形；count 列存在时标注 n=。
+
+**bio_plot_domains** — 蛋白结构域示意图
+`table ★`、`protein_col/start_col/end_col/domain_col/length_col`（自动识别）、`max_proteins`（默认 25）、`output_file`。
+同域名同色（Okabe-Ito 调色板）；域盒上下错位排列避免遮挡。
+
+> 全部绘图工具：`lang=zh`（默认）自动配置中文字体；输出默认 300dpi PNG+SVG（可用 `formats` 增补 PDF）。
 
 ### 比对与系统发育
 

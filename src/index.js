@@ -4,7 +4,7 @@
  * 注入 tools / skills / systemPrompt，贡献：
  *  - 系统提示词段（许愿式分析指引，persona.md 可编辑）
  *  - skill 目录（17 领域 + 5 研究 + 21 协议 + 8 指南 + 1 主 skill，共 52 个注册条目）
- *  - bio_python 执行器 + bio_env + bio_log/bio_memory + bio_goal + 76 个语义化工具 + 3 个 repair 工具（共 84 个工具）
+ *  - bio_python 执行器 + bio_env + bio_log/bio_memory + bio_goal + 84 个语义化工具 + 3 个 repair 工具（共 92 个工具）
  *  - rigor-guard 计算防火墙（_provenance 台账 + turn-stopping 无溯源数字提醒）
  *  - 后台预热 Python 环境（零依赖自举：uv + venv + biopython）
  *

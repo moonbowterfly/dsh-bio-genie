@@ -63,6 +63,10 @@ from seq_toolkit import (op_fasta_extract, op_fasta_stats, op_fasta_table,
 from seq_toolkit2 import (op_seq_batch_translate, op_orf_predict, op_protein_params,
                           op_ssr_mine, op_primer_check)
 from gff_toolkit import (op_gff_positions, op_gff_sequences, op_gff_ops)
+from plot_toolkit import (op_plot_gene_structure, op_plot_gene_locations,
+                          op_plot_gene_density)
+from plot_toolkit2 import (op_plot_heatmap, op_plot_venn, op_plot_upset,
+                           op_plot_enrichment, op_plot_domains)
 socket.setdefaulttimeout(20)
 from retry_utils import retry_on_network_error
 
@@ -2090,6 +2094,15 @@ OPS = {
     'gff_positions': op_gff_positions,
     'gff_sequences': op_gff_sequences,
     'gff_ops': op_gff_ops,
+    # ---- 出版级可视化工具箱：基因组/矩阵/集合/富集/域 ----
+    'plot_gene_structure': op_plot_gene_structure,
+    'plot_gene_locations': op_plot_gene_locations,
+    'plot_gene_density': op_plot_gene_density,
+    'plot_heatmap': op_plot_heatmap,
+    'plot_venn': op_plot_venn,
+    'plot_upset': op_plot_upset,
+    'plot_enrichment': op_plot_enrichment,
+    'plot_domains': op_plot_domains,
     'entrez_search': op_entrez_search,
     'entrez_fetch': op_entrez_fetch,
     'enrichr': op_enrichr,

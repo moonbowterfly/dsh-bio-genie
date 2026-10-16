@@ -155,8 +155,21 @@ def _id_key(rid, mode):
 # op: fasta_extract —— 批量提取 / 条件过滤 / 子序列 / 最长代表
 # ============================================================================
 
-def _parse_regions(regions):
-    """regions: ["seqid:100-200"] -> [(id, start1, end1)]（1-based 闭区间）。"""
+def _is_int(s):
+    try:
+        int(str(s).replace(',', ''))
+        return True
+    except (TypeError, ValueError):
+        return False
+
+
+def _parse_regions(regions, region_table=None):
+    """区域输入解析。
+
+    regions: ["seqid:100-200"]（1-based 闭区间）。
+    region_table: TSV 文件路径或 TSV 文本（3 列 seqid/start/end，
+        或 4 列 name/seqid/start/end——从表格复制坐标的常见场景）。
+    """
     out = []
     for r in regions or []:
         if isinstance(r, dict):
@@ -172,6 +185,34 @@ def _parse_regions(regions):
         if a < 1 or b < a:
             raise ValueError('区域坐标非法（需 1-based 且 start<=end）：%s' % r)
         out.append((rid, a, b))
+
+    if region_table:
+        if isinstance(region_table, str) and os.path.isfile(region_table):
+            with open(region_table, 'r', encoding='utf-8', errors='replace') as fh:
+                lines = [ln.rstrip('\r\n') for ln in fh]
+        else:
+            lines = str(region_table).splitlines()
+        n_added = 0
+        for ln in lines:
+            ln = ln.strip()
+            if not ln or ln.startswith('#'):
+                continue
+            cells = [c for c in re.split(r'\t+', ln) if c.strip()]
+            if len(cells) == 1:
+                cells = [c for c in ln.split() if c]
+            if len(cells) >= 4 and _is_int(cells[2]) and _is_int(cells[3]):
+                rid, a, b = cells[1], cells[2], cells[3]
+            elif len(cells) >= 3 and _is_int(cells[1]) and _is_int(cells[2]):
+                rid, a, b = cells[0], cells[1], cells[2]
+            else:
+                raise ValueError('区域表行无法解析（需 3 列 seqid/start/end 或 4 列 name/seqid/start/end）：%s' % ln)
+            a_i, b_i = int(a.replace(',', '')), int(b.replace(',', ''))
+            if a_i < 1 or b_i < a_i:
+                raise ValueError('区域表坐标非法（1-based, start<=end）：%s' % ln)
+            out.append((rid.strip(), a_i, b_i))
+            n_added += 1
+        if n_added == 0:
+            raise ValueError('region_table 中没有解析到任何区域行（检查格式/空文件）')
     return out
 
 
@@ -179,7 +220,7 @@ def op_fasta_extract(args):
     """批量提取：按 ID 列表 / 区域 / 条件过滤 / 最长代表。"""
     src = _req_path(args, 'input')
     ids = _norm_id_list(args)
-    regions = _parse_regions(args.get('regions'))
+    regions = _parse_regions(args.get('regions'), args.get('region_table'))
     flt = args.get('filter') or {}
     id_match = str(args.get('id_match') or 'exact').lower()
     if id_match not in ('exact', 'first_word', 'contains'):
@@ -188,7 +229,7 @@ def op_fasta_extract(args):
     longest_sep = str(args.get('longest_sep') or 'first_word')
 
     if not ids and not regions and not flt and not longest:
-        raise ValueError('至少提供一种提取条件：ids / id_file / regions / filter / longest')
+        raise ValueError('至少提供一种提取条件：ids / id_file / regions / region_table / filter / longest')
 
     index = scan_fasta_index(src)
     if not index:

@@ -1476,6 +1476,7 @@ function semanticTools(config) {
         ids: { type: 'array', items: { type: 'string' }, description: '要提取的序列 ID 列表' },
         id_file: { type: 'string', description: 'ID 列表文件路径（每行一个 ID）' },
         regions: { type: 'array', items: { type: 'string' }, description: '坐标区域列表，如 ["chr1:100-200"]（1-based 闭区间）' },
+        region_table: { type: 'string', description: 'TSV 区域表（文件路径或文本）：3 列 seqid/start/end 或 4 列 name/seqid/start/end（表格复制坐标场景）' },
         filter: {
           type: 'object',
           additionalProperties: false,
@@ -1705,6 +1706,163 @@ function semanticTools(config) {
         output_file: { type: 'string', description: 'filter/extract_region 输出路径，默认 <输入名>.filtered.gff3' },
       },
       op: 'gff_ops',
+      timeoutMs: 300_000,
+    }),
+    // ---- 出版级可视化工具箱（基因组 / 矩阵 / 集合 / 富集 / 域）----
+    bioTool(config, {
+      name: 'bio_plot_gene_structure',
+      description:
+        '基因结构图：从 GFF3/GTF 绘制基因模型（外显子盒 + 内含子线 + 链方向），多基因轨道。' +
+        'ids 指定基因（默认前 max_genes 个）。输出出版级 PNG/SVG（300dpi）。' +
+        '触发词：基因结构图、外显子内含子、gene structure、基因模型图。',
+      parameters: {
+        gff: { type: 'string', required: true, description: 'GFF3/GTF 文件路径' },
+        ids: { type: 'array', items: { type: 'string' }, description: '指定基因 ID（默认前 N 个）' },
+        max_genes: { type: 'number', description: '最多绘制基因数（默认 20）' },
+        width: { type: 'number', description: '图宽英寸（默认 10）' },
+        title: { type: 'string', description: '图标题' },
+        lang: { type: 'string', enum: ['zh', 'en'], description: '标签语言（默认 zh）' },
+        output_file: { type: 'string', description: '输出路径（默认 gene_structure.png）' },
+      },
+      op: 'plot_gene_structure',
+      timeoutMs: 300_000,
+    }),
+    bioTool(config, {
+      name: 'bio_plot_gene_locations',
+      description:
+        '基因位置图：染色体条带 + 基因标记；ids 中的基因以红点高亮并标注。' +
+        '触发词：基因位置、染色体分布、gene location、基因定位图。',
+      parameters: {
+        gff: { type: 'string', required: true, description: 'GFF3/GTF 文件路径' },
+        chroms: { type: 'array', items: { type: 'string' }, description: '染色体过滤（默认全部）' },
+        ids: { type: 'array', items: { type: 'string' }, description: '要高亮的基因 ID 列表' },
+        width: { type: 'number', description: '图宽英寸（默认 11）' },
+        max_labels: { type: 'number', description: '高亮标签上限（默认 30）' },
+        title: { type: 'string', description: '图标题' },
+        lang: { type: 'string', enum: ['zh', 'en'], description: '标签语言（默认 zh）' },
+        output_file: { type: 'string', description: '输出路径' },
+      },
+      op: 'plot_gene_locations',
+      timeoutMs: 300_000,
+    }),
+    bioTool(config, {
+      name: 'bio_plot_gene_density',
+      description:
+        '基因密度图：按窗口（默认 100kb）统计每条染色体基因数，面积/阶梯曲线。' +
+        'per_mb=true 输出 genes/Mb 密度。触发词：基因密度、密度分布、gene density。',
+      parameters: {
+        gff: { type: 'string', required: true, description: 'GFF3/GTF 文件路径' },
+        window: { type: 'number', description: '窗口大小 bp（默认 100000）' },
+        chroms: { type: 'array', items: { type: 'string' }, description: '染色体过滤' },
+        per_mb: { type: 'boolean', description: '是否归一化为 genes/Mb（默认 false=计数）' },
+        width: { type: 'number', description: '图宽英寸（默认 11）' },
+        title: { type: 'string', description: '图标题' },
+        lang: { type: 'string', enum: ['zh', 'en'], description: '标签语言（默认 zh）' },
+        output_file: { type: 'string', description: '输出路径' },
+      },
+      op: 'plot_gene_density',
+      timeoutMs: 300_000,
+    }),
+    bioTool(config, {
+      name: 'bio_plot_heatmap',
+      description:
+        '聚类热图：矩阵文件（TSV/CSV，首行列名+首列行名）→ 出版级热图。支持行/列层次聚类' +
+        '（scipy average linkage）、scale=row/col 标准化、cmap 选择（默认 RdBu_r；禁用 rainbow/jet 色系）。' +
+        '触发词：热图、聚类热图、表达矩阵图、heatmap。',
+      parameters: {
+        matrix: { type: 'string', required: true, description: '矩阵文件路径（TSV/CSV）' },
+        cluster_rows: { type: 'boolean', description: '行聚类（默认 true）' },
+        cluster_cols: { type: 'boolean', description: '列聚类（默认 true）' },
+        scale: { type: 'string', enum: ['none', 'row', 'col'], description: '标准化方式（默认 none）' },
+        cmap: { type: 'string', description: '色图（默认 RdBu_r；禁 rainbow/jet）' },
+        width: { type: 'number', description: '图宽英寸' },
+        height: { type: 'number', description: '图高英寸' },
+        title: { type: 'string', description: '图标题' },
+        output_file: { type: 'string', description: '输出路径（默认 heatmap.png）' },
+      },
+      op: 'plot_heatmap',
+      timeoutMs: 300_000,
+    }),
+    bioTool(config, {
+      name: 'bio_plot_venn',
+      description:
+        'Venn 图（2-3 组）：groups 直接给集合（数组的数组）或 group_files 给集合文件（每行一个元素）。' +
+        '>3 组时会明确提示改用 bio_plot_upset（区域重叠不可读）。触发词：Venn图、韦恩图、集合交集。',
+      parameters: {
+        groups: {
+          type: 'array',
+          items: { type: 'array', items: { type: 'string' } },
+          description: '集合数组的数组，如 [["a","b"],["b","c"]]',
+        },
+        group_files: { type: 'array', items: { type: 'string' }, description: '集合文件列表（每行一个元素），与 groups 二选一' },
+        labels: { type: 'array', items: { type: 'string' }, description: '集合名称' },
+        title: { type: 'string', description: '图标题' },
+        lang: { type: 'string', enum: ['zh', 'en'], description: '标签语言（默认 zh）' },
+        output_file: { type: 'string', description: '输出路径（默认 venn.png）' },
+      },
+      op: 'plot_venn',
+      timeoutMs: 300_000,
+    }),
+    bioTool(config, {
+      name: 'bio_plot_upset',
+      description:
+        'UpSet 图：任意集合数（2-12），按交集大小排序展示 top 交集（点阵 + 柱状图）。' +
+        '适用于 4 组及以上集合比较（比堆叠 Venn 可读）。触发词：UpSet、交集图、多集合比较。',
+      parameters: {
+        groups: {
+          type: 'array',
+          items: { type: 'array', items: { type: 'string' } },
+          description: '集合数组的数组',
+        },
+        group_files: { type: 'array', items: { type: 'string' }, description: '集合文件列表，与 groups 二选一' },
+        labels: { type: 'array', items: { type: 'string' }, description: '集合名称' },
+        top_n: { type: 'number', description: '展示 top 交集数（默认 20）' },
+        min_size: { type: 'number', description: '交集最小规模（默认 1）' },
+        include_singletons: { type: 'boolean', description: '是否包含单集合条目（默认 false）' },
+        title: { type: 'string', description: '图标题' },
+        lang: { type: 'string', enum: ['zh', 'en'], description: '标签语言（默认 zh）' },
+        output_file: { type: 'string', description: '输出路径（默认 upset.png）' },
+      },
+      op: 'plot_upset',
+      timeoutMs: 300_000,
+    }),
+    bioTool(config, {
+      name: 'bio_plot_enrichment',
+      description:
+        '富集结果条形图：自动识别 term/p/count 列（可显式指定 term_col/p_col/count_col），' +
+        '按 -log10(p) 排序横向条形（top_n 默认 20）。可直接对接 bio_enrichr 的返回整理成表后使用。' +
+        '触发词：富集图、富集条形图、enrichment plot、GO富集图。',
+      parameters: {
+        table: { type: 'string', required: true, description: '富集结果表路径（TSV/CSV）' },
+        term_col: { type: 'string', description: 'term 列名（默认自动识别 term/name/description）' },
+        p_col: { type: 'string', description: 'p 值列名（默认自动识别 p_value/pvalue/FDR 等）' },
+        count_col: { type: 'string', description: '计数列名（默认自动识别 count/overlap）' },
+        top_n: { type: 'number', description: '展示条目数（默认 20）' },
+        title: { type: 'string', description: '图标题' },
+        lang: { type: 'string', enum: ['zh', 'en'], description: '标签语言（默认 zh）' },
+        output_file: { type: 'string', description: '输出路径（默认 enrichment.png）' },
+      },
+      op: 'plot_enrichment',
+      timeoutMs: 300_000,
+    }),
+    bioTool(config, {
+      name: 'bio_plot_domains',
+      description:
+        '蛋白结构域示意图：从表格（protein/start/end/domain 列，自动识别或显式指定列名）绘制' +
+        '多蛋白域结构轨道（同域名同色）。触发词：结构域图、domain图、蛋白结构域示意图、Pfam图。',
+      parameters: {
+        table: { type: 'string', required: true, description: '结构域表路径（TSV/CSV）' },
+        protein_col: { type: 'string', description: '蛋白 ID 列（默认自动识别）' },
+        start_col: { type: 'string', description: '域起始列（默认自动识别）' },
+        end_col: { type: 'string', description: '域终止列（默认自动识别）' },
+        domain_col: { type: 'string', description: '域名列（默认自动识别）' },
+        length_col: { type: 'string', description: '蛋白长度列（可选）' },
+        max_proteins: { type: 'number', description: '最多蛋白数（默认 25）' },
+        title: { type: 'string', description: '图标题' },
+        lang: { type: 'string', enum: ['zh', 'en'], description: '标签语言（默认 zh）' },
+        output_file: { type: 'string', description: '输出路径（默认 domains.png）' },
+      },
+      op: 'plot_domains',
       timeoutMs: 300_000,
     }),
     // ---- BLAST / 多序列比对 / 系统发育 ----

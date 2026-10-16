@@ -157,6 +157,22 @@ try:
 except ValueError:
     check('all-missing raises', True)
 
+# region_table：TSV 区域表（3 列 + 4 列混合文本；文件模式）
+r = st.op_fasta_extract({'input': FA, 'region_table': 'name1\tseq1\t1\t9\nseq2\t1\t12\n',
+                         'output_file': os.path.join(OUT, 'ex7.fa')})
+got = read_fasta_keys(r['output_file'])
+check('region_table parse 2 rows', r['count'] == 2, str(r['count']))
+vals = list(got.values())
+check('region_table seq1:1-9', any(v == 'ATGGCTAGC' for v in vals), str(vals[:2]))
+check('region_table seq2:1-12', any(v == 'ATGAAATTTGGG' for v in vals), str(vals[:2]))
+
+rt_file = fixture('regions.tsv', 'x\tseq3\t1\t10\n')
+r = st.op_fasta_extract({'input': FA, 'region_table': rt_file,
+                         'output_file': os.path.join(OUT, 'ex8.fa')})
+got = read_fasta_keys(r['output_file'])
+check('region_table file mode', r['count'] == 1 and list(got.values())[0] == 'ATATATATAT',
+      str(got))
+
 r = st.op_fasta_extract({'input': DUP, 'longest': True,
                          'output_file': os.path.join(OUT, 'ex6.fa')})
 got = read_fasta_keys(r['output_file'])
