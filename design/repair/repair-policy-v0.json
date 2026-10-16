@@ -1,0 +1,62 @@
+{
+  "$comment": "g-repair-policy/v0 — machine-readable policy mirror of DEFAULT_POLICY (src/repair-contract.js). proposal.enabled=false in v0: no automated proposal generation; the lab runner is the only (maintainer-ignited) path.",
+  "schema": "g-repair-policy/v1",
+  "plugin_id": "dsh-bio-genie",
+  "mode": "proposal-only",
+  "capture": {
+    "source_kinds": [
+      "bio_python"
+    ],
+    "symptom_classes": [
+      "PYTHON_TRACEBACK"
+    ],
+    "max_captures_per_hour": 20
+  },
+  "proposal": {
+    "enabled": false,
+    "allowed_files": [],
+    "exact_deny": [
+      "package.json",
+      "pnpm-lock.yaml",
+      "package-lock.json",
+      ".npmrc",
+      "cordis.patch.yml",
+      "src/index.js",
+      ".gitmodules",
+      "scripts/install-preset.js",
+      "design/repair/repair-contract-v0.json",
+      "design/repair/repair-policy-v0.json",
+      "scripts/repair-lab-verify.mjs"
+    ],
+    "prefix_deny": [
+      "scripts/",
+      ".github/",
+      "preset/",
+      "skills/",
+      "prompts/",
+      "test/",
+      "node_modules/",
+      ".git/"
+    ],
+    "suffix_deny": [
+      ".exe",
+      ".dll",
+      ".pyc",
+      ".node",
+      ".so",
+      ".dylib",
+      ".zip",
+      ".tgz",
+      ".tar",
+      ".gz",
+      ".whl"
+    ]
+  },
+  "limits": {
+    "max_field_len": 512,
+    "max_incidents": 500,
+    "max_receipts": 500,
+    "max_lessons": 100,
+    "max_captures_per_hour": 20
+  }
+}

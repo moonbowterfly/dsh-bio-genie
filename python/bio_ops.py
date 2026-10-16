@@ -58,6 +58,11 @@ from design_host import (op_design_chassis_profile, op_design_integration_candid
 # B1 收口：design_consequence（design_consequence.py；独立 dispatcher，仅经 designTool 通道）
 from design_consequence import op_design_consequence
 from seq_util import read_seq_input
+from seq_toolkit import (op_fasta_extract, op_fasta_stats, op_fasta_table,
+                         op_fasta_ids)
+from seq_toolkit2 import (op_seq_batch_translate, op_orf_predict, op_protein_params,
+                          op_ssr_mine, op_primer_check)
+from gff_toolkit import (op_gff_positions, op_gff_sequences, op_gff_ops)
 socket.setdefaulttimeout(20)
 from retry_utils import retry_on_network_error
 
@@ -2072,6 +2077,19 @@ OPS = {
     'seq_io_read': op_seq_io_read,
     'seq_io_write': op_seq_io_write,
     'seq_kmer': op_seq_kmer,
+    # ---- FASTA / GFF 批量工具箱：序列与注释套件 ----
+    'fasta_extract': op_fasta_extract,
+    'fasta_stats': op_fasta_stats,
+    'fasta_table': op_fasta_table,
+    'fasta_ids': op_fasta_ids,
+    'seq_batch_translate': op_seq_batch_translate,
+    'orf_predict': op_orf_predict,
+    'protein_params': op_protein_params,
+    'ssr_mine': op_ssr_mine,
+    'primer_check': op_primer_check,
+    'gff_positions': op_gff_positions,
+    'gff_sequences': op_gff_sequences,
+    'gff_ops': op_gff_ops,
     'entrez_search': op_entrez_search,
     'entrez_fetch': op_entrez_fetch,
     'enrichr': op_enrichr,

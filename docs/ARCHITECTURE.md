@@ -175,7 +175,7 @@ GSEA 改由 Python 语义化工具 `bio_deseq2` / `bio_gsea` 提供。
 | 层 | 实现位置 | 触发条件 | 动作 | 上限 |
 |---|------|----------|------|------|
 | **L1 插件自愈** | 插件代码 | 当前**不实现任何自动重试**——所有失败统一透传到 stderr，让 agent 看见 | — | 0 次（占位；后续若加白名单错误类型的自动重试，必须以 `stderr` 追加 `[bio-genie self-healed: ...]` 让用户可见） |
-| **L2 记忆复用** | 插件（`pendingFixes` Map）+ agent 决策 | `bio_python` 失败后，stderr 错误签名若在 `~/.dsh/dsh-bio-genie/memory/error_lessons.json` 命中 | agent 主动 `bio_memory action=lessons` 查 fix_hint；命中即套用再调 | agent 试错 ≤ 1 次 |
+| **L2 记忆复用** | 插件 + agent 决策 | `bio_python` 失败后，stderr 错误签名若命中**已验证经验**（VERIFIED；经 lesson_proof 独立验证并绑定环境指纹） | agent 主动 `bio_memory action=lessons` 查已验证 fix_hint；命中可参考修法再调 | agent 试错 ≤ 1 次 |
 | **L3 agent 自愈** | agent（prompt 驱动） | 任何 L1/L2 未覆盖的失败（代码逻辑错、API 误用、路径错、限流、数据结构错） | 读 stderr → 改 code → 再调 | agent 最多自动修复 2 次（共 3 次尝试） |
 | **终止** | — | 累计 3 次仍失败 | **停止自愈，如实向用户报告**：错误原文 + 已尝试的修复路径 + 残余不确定性。绝不编造结果 | — |
 
@@ -191,7 +191,14 @@ GSEA 改由 Python 语义化工具 `bio_deseq2` / `bio_gsea` 提供。
 - `TimeoutError` / `timedOut=true` → 传更大 `timeoutMs`；大数据写文件而非 print
 - 模糊密码子 `TranslationError` → 翻译前 `seq.replace('X','N').replace('-','N').replace('.','N')`
 
-**沉淀**：`pendingFixes` Map 配对失败→修复成功 → 写入 `error_lessons.json`，下次同类错误直接套用 fix_hint（无需重新发明）。
+**沉淀（Repair Proposal v0 起收紧）**：失败→一次成功的配对**不再自动写入经验**；经验升级只经 `promoteVerifiedLesson(lesson_proof@1)`（base 必红 + 候选必绿 + 冻结 checker）。旧 `error_lessons.json` 保留为 LEGACY_UNVERIFIED（只计不返）。疑似插件/环境问题经 `bio_repair_capture`（token）登记脱敏观察；修复生效走维护者审批（v0 无 propose/verify/apply 工具）。详见 `docs/repair-proposal-v0.md`。
+
+### 11.1 Repair Proposal v0（受控修复事件管道，2026-10-16）
+
+- 三工具：`bio_repair_capture`（脱敏登记，仅 token）/ `bio_repair_status`（只读）/ `bio_repair_ledger_verify`（离线完整性）；`repairMode: 'off'` 可整体关闭。
+- 私有 store：`bioRoot()/repair/`（原子写 + sidecar 哈希 + 锁/CAS + 上限）；绝不进科研 workdir。
+- 机器契约：`design/repair/repair-contract-v0.json` + `repair-policy-v0.json`；lab 验证入口 `scripts/repair-lab-verify.mjs`（不进 npm 包）；测试 `test/repair-*.mjs` ×8。
+- 永不提供：文件编辑 / shell / Git / npm / 发布（agent 面）；自动应用（任何形态）。
 
 ## 12. 已知限制
 

@@ -476,7 +476,8 @@ language: mixed
 | bio_production_envelope | 生产包络线（产物理论上限预测） |
 | bio_circuit_compile / bio_circuit_simulate | 基因回路编译（→SBML+网络图）/ ODE/SSA 动力学仿真（首次调用自动装 biocrnpyler/bioscrape） |
 | bio_log | 执行日志回溯（最近/检索） |
-| bio_memory | 会话记忆查询（成功模式/修复经验） |
+| bio_memory | 会话记忆查询（成功模式/已验证经验） |
+| bio_repair_capture / bio_repair_status / bio_repair_ledger_verify | Repair Proposal v0 修复管道（登记脱敏观察 / 只读状态 / 台账完整性校验；无 propose·verify·apply） |
 | bio_env | 环境诊断 |
 | bio_goal | Autopilot 目标管理（create/status/pause/resume/complete/block，框架级持久目标 + 轮次预算） |
 
@@ -574,7 +575,7 @@ bio_python 失败时返回 \`needs_repair: true\` + 完整 stderr。下面分三
 | 层 | 谁修 | 触发条件 | 动作 | 上限 |
 |---|------|----------|------|------|
 | **L1 插件自愈** | 插件代码 | 当前**不实现任何自动重试**——所有失败统一透传到 stderr，让 agent 看见 | — | 0 次（占位；后续若加白名单错误类型的自动重试，必须以 \`stderr\` 追加 \`[bio-genie self-healed: ...]\` 让用户看见） |
-| **L2 记忆复用** | 插件（已存在） + agent 决策 | \`bio_python\` 失败后，stderr 错误签名若在 \`~/.dsh/dsh-bio-genie/memory/error_lessons.json\` 命中 | agent 主动 \`bio_memory action=lessons\` 查 fix_hint；命中即套用再调 | agent 试错 ≤ 1 次（用提示词的方式让 agent 先查记忆再改码）|
+| **L2 记忆复用** | 插件 + agent 决策 | \`bio_python\` 失败后，stderr 错误签名若命中**已验证经验**（VERIFIED；经独立验证并绑定环境指纹） | agent 主动 \`bio_memory action=lessons\` 查已验证 fix_hint；命中可参考修法再调 | agent 试错 ≤ 1 次（用提示词的方式让 agent 先查记忆再改码）|
 | **L3 agent 自愈** | agent（你） | 任何 L1/L2 未覆盖的失败（代码逻辑错、API 误用、路径错、限流、数据结构错） | 读 stderr → 改 code → 再调 | agent 最多自动修复 2 次（同一任务共 3 次尝试）|
 | **终止** | — | 累计 3 次仍失败 | **停止自愈，如实向用户报告**：错误原文 + 已尝试的修复路径 + 残余不确定性。绝不编造结果 | — |
 
@@ -582,7 +583,7 @@ bio_python 失败时返回 \`needs_repair: true\` + 完整 stderr。下面分三
 
 **L3 的纪律**：
 
-- ImportError/ModuleNotFoundError → 先 \`bio_env\` 看环境状态；若提示环境就绪却仍缺包，是插件 bug 而非任务 bug，**停止自愈、报告插件 bug**
+- ImportError/ModuleNotFoundError → 先 \`bio_env\` 看环境状态；若提示环境就绪却仍缺包，是插件 bug 而非任务 bug，**停止自愈、报告插件 bug**（可用 \`bio_repair_capture\` + 失败结果的 \`repair_observation_token\` 登记脱敏观察，勿附原始内容）
 - HTTP 429/速率限制 → 在 code 里加 \`time.sleep(0.4)\`（NCBI 限流 3 req/s 对应间隔）；批量任务走 \`bio-proto-entrez-batch\` 协议的分批与 sleep
 - FileNotFoundError → 检查路径（相对路径基于工作区；不确定就用绝对路径）
 - KeyError/AttributeError → 读 stderr 行号定位，检查数据结构
@@ -596,15 +597,16 @@ bio_python 失败时返回 \`needs_repair: true\` + 完整 stderr。下面分三
 - 不要让 \`needs_repair=true\` 触发后用同一份 code 再调一次（不读 stderr 不改码 = 浪费时间）
 - 不要把 ImportError 当作「环境没引导好」自行 pip install 任何东西（违反「零安装」原则；除非插件代码本身定义了白名单自动补装）
 
-**沉淀纪律**：失败→修复成功的配对由插件（\`pendingFixes\` Map）自动写入 \`error_lessons.json\`，下次同类错误直接套用 fix_hint（无需重新发明）。**插件层自愈动作也必须写日志**（未来若加），格式 \`[bio-genie self-healed: <动作>]\` 追加在 stderr 末尾。
+**沉淀纪律（Repair Proposal v0 起）**：失败→一次成功的配对**不再自动写入经验**（旧直写已移除）；疑似插件/环境问题用失败结果中的 \`repair_observation_token\` 显式调 \`bio_repair_capture\` 登记脱敏观察（勿粘贴原始日志/代码/路径）。经验升级只经独立验证（lesson_proof：base 必红 + 候选必绿 + 冻结 checker）；修复生效走维护者审批管道（v0 不做自动应用，见 docs/repair-proposal-v0.md）。**插件层自愈动作也必须写日志**（未来若加），格式 \`[bio-genie self-healed: <动作>]\` 追加在 stderr 末尾。
 
-## 会话记忆（越用越聪明）
+## 会话记忆与修复管道
 
-插件会把成功的 bio_python 代码模式与错误修复经验记到本地（$DSH_HOME/dsh-bio-genie/memory/）：
+插件会把成功的 bio_python 代码模式与**已验证**错误修复经验记到本地（$DSH_HOME/dsh-bio-genie/）：
 
 - 写非平凡代码前，可先 bio_memory action=patterns 查同类任务是否已有成功模板
-- bio_python 失败时，查 bio_memory action=lessons：若错误签名命中，直接套用 fix_hint
-- 失败→修复成功的配对会自动沉淀为经验，下次同类错误直接给出修法
+- bio_python 失败时，查 bio_memory action=lessons：仅返回经独立验证（lesson_proof）且环境匹配的经验，命中可参考 fix_hint
+- 未验证旧经验（LEGACY_UNVERIFIED）不返回、不套用
+- 疑似插件/环境问题：用失败结果的 repair_observation_token 调 bio_repair_capture 登记脱敏观察（无原始内容）；bio_repair_status / bio_repair_ledger_verify 只读查看管道与台账完整性；修复生效永远走维护者审批（v0 不做自动应用）
 
 ## 科学严谨性
 

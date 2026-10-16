@@ -11,17 +11,20 @@
  */
 import assert from 'node:assert/strict'
 
+// registry 桩在文件头已可用于对照；此处显式注册一次（无副作用）
+import { registerTools } from '../src/tools.js'
 const plugin = await import('../src/index.js')
 
 // ① 静态注入不得包含可选服务 webServer
 assert.deepEqual(plugin.inject, ['tools', 'skills', 'systemPrompt'])
 
 let toolRegistrations = 0
+const toolNames = []
 let skillRegistrations = 0
 const onEvents = []
 let dynamicInjection = null
 const ctx = {
-  tools: { register: () => { toolRegistrations += 1; return () => {} } },
+  tools: { register: (t) => { toolRegistrations += 1; toolNames.push(t?.name ?? ''); return () => {} } },
   skills: { register: () => { skillRegistrations += 1; return () => {} } },
   systemPrompt: { section: () => {} },
   on: (event) => { onEvents.push(event); return () => {} },
@@ -34,8 +37,26 @@ const ctx = {
 plugin.apply(ctx, { warmUp: false })
 
 // ② 无 webServer 环境下：工具与 skill 已注册、rigor-guard 事件已挂
-assert.equal(toolRegistrations, 69, `expected 69 tool registrations, got ${toolRegistrations}`)
+// [repair-v0] 计数不写死（工具集随版本演进）：与 registerTools 实注册表逐名对照
+{
+  const expectedNames = []
+  const probeCtx = { tools: { register: (t) => { expectedNames.push(t?.name ?? ''); return () => {} } } }
+  registerTools(probeCtx, { enableLog: false })
+  assert.equal(toolRegistrations, expectedNames.length,
+    `tool count must match registry (${toolRegistrations} vs ${expectedNames.length})`)
+  assert.deepEqual([...toolNames].sort(), [...expectedNames].sort(), 'registered tool set must equal registerTools registry')
+}
 assert.equal(skillRegistrations, 52, `expected 52 skill registrations, got ${skillRegistrations}`)
+// [repair-v0] 修复管道面（C4 检查项）：三工具恰注册一次、无 propose/verify/apply、名称全局唯一
+{
+  const repairNames = toolNames.filter((n) => n.startsWith('bio_repair_')).sort()
+  assert.deepEqual(repairNames, ['bio_repair_capture', 'bio_repair_ledger_verify', 'bio_repair_status'],
+    `unexpected repair tools: ${repairNames.join(', ')}`)
+  for (const forbidden of ['bio_repair_propose', 'bio_repair_verify', 'bio_repair_apply']) {
+    assert.ok(!toolNames.includes(forbidden), `forbidden tool registered: ${forbidden}`)
+  }
+  assert.equal(new Set(toolNames).size, toolNames.length, 'tool names must be unique')
+}
 assert.ok(onEvents.includes('tools/post-execute'), 'rigor-guard post-execute hook missing')
 assert.ok(onEvents.includes('agent/turn-stopping'), 'rigor-guard turn-stopping hook missing')
 

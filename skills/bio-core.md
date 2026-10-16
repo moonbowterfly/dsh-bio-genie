@@ -46,7 +46,8 @@ print(len(r), r.seq, r.id)
 `bio_python` 失败时返回 `needs_repair: true` + 完整 stderr。**严格遵守三层职责边界**（详见主 skill `dsh-bio-genie` 的 ACR 章节）：
 
 - **L1 插件自愈**：当前**不实现任何自动重试**——所有失败透传到 stderr。若后续插件加了白名单自愈，stderr 必追加 `[bio-genie self-healed: <动作>]` 提示。
-- **L2 记忆复用**：失败后**先 `bio_memory action=lessons` 查同类修复经验**，命中 fix_hint 即套用再调（最多试 1 次）。
+- **L2 记忆复用**：失败后**先 `bio_memory action=lessons` 查**（仅返回已验证经验，未验证历史不返回）；命中可参考 fix_hint 再调（最多试 1 次）。
+- **插件问题留证（v0）**：若怀疑是插件/环境契约问题，用失败结果中的 `repair_observation_token` 调 `bio_repair_capture` 登记脱敏观察（勿附原始日志/代码/路径）；修复生效走维护者审批管道——**不做**自动应用。
 - **L3 agent 自愈**：L1/L2 未覆盖时，**读 stderr → 改 code → 再调**，最多 2 次修复（共 3 次尝试）。
 - **终止**：3 次仍失败 → 如实报告（错误原文 + 已尝试的修复），绝不编造结果。
 

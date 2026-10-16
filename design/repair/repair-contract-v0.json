@@ -1,0 +1,179 @@
+{
+  "$comment": "g-repair-contract/v0 — machine-readable mirror of src/repair-contract.js. Regenerate: node tmp/gen-repair-contract-json.mjs. Cross-checked by test/repair-contract.mjs; do not hand-edit in ways that drift from the JS module.",
+  "contract_version": "v0",
+  "schemas": {
+    "incident": {
+      "name": "g-repair-incident/v1",
+      "fields": [
+        "attribution",
+        "created_at",
+        "dedupe_key",
+        "incident_id",
+        "op_id",
+        "package_fingerprint",
+        "plugin_id",
+        "privacy",
+        "schema",
+        "source_kind",
+        "state",
+        "symptom_class",
+        "tool_id"
+      ]
+    },
+    "proposalRequest": {
+      "name": "g-repair-proposal-request/v1",
+      "fields": [
+        "allowed_categories",
+        "allowed_files",
+        "base",
+        "budget",
+        "created_at",
+        "expiry",
+        "frozen_test_set_sha",
+        "incident_id",
+        "mre_id",
+        "mre_sha256",
+        "oracle_id",
+        "oracle_sha256",
+        "repair_contract_sha",
+        "request_id",
+        "requested_by",
+        "schema",
+        "verifier_id",
+        "verifier_sha256"
+      ]
+    },
+    "receipt": {
+      "name": "g-repair-receipt/v1",
+      "fields": [
+        "base_red",
+        "created_at",
+        "evidence",
+        "frozen_suite",
+        "patch_green",
+        "policy_check",
+        "proposal_id",
+        "receipt_id",
+        "result",
+        "schema",
+        "verifier"
+      ]
+    },
+    "lessonProof": {
+      "name": "g-repair-lesson-proof/v1",
+      "fields": [
+        "base_fingerprint",
+        "created_at",
+        "green_case_id",
+        "lesson_id",
+        "proof_id",
+        "red_case_id",
+        "result_sha256",
+        "revoked",
+        "schema",
+        "verifier"
+      ]
+    },
+    "lesson": {
+      "name": "g-repair-lesson/v1",
+      "fields": [
+        "created_at",
+        "env",
+        "error_signature",
+        "fix_hint",
+        "lesson_id",
+        "status"
+      ]
+    }
+  },
+  "states": [
+    "OBSERVED",
+    "TRIAGED",
+    "REPRODUCIBLE",
+    "NOT_REPRODUCIBLE",
+    "OUT_OF_SCOPE",
+    "PROPOSAL_CREATED",
+    "INDEPENDENTLY_VERIFIED",
+    "MAINTAINER_APPROVED",
+    "MERGED",
+    "RELEASED",
+    "POST_RELEASE_VERIFIED",
+    "REJECTED",
+    "SUPERSEDED",
+    "STALE"
+  ],
+  "transitions": {
+    "OBSERVED": [
+      "TRIAGED",
+      "NOT_REPRODUCIBLE",
+      "OUT_OF_SCOPE",
+      "REJECTED",
+      "SUPERSEDED",
+      "STALE"
+    ],
+    "TRIAGED": [
+      "REPRODUCIBLE",
+      "NOT_REPRODUCIBLE",
+      "OUT_OF_SCOPE",
+      "REJECTED",
+      "SUPERSEDED",
+      "STALE"
+    ],
+    "REPRODUCIBLE": [
+      "PROPOSAL_CREATED",
+      "REJECTED",
+      "SUPERSEDED",
+      "STALE"
+    ],
+    "PROPOSAL_CREATED": [
+      "INDEPENDENTLY_VERIFIED",
+      "REJECTED",
+      "SUPERSEDED",
+      "STALE"
+    ],
+    "INDEPENDENTLY_VERIFIED": [
+      "MAINTAINER_APPROVED",
+      "REJECTED",
+      "SUPERSEDED",
+      "STALE"
+    ],
+    "MAINTAINER_APPROVED": [
+      "MERGED",
+      "REJECTED",
+      "SUPERSEDED",
+      "STALE"
+    ],
+    "MERGED": [
+      "RELEASED",
+      "STALE"
+    ],
+    "RELEASED": [
+      "POST_RELEASE_VERIFIED",
+      "STALE"
+    ],
+    "POST_RELEASE_VERIFIED": [
+      "STALE"
+    ],
+    "NOT_REPRODUCIBLE": [
+      "STALE"
+    ],
+    "OUT_OF_SCOPE": [
+      "STALE"
+    ],
+    "REJECTED": [],
+    "SUPERSEDED": [],
+    "STALE": []
+  },
+  "limits": {
+    "max_field_len": 512,
+    "max_incidents": 500,
+    "max_receipts": 500,
+    "max_lessons": 100,
+    "max_captures_per_hour": 20
+  },
+  "privacy_rules": [
+    "closed sets: unknown fields are rejected; raw stderr/stdout/code/workdir/paths/sequences/tokens never enter any record",
+    "incident.attribution is always UNVERIFIED; incident.privacy is always SANITIZED",
+    "private store is local-only and never published; public release-level records are a v1 concern (no public ledger in v0)"
+  ]
+}

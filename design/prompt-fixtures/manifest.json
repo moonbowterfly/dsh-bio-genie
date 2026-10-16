@@ -7,12 +7,12 @@
   ],
   "config_fingerprint": {
     "dsh_version": {
-      "value": "0.6.49",
+      "value": "0.6.51",
       "source": "package.json#version"
     },
     "preset": {
       "name": "bio-genie",
-      "digest_sha256": "86021b8199a7260557b90bb7ae2cec31ed7bb0d8153dda3059bbc03ceede1dbc",
+      "digest_sha256": "f24f4864aa2e1fa2d2a3311068e506ce089df6a785204b0c299c0987ecd28680",
       "source": "preset/bio-genie/preset.yml + preset/bio-genie/agent.cordis.yml（按相对名排序逐文件 sha256 后再拼接哈希）"
     },
     "model": {
@@ -27,8 +27,13 @@
     }
   },
   "config_hash": {
-    "value": "efaba7653e0d23824c63e6252c8badd6792c7bd8595a0e21267fd42fcad23006",
-    "canonical_fields": ["fixture_version", "dsh_version", "preset", "skill_registry_digest"],
+    "value": "8ee07a15b9b0261ba7b34e190b7eff31cc6feda493366d6bf82b4cb98a46cc47",
+    "canonical_fields": [
+      "fixture_version",
+      "dsh_version",
+      "preset",
+      "skill_registry_digest"
+    ],
     "note": "仅对可固化字段取规范化 JSON（键排序）算 sha256；model 为 pending 不参与"
   },
   "status_vocab_source": "design/failure-matrix.json#expected_status_vocab（= design_host.py TOOL_STATES 六词）",

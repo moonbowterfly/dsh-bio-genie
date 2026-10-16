@@ -4,7 +4,7 @@
  * 注入 tools / skills / systemPrompt，贡献：
  *  - 系统提示词段（许愿式分析指引，persona.md 可编辑）
  *  - skill 目录（17 领域 + 5 研究 + 21 协议 + 8 指南 + 1 主 skill，共 52 个注册条目）
- *  - bio_python 执行器 + bio_env + bio_log/bio_memory + bio_goal + 64 个语义化工具（共 69 个工具）
+ *  - bio_python 执行器 + bio_env + bio_log/bio_memory + bio_goal + 76 个语义化工具 + 3 个 repair 工具（共 84 个工具）
  *  - rigor-guard 计算防火墙（_provenance 台账 + turn-stopping 无溯源数字提醒）
  *  - 后台预热 Python 环境（零依赖自举：uv + venv + biopython）
  *
@@ -34,7 +34,7 @@ export const name = 'dsh-bio-genie'
  * 现在改用 apply() 内的动态注入 ctx.inject(['webServer'], cb)（官方 dsh 插件
  * 同款模式）：webServer 可用时注册浏览器侧设置面板的 /api/dsh-bio-genie/*
  * 路由（skill 清单 / Python 包列表 / addons / 代谢与编辑域数据）；不可用时
- * 69 个工具与 52 个 skill 照常注册，面板静态部分照常渲染。
+ * 72 个工具与 52 个 skill 照常注册，面板静态部分照常渲染。
  */
 export const inject = ['tools', 'skills', 'systemPrompt']
 
@@ -44,6 +44,9 @@ const DEFAULT_CONFIG = {
   warmUp: true,
   enableLog: true,
   enableMemory: true,
+  // Repair Proposal v0：'normal'=注册 capture/status/ledger_verify 三工具（失败时发观察 token）；
+  // 'off'=完全关闭 repair 通道。v0 不注册 propose/verify/apply（见 docs/repair-proposal-v0.md）。
+  repairMode: 'normal',
   pythonEnvDir: undefined,
 }
 

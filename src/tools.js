@@ -18,9 +18,12 @@ import { cacheGet, cacheSet, throttle } from './throttle.js'
 import { detectDomain, domainById } from './domain-adapter.js'
 import { appendLog, codeHash, readLogs } from './log.js'
 import {
-  codeSignature, errorSignature, rememberSuccess, rememberLesson,
+  codeSignature, errorSignature, rememberSuccess, legacyLessonCount,
   readPatterns, readLessons, searchMemory,
 } from './memory.js'
+import { issueObservationToken, captureIncident } from './repair-capture.js'
+import { ledgerSummary } from './repair-ledger.js'
+import { repairRoot } from './repair-store.js'
 import { stampProvenance } from './provenance.js'
 import { verifyDesignPacket, PACKET_DIR } from './design-gate.js'
 import { DESIGN_OPS } from './design-ops.js'
@@ -35,7 +38,9 @@ import { loadCapabilityPolicy } from './design-capability.js'
 /** 引导可能耗时数分钟；工具执行期间等待引导完成。 */
 const BOOT_WAIT_MS = 600_000
 
-/** 「失败挂起」队列：signature → 失败信息，等待同意图的成功来配对成经验（上限 20 防膨胀）。 */
+/** 「失败挂起」队列：signature → 失败信息（上限 20 防膨胀）。
+ *  Repair Proposal v0 起仅作**未验证候选关联**（纯内存）：失败→一次成功的配对
+ *  不再自动写入 L2——经验升级只经 promoteVerifiedLesson(lesson_proof@1)。 */
 const pendingFixes = new Map()
 
 /** 确保 Python 环境就绪并返回 python 路径；失败抛错。 */
@@ -998,6 +1003,7 @@ export function registerTools(ctx, config) {
           timedOut: { type: 'boolean', required: true },
           truncated: { type: 'boolean' },
           needs_repair: { type: 'boolean' },
+          repair_observation_token: { type: 'string', description: '疑似插件问题的短命观察 token（有 traceback 时出现）；可显式用 bio_repair_capture 登记为脱敏观察，token 本身不含任何原始内容。' },
           _provenance: { type: 'object', additionalProperties: true, description: '计算防火墙背书：本结果由哪个工具产出。' },
         },
       },
@@ -1015,6 +1021,12 @@ export function registerTools(ctx, config) {
       // 因此代码级失败要靠 stderr 里的 traceback 头判定，而不是 out.ok。
       const hasTraceback = /\bTraceback\s*\(most recent call last\)/.test(out.stderr ?? '')
       if (hasTraceback) canonical.needs_repair = true
+      // Repair Proposal v0：疑似插件问题的短命观察 token（纯加性；本身不含 stderr/代码/路径）。
+      // 首次 traceback **不落盘**；只有显式 bio_repair_capture(token) 才登记脱敏 incident。
+      if (hasTraceback && config.repairMode !== 'off') {
+        const observeToken = issueObservationToken({ toolId: 'bio_python', sourceKind: 'bio_python', symptomClass: 'PYTHON_TRACEBACK' })
+        if (observeToken) canonical.repair_observation_token = observeToken
+      }
       // 透明性日志：异步写，不阻塞返回（可 config.enableLog=false 关闭）
       const preview = (args.code ?? '').replace(/\s+/g, ' ').trim().slice(0, 200)
       if (config.enableLog !== false) {
@@ -1039,15 +1051,10 @@ export function registerTools(ctx, config) {
           pendingFixes.set(sig, { error_signature: errorSignature(out.stderr), failed_preview: preview })
           if (pendingFixes.size > 20) pendingFixes.delete(pendingFixes.keys().next().value)
         } else {
-          const pending = pendingFixes.get(sig)
-          if (pending) {
-            rememberLesson({
-              error_signature: pending.error_signature,
-              fix_hint: preview,
-              example: `${pending.failed_preview}  →  ${preview}`,
-            })
-            pendingFixes.delete(sig)
-          }
+          // Repair Proposal v0 语义收紧：失败→一次成功的配对不再自动沉淀为 L2 经验
+          //（原 rememberLesson 直写已移除）。配对仅作未验证候选关联（内存），
+          // 经验升级只经 lesson_proof@1（见 memory.js / docs/repair-proposal-v0.md）。
+          if (pendingFixes.has(sig)) pendingFixes.delete(sig)
           rememberSuccess({ signature: sig, template: preview, tool: 'bio_python' })
         }
       }
@@ -1143,9 +1150,9 @@ export function registerTools(ctx, config) {
   disposers.push(ctx.tools.register(defineTool({
     name: 'bio_memory',
     description:
-      '查询插件的会话记忆：成功代码模式（patterns）与错误修复经验（lessons），越用越聪明。' +
-      'action=patterns 列出成功模式；action=lessons 列出错误→修复经验；action=search 按关键词检索两者。' +
-      '写非平凡代码前先查 patterns 是否有同类任务现成模板；bio_python 失败时查 lessons 是否命中错误签名，直接套用 fix_hint。' +
+      '查询插件的会话记忆：成功代码模式（patterns）与**已验证**错误修复经验（lessons）。' +
+      'action=patterns 列出成功模式；action=lessons 列出已验证经验（只含经独立验证且环境匹配的经验，未验证历史不返回）；action=search 按关键词检索两者。' +
+      '写非平凡代码前先查 patterns 是否有同类任务现成模板；bio_python 失败时查 lessons 是否命中错误签名，命中可参考 fix_hint。' +
       '触发词：成功模式、修复经验、之前怎么修的、记忆。',
     parameters: {
       action: { type: 'string', enum: ['patterns', 'lessons', 'search'], description: 'patterns=成功模式（默认）；lessons=错误修复经验；search=关键词检索' },
@@ -1173,12 +1180,86 @@ export function registerTools(ctx, config) {
       }
       if (action === 'lessons') {
         const items = readLessons().slice(0, limit)
-        return { action, count: items.length, items }
+        const legacy = legacyLessonCount()
+        return {
+          action,
+          count: items.length,
+          items,
+          ...(legacy > 0
+            ? { legacy_unverified: legacy, note: '存在旧版未验证经验（LEGACY_UNVERIFIED）——不返回、不套用，仅计数待人工重验/清理' }
+            : {}),
+        }
       }
       const res = searchMemory(args.query ?? '')
       return { action, query: args.query ?? '', count: res.patterns.length + res.lessons.length, items: [...res.lessons, ...res.patterns].slice(0, limit) }
     },
   })))
+
+  // ============ Repair Proposal v0（受控修复事件管道：capture / status / ledger_verify） ============
+  // 常规 profile 仅注册三件（刻意**不注册** propose / verify / apply——无编辑、执行、发布能力）。
+  // 设计与边界见 docs/repair-proposal-v0.md；机器契约见 design/repair/。
+  if (config.repairMode !== 'off') {
+    disposers.push(ctx.tools.register(defineTool({
+      name: 'bio_repair_capture',
+      description:
+        '登记一条**脱敏**的疑似插件问题观察（Repair Proposal v0）。输入只接受 bio_python 结果中的 ' +
+        'repair_observation_token（短命、一次性、不含原始内容）。本工具不接收原始日志/代码/路径/序列——' +
+        '登记产物仅为 OBSERVED incident（attribution=UNVERIFIED，**不是**插件 bug 认定），供维护者分诊与后续独立验证。' +
+        '触发词：登记观察、疑似插件问题、repair capture、留证。',
+      parameters: {
+        token: { type: 'string', required: true, description: 'bio_python 失败结果中的 repair_observation_token' },
+      },
+      output: {
+        schema: { type: 'object', additionalProperties: true },
+        render: (_args, value) => [{ type: 'text', text: JSON.stringify(value, null, 2) }],
+      },
+      async execute(args) {
+        return captureIncident({ token: args.token })
+      },
+    })))
+    disposers.push(ctx.tools.register(defineTool({
+      name: 'bio_repair_status',
+      description:
+        'Repair Proposal v0 状态（只读）：模式（proposal-only）、私有 store 计数（incident/receipt/lesson）、' +
+        'incident 状态分布与最近条目（均为脱敏摘要，无原始内容）、完整性速览与 legacy 计数。' +
+        '触发词：repair 状态、修复管道、incident 列表。',
+      parameters: {},
+      output: {
+        schema: { type: 'object', additionalProperties: true },
+        render: (_args, value) => [{ type: 'text', text: JSON.stringify(value, null, 2) }],
+      },
+      async execute() {
+        const summary = ledgerSummary({ maxRecent: 5 })
+        return {
+          mode: 'proposal-only',
+          enabled: true,
+          store_root: repairRoot(),
+          counts: summary.counts,
+          by_state: summary.by_state,
+          recent: summary.recent,
+          integrity_ok: summary.ok,
+          issues_count: summary.issues.length,
+          legacy_unverified_lessons: legacyLessonCount(),
+        }
+      },
+    })))
+    disposers.push(ctx.tools.register(defineTool({
+      name: 'bio_repair_ledger_verify',
+      description:
+        '离线校验私有修复台账完整性：逐条核对 sidecar 哈希、可读性与文件名规范，返回问题清单' +
+        '（含问题 code；不含任何原始内容）。用于确认台账未被篡改、无半写残留。' +
+        '触发词：台账校验、ledger verify、完整性检查。',
+      parameters: {},
+      output: {
+        schema: { type: 'object', additionalProperties: true },
+        render: (_args, value) => [{ type: 'text', text: JSON.stringify(value, null, 2) }],
+      },
+      async execute() {
+        const summary = ledgerSummary({ maxRecent: 0 })
+        return { ok: summary.ok, checked: summary.checked, counts: summary.counts, issues: summary.issues }
+      },
+    })))
+  }
 
   // ============ 目标管理（Autopilot：框架级 goal 持久化） ============
   // ctx.goals 是框架 Cordis 服务（@deepseek-ai/dsh-goal）。部署缺少该服务时
@@ -1381,6 +1462,250 @@ function semanticTools(config) {
       },
       op: 'seq_restriction',
       timeoutMs: 120_000,
+    }),
+    // ---- FASTA / GFF 批量工具箱（序列与注释套件）----
+    bioTool(config, {
+      name: 'bio_fasta_extract',
+      description:
+        '从 FASTA 文件批量提取序列：按 ID 列表（ids/id_file）、坐标区域（regions，如 "chr1:100-200"）、' +
+        '条件过滤（filter：长度/GC/ID 正则）或按组取最长代表（longest）。适合从基因组或转录组大文件中' +
+        '抽取目标序列。id_match 控制 ID 匹配方式（exact/first_word/contains，默认 exact）。' +
+        '输出 FASTA 文件并返回摘要与缺失清单。触发词：提取序列、抽序列、按ID提取、筛选fasta、最长转录本、取子序列。',
+      parameters: {
+        input: { type: 'string', required: true, description: '输入 FASTA 文件路径' },
+        ids: { type: 'array', items: { type: 'string' }, description: '要提取的序列 ID 列表' },
+        id_file: { type: 'string', description: 'ID 列表文件路径（每行一个 ID）' },
+        regions: { type: 'array', items: { type: 'string' }, description: '坐标区域列表，如 ["chr1:100-200"]（1-based 闭区间）' },
+        filter: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            min_len: { type: 'number', description: '最小长度' },
+            max_len: { type: 'number', description: '最大长度' },
+            min_gc: { type: 'number', description: '最小 GC%（0-100）' },
+            max_gc: { type: 'number', description: '最大 GC%（0-100）' },
+            id_regex: { type: 'string', description: 'ID 正则过滤' },
+          },
+          description: '条件过滤：{min_len, max_len, min_gc, max_gc, id_regex}',
+        },
+        id_match: { type: 'string', enum: ['exact', 'first_word', 'contains'], description: 'ID 匹配方式，默认 exact' },
+        longest: { type: 'boolean', description: '按 ID 分组（竖线/点/空白前）取最长序列，默认 false' },
+        output_file: { type: 'string', description: '输出路径，默认 <输入名>.extracted.fasta' },
+      },
+      op: 'fasta_extract',
+      timeoutMs: 300_000,
+    }),
+    bioTool(config, {
+      name: 'bio_fasta_stats',
+      description:
+        'FASTA 批量统计：记录数/总长/最小最大平均中位长度/N50/N90/总 GC%，可输出每条序列（长度/GC/N 计数）' +
+        '表格与长度分布直方图；window_size 给定时附滑窗 GC 系列。触发词：fasta统计、序列统计、N50、GC含量、长度分布。',
+      parameters: {
+        input: { type: 'string', required: true, description: '输入 FASTA 文件路径' },
+        per_sequence: { type: 'boolean', description: '是否输出每条序列统计（默认 true）' },
+        write_table: { type: 'boolean', description: '是否把每条序列表写入文件（默认 true）' },
+        window_size: { type: 'number', description: '滑窗大小（可选，如 1000）' },
+        window_step: { type: 'number', description: '滑窗步长（默认等于窗口）' },
+        output_file: { type: 'string', description: '每条序列表输出路径，默认 <输入名>.stats.tsv' },
+      },
+      op: 'fasta_stats',
+      timeoutMs: 300_000,
+    }),
+    bioTool(config, {
+      name: 'bio_fasta_table',
+      description:
+        'FASTA 与表格互转：to_table 把 FASTA 转为 TSV（可选列 id/description/length/gc_percent，' +
+        'include_sequence 加 sequence 列）；to_fasta 把 TSV 转回 FASTA（id_col/sequence_col 指定列名）。' +
+        '触发词：fasta转表格、序列转表格、表格转fasta。',
+      parameters: {
+        input: { type: 'string', required: true, description: '输入文件路径（FASTA 或 TSV）' },
+        action: { type: 'string', enum: ['to_table', 'to_fasta'], description: '转换方向，默认 to_table' },
+        fields: { type: 'array', items: { type: 'string' }, description: 'to_table 输出列（默认 id/description/length/gc_percent）' },
+        include_sequence: { type: 'boolean', description: 'to_table 是否包含序列列' },
+        id_col: { type: 'string', description: 'to_fasta 的 ID 列名（默认 id）' },
+        sequence_col: { type: 'string', description: 'to_fasta 的序列列名（默认 sequence）' },
+        description_col: { type: 'string', description: 'to_fasta 的可选描述列名' },
+        output_file: { type: 'string', description: '输出路径' },
+      },
+      op: 'fasta_table',
+      timeoutMs: 300_000,
+    }),
+    bioTool(config, {
+      name: 'bio_fasta_ids',
+      description:
+        'FASTA ID 批量重写：simplify（默认截到首个空白/竖线/点之前；可用 pattern+group 正则提取）、' +
+        'rename（map_file 两列映射）、prefix/suffix（text 增前后缀）。触发词：ID简化、ID重命名、批量改名、加前缀。',
+      parameters: {
+        input: { type: 'string', required: true, description: '输入 FASTA 文件路径' },
+        action: { type: 'string', enum: ['simplify', 'rename', 'prefix', 'suffix'], description: '操作类型，默认 simplify' },
+        map_file: { type: 'string', description: 'rename 映射文件（旧ID<TAB>新ID）' },
+        pattern: { type: 'string', description: 'simplify 自定义正则（默认按分隔符截断）' },
+        group: { type: 'number', description: 'simplify 正则捕获组序号（默认 1）' },
+        text: { type: 'string', description: 'prefix/suffix 的文本' },
+        keep_description: { type: 'boolean', description: '是否保留描述部分' },
+        output_file: { type: 'string', description: '输出路径' },
+      },
+      op: 'fasta_ids',
+      timeoutMs: 300_000,
+    }),
+    bioTool(config, {
+      name: 'bio_seq_batch_translate',
+      description:
+        '批量翻译核酸序列为蛋白：输入 FASTA，输出蛋白 FASTA。frame 可为 auto（默认单帧）/0/1/2/' +
+        'all6（六个阅读框全出）。table 指定遗传密码表（默认 1）。to_stop 在首个终止密码子截断；' +
+        'trim_stop 去掉末尾终止符。返回非 3 倍数长度与内部终止密码子警告。' +
+        '触发词：批量翻译、CDS翻译、六框翻译、核酸转蛋白。',
+      parameters: {
+        input: { type: 'string', required: true, description: '输入核酸 FASTA 文件路径' },
+        frame: { type: 'string', enum: ['auto', '0', '1', '2', 'all6'], description: '阅读框，默认 auto' },
+        table: { type: 'number', description: '遗传密码表编号（默认 1 标准表）' },
+        to_stop: { type: 'boolean', description: '首个终止密码子截断' },
+        trim_stop: { type: 'boolean', description: '去掉末尾终止符' },
+        output_file: { type: 'string', description: '输出蛋白 FASTA 路径' },
+      },
+      op: 'seq_batch_translate',
+      timeoutMs: 300_000,
+    }),
+    bioTool(config, {
+      name: 'bio_orf_predict',
+      description:
+        'ORF 预测（批量）：扫描单链或双链六个阅读框，找完整 ORF（ATG..终止密码子）或含部分 ORF' +
+        '（mode=complete_partial）。min_aa 最小氨基酸长度（默认 30）。输出坐标表（1-based 含终止密码子）、' +
+        '长度、阅读框。触发词：ORF预测、开放阅读框、找ORF、完整ORF。',
+      parameters: {
+        input: { type: 'string', required: true, description: '输入核酸 FASTA 文件路径' },
+        min_aa: { type: 'number', description: '最小 ORF 氨基酸长度（默认 30）' },
+        strands: { type: 'string', enum: ['plus', 'both'], description: '扫描链，默认 both' },
+        mode: { type: 'string', enum: ['complete', 'complete_partial'], description: 'complete 只看完整 ORF；complete_partial 含部分（默认 complete）' },
+        max_orfs_per_seq: { type: 'number', description: '每序列最多输出 ORF 数（默认 200）' },
+        table: { type: 'number', description: '遗传密码表（默认 1）' },
+        output_file: { type: 'string', description: 'ORF 表输出路径' },
+      },
+      op: 'orf_predict',
+      timeoutMs: 300_000,
+    }),
+    bioTool(config, {
+      name: 'bio_protein_params',
+      description:
+        '蛋白质参数计算（ProtParam 等效）：分子量/pI/GRAVY 疏水性/脂肪族指数/芳香性/消光系数/氨基酸组成。' +
+        '单序列用 sequence，批量用 input（FASTA）。触发词：蛋白参数、分子量、等电点、pI、疏水性、蛋白理化性质。',
+      parameters: {
+        sequence: { type: 'string', description: '单条蛋白序列（与 input 二选一）' },
+        input: { type: 'string', description: '蛋白 FASTA 文件路径（批量模式）' },
+        label: { type: 'string', description: '单序列模式的结果标签' },
+        limit: { type: 'number', description: '批量模式最多处理条数（默认 500）' },
+        output_file: { type: 'string', description: '批量结果表输出路径' },
+      },
+      op: 'protein_params',
+      timeoutMs: 300_000,
+    }),
+    bioTool(config, {
+      name: 'bio_ssr_mine',
+      description:
+        'SSR/微卫星挖掘（批量）：扫描 1-6 核苷酸重复单元（perfect 型），默认阈值 单10/双6/三5/四5/五4/六4。' +
+        'min_repeats 可自定义阈值（如 "1:12,2:7,3:5"）。输出位点表（ID/类型/motif/位置/重复数/长度）。' +
+        '触发词：SSR、微卫星、简单重复序列、SSR挖掘。',
+      parameters: {
+        input: { type: 'string', required: true, description: '输入 FASTA 文件路径' },
+        max_motif_len: { type: 'number', description: '最大重复单元长度（默认 6）' },
+        min_repeats: { type: 'string', description: '自定义阈值，格式 "单元长度:次数"，如 "1:12,2:7"' },
+        output_file: { type: 'string', description: 'SSR 表输出路径，默认 <输入名>.ssr.tsv' },
+      },
+      op: 'ssr_mine',
+      timeoutMs: 300_000,
+    }),
+    bioTool(config, {
+      name: 'bio_primer_check',
+      description:
+        '引物检查：在目标序列库（input FASTA 或 sequences 数组）中定位引物结合位点（3\' 端严格匹配），' +
+        'pairs 模式预测扩增子大小。max_mismatch 允许错配数（默认 0，3\' 端始终严格）。' +
+        '触发词：引物检查、引物特异性、扩增子、primer check。',
+      parameters: {
+        primers: {
+          type: 'array',
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              name: { type: 'string', description: '引物名' },
+              sequence: { type: 'string', required: true, description: '引物序列（5\'->3\'）' },
+            },
+          },
+          description: '单引物列表 [{name?, sequence}]',
+        },
+        pairs: {
+          type: 'array',
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              name: { type: 'string', description: '引物对名' },
+              forward: { type: 'string', required: true, description: '正向引物序列' },
+              reverse: { type: 'string', required: true, description: '反向引物序列（合成序，非反向互补）' },
+            },
+          },
+          description: '引物对列表 [{name?, forward, reverse}]',
+        },
+        input: { type: 'string', description: '目标序列库 FASTA 路径' },
+        sequences: { type: 'array', items: { type: 'string' }, description: '直接给目标序列数组（与 input 二选一）' },
+        max_mismatch: { type: 'number', description: '允许错配数（默认 0）' },
+        min_amplicon: { type: 'number', description: '扩增子最小长度（默认 60）' },
+        max_amplicon: { type: 'number', description: '扩增子最大长度（默认 2000）' },
+      },
+      op: 'primer_check',
+      timeoutMs: 300_000,
+    }),
+    bioTool(config, {
+      name: 'bio_gff_positions',
+      description:
+        'GFF/GTF 位置信息提取：按类型（gene/mRNA/CDS/exon...）导出位置表' +
+        '（seqid/type/start/end/strand/length + 指定属性列 ID/Name 等）。' +
+        '触发词：GFF位置、基因位置表、GFF提取、注释信息提取。',
+      parameters: {
+        gff: { type: 'string', required: true, description: 'GFF3/GTF 文件路径' },
+        types: { type: 'array', items: { type: 'string' }, description: '要提取的类型（默认 ["gene"]）' },
+        attrs: { type: 'array', items: { type: 'string' }, description: '附加属性列（默认 ["ID","Name"]）' },
+        output_file: { type: 'string', description: '输出 TSV 路径，默认 <输入名>.positions.tsv' },
+      },
+      op: 'gff_positions',
+      timeoutMs: 300_000,
+    }),
+    bioTool(config, {
+      name: 'bio_gff_sequences',
+      description:
+        '从基因组 FASTA + GFF3/GTF 提取特征序列：feature=gene/mRNA/exon/CDS/promoter。' +
+        'CDS 模式按转录本拼接多段 CDS（区间并集，正确处理重叠），负链自动反向互补，并检查' +
+        '长度是否为 3 倍数与内部终止密码子。promoter 模式取转录起始位点上游 promoter_len bp。' +
+        '触发词：提取CDS、基因序列提取、启动子提取、按GFF提取序列。',
+      parameters: {
+        genome: { type: 'string', required: true, description: '基因组 FASTA 文件路径' },
+        gff: { type: 'string', required: true, description: 'GFF3/GTF 注释文件路径' },
+        feature: { type: 'string', enum: ['gene', 'mRNA', 'exon', 'CDS', 'promoter'], description: '要提取的特征类型，默认 CDS' },
+        ids: { type: 'array', items: { type: 'string' }, description: '只提取这些 ID（可选）' },
+        promoter_len: { type: 'number', description: 'promoter 模式上游长度（默认 2000）' },
+        limit: { type: 'number', description: '最多提取条数（默认 20000）' },
+        check_cds: { type: 'boolean', description: '是否做 CDS 完整性检查（默认 true）' },
+        output_file: { type: 'string', description: '输出 FASTA 路径' },
+      },
+      op: 'gff_sequences',
+      timeoutMs: 300_000,
+    }),
+    bioTool(config, {
+      name: 'bio_gff_ops',
+      description:
+        'GFF/GTF 通用操作：stats（类型/序列分布统计 + 基因长度统计）/ filter（按类型/序列/区域/属性正则过滤）' +
+        '/ extract_region（区域提取）。触发词：GFF统计、GFF过滤、GFF区域提取。',
+      parameters: {
+        gff: { type: 'string', required: true, description: 'GFF3/GTF 文件路径' },
+        action: { type: 'string', enum: ['stats', 'filter', 'extract_region'], description: '操作类型，默认 stats' },
+        types: { type: 'array', items: { type: 'string' }, description: 'filter 要保留的类型' },
+        seqids: { type: 'array', items: { type: 'string' }, description: 'filter 要保留的序列名' },
+        region: { type: 'string', description: '区域过滤/提取，如 "chr1:10000-20000"' },
+        attr_regex: { type: 'string', description: '属性正则过滤（匹配属性或整行）' },
+        output_file: { type: 'string', description: 'filter/extract_region 输出路径，默认 <输入名>.filtered.gff3' },
+      },
+      op: 'gff_ops',
+      timeoutMs: 300_000,
     }),
     // ---- BLAST / 多序列比对 / 系统发育 ----
     bioTool(config, {
@@ -2437,6 +2762,9 @@ function renderBioPython(_args, value) {
   const parts = []
   if (value.needs_repair) {
     parts.push('[needs_repair] 代码抛异常（见下方 stderr）——根据 stderr 修复后重新调用 bio_python，最多修复 2 次')
+    if (value.repair_observation_token) {
+      parts.push('(若怀疑是插件/环境问题：可用 bio_repair_capture 提交 repair_observation_token 登记脱敏观察——不要粘贴原始日志/代码/路径)')
+    }
   }
   if (value.stdout) parts.push(value.stdout)
   if (value.stderr) parts.push(`[stderr]\n${value.stderr}`)

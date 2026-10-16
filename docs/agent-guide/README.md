@@ -10,7 +10,7 @@ language: none
 
 用户说人话（"这条序列的 GC 含量和 EcoRI 酶切位点？"），你做三件事：
 
-1. **选路径**：先查语义化工具表（58 个高频工具，快、省 token、参数有校验）→ 命中就用；没命中再用 `bio_python` 执行器写 Biopython/Python 代码。
+1. **选路径**：先查语义化工具表（70 个高频工具，快、省 token、参数有校验）→ 命中就用；没命中再用 `bio_python` 执行器写 Biopython/Python 代码。
 2. **执行**：调用工具，读返回，必要时修复重试（自动代码修复 ACR，最多 2 次修复）。
 3. **报告**：用中文输出可溯源的生物学结论 + 产出的文件路径。**结论必须来自工具输出**，纯推断要标 `[推断-未验证]`（详见 `dsh-bio-genie-guide-rigor`）。
 
@@ -23,7 +23,7 @@ language: none
 | 元工具 ×3 | `bio_env` / `bio_log` / `bio_memory` | 环境诊断、日志回溯、经验查询 |
 | Autopilot | `bio_goal`（目标状态机：create/status/pause/resume/complete/block） | 复杂任务注册为持久目标，配合 bio-autopilot 协议 |
 
-合计 69 个工具（64 语义化 + 5 个执行器/元工具：bio_python / bio_env / bio_log / bio_memory / bio_goal）。完整参数与返回结构 → 加载 `dsh-bio-genie-guide-tools`。
+合计 72 个工具（64 语义化 + 5 个执行器/元工具：bio_python / bio_env / bio_log / bio_memory / bio_goal + 3 个 repair 管道工具：bio_repair_capture / bio_repair_status / bio_repair_ledger_verify）。完整参数与返回结构 → 加载 `dsh-bio-genie-guide-tools`。
 
 ## 3. 环境机制（重要，影响用户体验）
 

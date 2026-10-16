@@ -67,31 +67,47 @@ let fail = 0
 let warned = 0
 let skipped = 0
 
-// [P1-6] design 链六工具：经注册表实取，恰好注册一次（重复/缺失 → FAIL）。
-// 注册形态异构（name: '字面量' 与 name: op 变量两种），字面量计数会误判
-// （如 design_casefile_export 以 `const op = '...'; name: op` 注册、design_consequence
-// 的 name/op 各出现一次字面量）——以 registerTools 实注册结果为准。
+// [P1-6 + repair-v0] 注册表实取：design 六工具 + repair 三工具唯一性；
+// 且「正则提取的全部工具」必须与「实注册表」完全一致——防「正则漏工具=假装在守」。
 {
   const SIX_DESIGN_TOOLS = [
     'bio_chassis_profile', 'bio_integration_candidates', 'bio_circuit_contextualize',
     'design_consequence', 'design_casefile_validate', 'design_casefile_export',
   ]
+  const REPAIR_TOOLS = ['bio_repair_capture', 'bio_repair_status', 'bio_repair_ledger_verify']
+  const FORBIDDEN_REPAIR_TOOLS = ['bio_repair_propose', 'bio_repair_verify', 'bio_repair_apply']
   const registered = []
   const ctx = { tools: { register: (t) => { registered.push(t.name); return () => {} } } }
   registerTools(ctx, { enableLog: false, pythonPath: VENV })
   const count = (n) => registered.filter((x) => x === n).length
   let allOnce = true
-  for (const t of SIX_DESIGN_TOOLS) {
+  for (const t of [...SIX_DESIGN_TOOLS, ...REPAIR_TOOLS]) {
     const n = count(t)
     if (n !== 1) {
       allOnce = false
-      console.log(`FAIL  六 design 工具注册唯一性：${t} 注册 ${n} 次（预期恰好 1 次）`)
+      console.log(`FAIL  工具注册唯一性：${t} 注册 ${n} 次（预期恰好 1 次）`)
       fail += 1
     }
   }
   if (allOnce) {
-    console.log(`PASS  六 design 链工具在 src/tools.js 恰好注册一次（${SIX_DESIGN_TOOLS.join(', ')}）`)
+    console.log(`PASS  design 六工具 + repair 三工具在注册表恰好注册一次`)
     pass += 1
+  }
+  for (const t of FORBIDDEN_REPAIR_TOOLS) {
+    if (registered.includes(t)) {
+      console.log(`FAIL  normal profile 不得注册 ${t}`)
+      fail += 1
+    }
+  }
+  const regSet = new Set(registered)
+  const missing = [...regSet].filter((t) => !allToolNames.has(t)).sort()
+  const extra = [...allToolNames].filter((t) => !regSet.has(t)).sort()
+  if (missing.length === 0 && extra.length === 0) {
+    console.log(`PASS  工具真值一致：正则 ${allToolNames.size} === 注册表 ${regSet.size}`)
+    pass += 1
+  } else {
+    console.log(`FAIL  工具真值不一致：注册表独有 [${missing.join(', ')}]；正则独有 [${extra.join(', ')}]`)
+    fail += 1
   }
 }
 

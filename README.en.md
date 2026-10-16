@@ -173,13 +173,13 @@ This plugin also ships a **dsh agent preset** — `bio-genie` — that turns the
 
 ### What it is
 
-- **Persona source files** (`preset/bio-genie/`: `preset.yml` + `agent.cordis.yml` + `skills/`) — override the base persona, telling AI: "you have 69 tools + 52 skills at hand"; the preset section of `cordis.patch.yml` is generated from this directory by `scripts/build-preset-patch.mjs` (single source of truth; do not hand-edit the generated file).
+- **Persona source files** (`preset/bio-genie/`: `preset.yml` + `agent.cordis.yml` + `skills/`) — override the base persona, telling AI: "you have 72 tools + 52 skills at hand"; the preset section of `cordis.patch.yml` is generated from this directory by `scripts/build-preset-patch.mjs` (single source of truth; do not hand-edit the generated file).
 - **Onboarding mantra** (`skills/dsh-bio-genie-expert.md`) — a meta-skill: "1. Inspect workspace → 2. Pick semantic tool / `bio_python` → 3. Fail by ACR three-layer repair → 4. Report with traceable chain".
 - **One-shot install**: on DSH 0.2.0+ the preset is shipped by the plugin’s own declaration (available immediately after install, zero post-steps); on DSH 0.1.x the `postinstall` hook copies the preset to `~/.dsh/.agent-presets/bio-genie/` (requires approving the build script — see the Chinese README’s 「安装后批准构建脚本」 section).
 
 ### What it is **not**
 
-- ❌ **Does NOT own the 69 tools** — every `bio_*` / `design_*` tool is still injected by the plugin's `cordis.patch.yml`; the preset **does not redeclare** any tool to avoid conflicts.
+- ❌ **Does NOT own the 72 tools** — every `bio_*` / `design_*` tool is still injected by the plugin's `cordis.patch.yml`; the preset **does not redeclare** any tool to avoid conflicts.
 - ❌ **Does NOT change the default persona** — after installation, "生物基因精灵" appears in dsh's preset selector; users **actively pick** it to activate. `agent-presets.default` is **not** changed to `bio-genie`.
 - ❌ **Does NOT break other plugins** — presets and plugins are two independent seams in dsh; they coexist without conflict.
 

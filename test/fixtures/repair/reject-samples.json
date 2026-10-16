@@ -1,0 +1,60 @@
+{
+  "comment": "全部为合成拒绝样本（仅测试用；禁真实日志/序列/路径/用户代码——C4 fixture 约定）。record 是「有效 incident 基座 + 一处违规」的完整快照。",
+  "samples": [
+    {
+      "name": "raw-stderr-field",
+      "record": {
+        "schema": "g-repair-incident/v1",
+        "incident_id": "0f8a7b6c-5d4e-4321-9876-0123456789ab",
+        "state": "OBSERVED",
+        "attribution": "UNVERIFIED",
+        "source_kind": "bio_python",
+        "plugin_id": "dsh-bio-genie",
+        "package_fingerprint": { "package": "@dsh-bio/dsh-bio-genie", "version": "0.0.0-fixture", "node": "22.0.0", "python": "3.12", "sources_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" },
+        "tool_id": "bio_python",
+        "op_id": null,
+        "symptom_class": "PYTHON_TRACEBACK",
+        "dedupe_key": "dk_0123456789abcdef0123456789abcdef",
+        "created_at": "2026-01-01T00:00:00+08:00",
+        "privacy": "SANITIZED",
+        "raw_stderr": "Traceback (most recent call last): [SYNTHETIC FIXTURE TEXT]"
+      }
+    },
+    {
+      "name": "absolute-path-id",
+      "record": {
+        "schema": "g-repair-incident/v1",
+        "incident_id": "C:/somewhere/evil",
+        "state": "OBSERVED",
+        "attribution": "UNVERIFIED",
+        "source_kind": "bio_python",
+        "plugin_id": "dsh-bio-genie",
+        "package_fingerprint": { "package": "@dsh-bio/dsh-bio-genie", "version": "0.0.0-fixture", "node": "22.0.0", "python": "3.12", "sources_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" },
+        "tool_id": "bio_python",
+        "op_id": null,
+        "symptom_class": "PYTHON_TRACEBACK",
+        "dedupe_key": "dk_0123456789abcdef0123456789abcdef",
+        "created_at": "2026-01-01T00:00:00+08:00",
+        "privacy": "SANITIZED"
+      }
+    },
+    {
+      "name": "unknown-state",
+      "record": {
+        "schema": "g-repair-incident/v1",
+        "incident_id": "0f8a7b6c-5d4e-4321-9876-0123456789ab",
+        "state": "FIXED_BY_HAND",
+        "attribution": "UNVERIFIED",
+        "source_kind": "bio_python",
+        "plugin_id": "dsh-bio-genie",
+        "package_fingerprint": { "package": "@dsh-bio/dsh-bio-genie", "version": "0.0.0-fixture", "node": "22.0.0", "python": "3.12", "sources_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" },
+        "tool_id": "bio_python",
+        "op_id": null,
+        "symptom_class": "PYTHON_TRACEBACK",
+        "dedupe_key": "dk_0123456789abcdef0123456789abcdef",
+        "created_at": "2026-01-01T00:00:00+08:00",
+        "privacy": "SANITIZED"
+      }
+    }
+  ]
+}

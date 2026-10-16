@@ -2,7 +2,7 @@
 language: none
 ---
 
-# 工具全参考（69 个）
+# 工具全参考（84 个）
 
 > 每个工具：功能 → 参数（★=必填）→ 返回关键字段 → 典型触发词。**选工具第一优先，`bio_python` 执行器第二优先**。
 
@@ -102,6 +102,66 @@ language: none
 
 **bio_sc_qc** — 单细胞 RNA-seq 质控（scanpy，首次调用自动装）：`input_file ★`（`.h5ad` 或 10X `.h5`）、`output_dir`（默认工作区 `sc_qc/`）、`species`（human/mouse/zebrafish/other，**决定线粒体基因前缀：human=`MT-`，mouse=`mt-`，选错 MT% 恒为 0**）、`mad_counts`/`mad_genes`/`mad_mt`（MAD 阈值，默认 5/5/3）、`min_genes`（默认 200）、`min_cells`（默认 3）、`mt_cap`（线粒体%硬上限，可选）、`apply_filter`（默认 true）、`make_plots`（默认 true）。
 返回 `{cells_raw, genes_raw, cells_after_filter, cells_removed, cells_retained_fraction, qc_before{median_*}, thresholds{counts_range, genes_range, pct_mt_max, ...}, filter_breakdown{failed_counts_mad, failed_genes_mad, failed_mt_mad, failed_min_genes}, genes_after_filter, filtered_file, with_qc_file, qc_figure, comparison_figure}`。MAD 过滤按 scverse 最佳实践（先 log1p 再算中位数绝对偏差）。
+
+### FASTA/GFF 批量工具箱（序列与注释）
+
+**bio_fasta_extract** — FASTA 批量提取/过滤/子序列
+| 参数 | 说明 |
+|---|---|
+| input ★ | 输入 FASTA 文件路径 |
+| ids / id_file | 要提取的 ID 列表 / 每行一个 ID 的文件（可同用，去重合并） |
+| regions | 坐标区域数组，如 `["chr1:100-200"]`（1-based 闭区间） |
+| filter | 条件过滤：`{min_len, max_len, min_gc, max_gc, id_regex}` |
+| id_match | ID 匹配方式：`exact`（默认）/ first_word / contains |
+| longest | `true` 时按 ID 分组（竖线/点/空白前）取最长序列 |
+| output_file | 输出路径（默认 `<输入名>.extracted.fasta`） |
+
+返回：`{count, requested, missing[], missing_count, total_bp, output_file, preview[]}`。流式索引（先扫一遍建 offset 再按需 seek），大文件友好；全部请求零命中时报错（fail-closed），部分缺失列出 missing。
+
+**bio_fasta_stats** — 批量统计
+`input ★`、`per_sequence`（默认 true）、`write_table`（默认 true）、`window_size`/`window_step`（可选滑窗）、`output_file`。
+返回：`{n, total_bp, mean_len, median_len, min_len, max_len, n50, n90, gc_percent, length_histogram{bins}, per_sequence_preview[], table_file, window_stats?}`。
+
+**bio_fasta_table** — FASTA↔TSV 互转
+`input ★`、`action`（to_table 默认 / to_fasta）、`fields`（to_table 列：id/description/length/gc_percent）、`include_sequence`（加 sequence 列）、`id_col`/`sequence_col`/`description_col`（to_fasta 列名）、`output_file`。
+要点：to_fasta 要求表格含指定序列列（缺列明确报错）；含序列列时 roundtrip 无损。
+
+**bio_fasta_ids** — ID 批量重写
+`input ★`、`action`（simplify 默认 / rename / prefix / suffix）、`map_file`（rename：两列映射）、`pattern`+`group`（simplify 自定义正则）、`text`（prefix/suffix）、`keep_description`、`output_file`。
+simplify 默认截到首个空白/竖线/点之前（`geneA.1`→`geneA`）；rename 未命中 ID 原样保留并计入 `unmapped_preview`。
+
+**bio_seq_batch_translate** — 批量翻译
+`input ★`、`frame`（auto 默认 / 0 / 1 / 2 / all6）、`table`（默认 1）、`to_stop`、`trim_stop`、`output_file`。
+返回：`{count_in, count_out, warnings[], output_file}`。all6 每序列输出 6 条（`id|frame+1` 等）；长度非 3 倍数与内部终止密码子进 warnings。
+
+**bio_orf_predict** — ORF 预测
+`input ★`、`min_aa`（默认 30）、`strands`（both 默认 / plus）、`mode`（complete 默认 / complete_partial）、`max_orfs_per_seq`（默认 200）、`table`、`output_file`。
+返回：`{n_orfs, top_orfs[{id, start, end, strand_frame, length_nt, length_aa, kind}], output_file}`。坐标 1-based 闭区间、含终止密码子；kind：complete / partial_end（无终止）/ partial_start（无 ATG）。
+
+**bio_protein_params** — 蛋白参数（ProtParam 等效）
+`sequence`（单序列）或 `input`（FASTA 批量）、`label`、`limit`、`output_file`。
+返回：`{count, results[{id, length, molecular_weight_kda, isoelectric_point, gravy, aromaticity, aliphatic_index, extinction_coeff_280_reduced, extinction_coeff_280_cystine, aa_composition_percent}]}`。批量 >100 条时表落盘。
+
+**bio_ssr_mine** — SSR 微卫星挖掘
+`input ★`、`max_motif_len`（默认 6）、`min_repeats`（自定义阈值 `"1:12,2:7,3:5"`；默认 单10/双6/三5/四5/五4/六4）、`output_file`。
+返回：`{total_ssr, by_type, preview[{id, type, motif, position, repeats, length}], output_file}`。同一区间多周期命中保留最短周期。
+
+**bio_primer_check** — 引物定位/扩增子
+`primers`（`[{name?, sequence}]`）和/或 `pairs`（`[{name?, forward, reverse}]`）、`input`（目标 FASTA）或 `sequences`、`max_mismatch`（默认 0）、`min_amplicon`/`max_amplicon`。
+返回：`{primers[{name, n_hits, hits[{target, position, end, mismatches}]}], pairs[{name, n_amplicons, amplicons[{target, forward_at, reverse_at, size}]}]}`。3' 端种子严格匹配；reverse 引物按合成序传入（内部自动 rc 搜索）；坐标 1-based。
+
+**bio_gff_positions** — GFF 位置表
+`gff ★`、`types`（默认 ["gene"]）、`attrs`（附加属性列，默认 ["ID","Name"]）、`output_file`。
+返回表列：seqid/type/start/end/strand/length + 属性列。types 无匹配时列出文件中的实际类型。
+
+**bio_gff_sequences** — 基因组+GFF 特征序列提取
+`genome ★`、`gff ★`、`feature`（CDS 默认 / gene / mRNA / exon / promoter）、`ids`（过滤）、`promoter_len`（默认 2000）、`limit`、`check_cds`、`output_file`。
+要点：CDS 按转录本归组、区间并集拼接（自动处理 1bp 重叠，报告 `overlap_nt_removed`）；负链整体反向互补；拼接后检查长度 %3 与内部终止密码子（warnings）。promoter 取 TSS 上游（负链 TSS=gene end）。
+返回：`{count, n_not_multiple_of_3, total_bp, output_file, warnings[], preview[]}`。
+
+**bio_gff_ops** — GFF 统计/过滤/区域提取
+`gff ★`、`action`（stats 默认 / filter / extract_region）、`types`/`seqids`/`region`/`attr_regex`（过滤条件）、`output_file`。
+stats 返回：`{by_type, per_seqid_top, gene_length_stats{count, mean, min, max, n50}}`。
 
 ### 比对与系统发育
 
@@ -262,5 +322,15 @@ language: none
 **design_consequence** — 耦合后果推理（design 通道）：`model_ref ★`（sbml + card）、`coupling_profile ★`、`medium`（必填，不支持默认富培养基）、`objective`（默认 biomass）、`scenarios[]`、`casefile_dir`（可选）、`strict`（默认 true）。返回 consequences@1（scenario → growth 方向预测与置信区间）+ design envelope（status/reason_code/artifact_refs/detail）。门禁拒绝 → BLOCKED；规则全 miss → NOT_RUN（禁猜映射）。触发词：设计后果、consequence、耦合后果推理、growth 方向预测。
 
 **design_casefile_validate** — casefile 红线校验（design 通道）：`casefile_dir ★`（工作区内）。返回 checks[8]（SNAPSHOT_BINDING / MANIFEST_COMPLETE / MANIFEST_DISK_HASH / SCHEMA / R1 / R2 / R3 / DAG_ACYCLIC），全 PASS 才放行导出。触发词：案例包校验、红线检查、validate casefile。
+
+### 修复管道（Repair Proposal v0）
+
+**bio_repair_capture** — 登记一条**脱敏**的疑似插件问题观察（v0 受控修复事件管道）：`token ★`（bio_python 失败结果中的 `repair_observation_token`，短命一次性）。**只接受 token**——不接收原始日志/代码/路径/序列；产物为 OBSERVED incident（attribution=UNVERIFIED，不是插件 bug 认定）。触发词：登记观察、疑似插件问题、repair capture。
+
+**bio_repair_status** — 只读状态：模式（proposal-only）、incident/receipt/lesson 计数、状态分布、最近条目（脱敏摘要）、完整性速览与 legacy 计数。触发词：repair 状态、修复管道、incident 列表。
+
+**bio_repair_ledger_verify** — 离线台账完整性校验：逐条核对 sidecar 哈希/可读性/文件名规范，返回问题清单（无原始内容）。触发词：台账校验、ledger verify、完整性检查。
+
+> 无 propose/verify/apply 工具（不提供编辑、执行、发布能力）；设计与边界见仓库 `docs/repair-proposal-v0.md`。`repairMode: 'off'` 可整体关闭本管道。
 
 **design_casefile_export** — casefile 归档导出（design 通道）：`casefile_dir ★` + `format`（zip/report/both，默认 both）+ `audit_view_id` + `expected_parent_snapshot_sha`。对未收口快照执行确定性 report-finalize 事务（S_n → 含 report.md 的 S_(n+1)）→ 精确 validate → 导出；产物落 `exports/<snap12>/`，不入科学快照；纯导出要求目标快照恰含 1 个终态化报告，否则 INVALID_INPUT/REPORT_FINALIZE_REQUIRED。触发词：导出案例包、最终报告、归档 bundle。

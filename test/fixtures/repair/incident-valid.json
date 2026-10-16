@@ -1,0 +1,21 @@
+{
+  "schema": "g-repair-incident/v1",
+  "incident_id": "0f8a7b6c-5d4e-4321-9876-0123456789ab",
+  "state": "OBSERVED",
+  "attribution": "UNVERIFIED",
+  "source_kind": "bio_python",
+  "plugin_id": "dsh-bio-genie",
+  "package_fingerprint": {
+    "package": "@dsh-bio/dsh-bio-genie",
+    "version": "0.0.0-fixture",
+    "node": "22.0.0",
+    "python": "3.12",
+    "sources_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+  },
+  "tool_id": "bio_python",
+  "op_id": null,
+  "symptom_class": "PYTHON_TRACEBACK",
+  "dedupe_key": "dk_0123456789abcdef0123456789abcdef",
+  "created_at": "2026-01-01T00:00:00+08:00",
+  "privacy": "SANITIZED"
+}

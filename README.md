@@ -22,7 +22,7 @@
 |------|------|
 | 🪄 **许愿式分析（Wish Coding）** | 说人话就能分析：*"这条序列的 GC 含量和 EcoRI 酶切位点？"* |
 | 🧩 **全功能覆盖** | `bio_python` 执行器可运行任意 Biopython 代码（比对、PDB、Phylo、motif、BLAST…），配合 22 个领域/研究 skill 配方 |
-| ⚡ **高频语义化工具** | 58 个固定参数工具（GC 含量、翻译、限制酶、k-mer、文件 IO、BLAST、多序列比对、系统发育树、Entrez 检索、通路富集、PubMed 文献、参考基因组、Addgene 质粒库检索、UniProt 蛋白知识库、内含子外显子、点阵图、树比较、RNA 二级结构、来源审计、单细胞 QC、出版级绘图、机器学习、DNA 设计、Primer3 引物/多约束 DNA 优化/克隆模拟/SBOL 标准化/生产包络线/CRISPR 向导设计/编辑验证/合成可行性检查、基因回路编译/动力学仿真、差异表达/GSEA）+ 5 个执行器/元工具（bio_python / bio_env / bio_log / bio_memory / bio_goal）——省 token、输出稳定、参数有校验 |
+| ⚡ **高频语义化工具** | 70 个固定参数工具（GC 含量、翻译、限制酶、k-mer、文件 IO、BLAST、多序列比对、系统发育树、Entrez 检索、通路富集、PubMed 文献、参考基因组、Addgene 质粒库检索、UniProt 蛋白知识库、内含子外显子、点阵图、树比较、RNA 二级结构、来源审计、单细胞 QC、出版级绘图、机器学习、DNA 设计、Primer3 引物/多约束 DNA 优化/克隆模拟/SBOL 标准化/生产包络线/CRISPR 向导设计/编辑验证/合成可行性检查、基因回路编译/动力学仿真、差异表达/GSEA、FASTA/GFF 批量工具箱）+ 5 个执行器/元工具（bio_python / bio_env / bio_log / bio_memory / bio_goal）——省 token、输出稳定、参数有校验 |
 | 📦 **零安装** | 自动下载隔离的 Python 环境（uv + venv + Biopython 绘图栈）到 `$DSH_HOME/dsh-bio-genie/`，不污染系统 |
 | 🇨🇳 **网络自动适配** | 默认直连官方源，任一环节失败自动切换国内镜像（uv→清华 PyPI、CPython→npmmirror、PyPI 包→清华镜像），无需任何配置 |
 | 🛡️ **环境隔离** | Python 子进程以 `-I`（isolated）模式运行，不受宿主 PYTHONPATH 污染 |
@@ -164,6 +164,18 @@ cp -r src index.js cordis.patch.yml package.json skills prompts python docs \
 | `bio_phylo_compare` | 系统发育树比较（Robinson-Foulds 距离 + 归一化 + 拓扑差异明细） | 树比较、RF 距离 |
 | `bio_rna_fold` | RNA 二级结构预测（ViennaRNA：MFE 结构/ΔG/碱基对/集合自由能 + 结构示意图；首次调用自动装） | RNA 二级结构、折叠、MFE |
 | `bio_sc_qc` | 单细胞 RNA-seq 质控（scanpy：QC 指标 → MAD 过滤 → 出图 → 保存 h5ad；首次调用自动装） | 单细胞、scRNA-seq、QC、h5ad |
+| `bio_fasta_extract` | FASTA 批量提取/过滤/子序列（按 ID 列表/坐标区域/长度·GC·正则过滤/分组取最长；流式索引大文件友好） | 提取序列、按ID提取、最长转录本 |
+| `bio_fasta_stats` | 批量统计（记录数/总长/N50/N90/总 GC% + 每条序列表 + 长度分布 + 滑窗 GC） | fasta统计、N50、长度分布 |
+| `bio_fasta_table` | FASTA↔TSV 互转（含序列列可选，roundtrip 无损） | fasta转表格、表格转fasta |
+| `bio_fasta_ids` | ID 批量重写（简化/映射重命名/前后缀） | ID简化、批量改名 |
+| `bio_seq_batch_translate` | 批量翻译（单帧/指定框/六框；相位与终止处理 + 完整性警告） | 批量翻译、CDS翻译、六框 |
+| `bio_orf_predict` | ORF 预测（双链六框、完整/部分、坐标表） | ORF预测、开放阅读框 |
+| `bio_protein_params` | 蛋白参数（MW/pI/GRAVY/脂肪族指数/消光系数/组成） | 蛋白参数、分子量、等电点 |
+| `bio_ssr_mine` | SSR 微卫星挖掘（1-6 核苷酸单元，阈值可配） | SSR、微卫星 |
+| `bio_primer_check` | 引物定位/扩增子预测（3' 端严格匹配） | 引物检查、扩增子 |
+| `bio_gff_positions` | GFF 位置/属性表导出 | GFF位置、基因位置表 |
+| `bio_gff_sequences` | 基因组+GFF 特征序列提取（gene/mRNA/exon/CDS/promoter；CDS 并集拼接+负链+完整性检查） | 提取CDS、启动子提取 |
+| `bio_gff_ops` | GFF 统计/过滤/区域提取 | GFF统计、GFF过滤 |
 
 ### 序列类型自动判断
 
@@ -213,13 +225,13 @@ X 与 gap 在翻译时按未知碱基处理（Biopython 标准行为），含 X/
 
 ### 它是什么
 
-- **人设源文件**（`preset/bio-genie/`：`preset.yml` + `agent.cordis.yml` + `skills/`）——覆盖 base persona，告诉 AI「你手头有 69 个工具 + 52 个 skill」；`cordis.patch.yml` 的 preset 段由 `scripts/build-preset-patch.mjs` 从此目录生成（单一数据源，勿手改生成物）。
+- **人设源文件**（`preset/bio-genie/`：`preset.yml` + `agent.cordis.yml` + `skills/`）——覆盖 base persona，告诉 AI「你手头有 84 个工具 + 52 个 skill」；`cordis.patch.yml` 的 preset 段由 `scripts/build-preset-patch.mjs` 从此目录生成（单一数据源，勿手改生成物）。
 - **入门口诀**（`skills/dsh-bio-genie-expert.md`）——一个 meta-skill：「先看工作区 → 二选一（语义化工具 / `bio_python`） → 失败按 ACR 三层修 → 报告带可追溯链」。
 - **一键安装**：0.2.0+ 由插件自带的 preset 声明直接提供（装完即有，零后置动作）；0.1.x 由 `postinstall` 钩子把 preset 复制到 `~/.dsh/.agent-presets/bio-genie/`（需先批准构建脚本，见上文）。
 
 ### 它**不是**
 
-- ❌ **不接管 69 个工具**——所有 `bio_*` / `design_*` 工具仍由本插件的 `cordis.patch.yml` 注入，preset **不重声明**任何工具，避免冲突。
+- ❌ **不接管 84 个工具**——所有 `bio_*` / `design_*` 工具仍由本插件的 `cordis.patch.yml` 注入，preset **不重声明**任何工具，避免冲突。
 - ❌ **不抢默认人设**——安装后「生物基因精灵」出现在 dsh 预设选择器里；用户**主动选择**才激活。`agent-presets.default` 不会被改成 `bio-genie`。
 - ❌ **不破坏其他插件**——presets 与 plugins 是 dsh 的两个独立 seam，共存不冲突。
 
