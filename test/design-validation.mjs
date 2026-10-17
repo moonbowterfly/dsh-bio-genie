@@ -7,12 +7,17 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { dispatchDesignOp, verifyStagedCandidate } from '../src/design-dispatch.js'
 import { validateDesignArtifact } from '../src/design-validate.js'
+import { cleanVenvEnv } from './clean-venv-env.mjs'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
 const PACKET = join(ROOT, 'design', 'packet')
 const CORPUS = join(PACKET, 'schema-corpus', 'schema_cases.json')
 const home = process.env.USERPROFILE || process.env.HOME
 const VENV = process.env.DSH_BIO_PYTHON || join(home, '.dsh', 'dsh-bio-genie', 'python-env', 'Scripts', 'python.exe')
+
+// venv python 须隔离宿主 PYTHONPATH（Hermes agent shell 会注入其工具 venv 的
+// site-packages 影子化同名包）：统一走 test/clean-venv-env.mjs（含背景说明）。
+const venvEnv = cleanVenvEnv()
 
 let pass = 0
 let fail = 0
@@ -29,7 +34,7 @@ const work = mkdtempSync(join(tmpdir(), 'design-val-'))
   const pyOut = join(work, 'py.json')
   const r1 = spawnSync(process.execPath, [join(ROOT, 'src', 'design-validate.js'), '--batch', CORPUS, '--out', tsOut], { encoding: 'utf8', timeout: 300000 })
   check('TS 批跑 exit 0', r1.status === 0, (r1.stderr || '').slice(-200))
-  const r2 = spawnSync(VENV, [join(ROOT, 'python', 'design_validate.py'), '--batch', CORPUS, '--out', pyOut], { encoding: 'utf8', timeout: 300000 })
+  const r2 = spawnSync(VENV, [join(ROOT, 'python', 'design_validate.py'), '--batch', CORPUS, '--out', pyOut], { encoding: 'utf8', timeout: 300000, env: venvEnv })
   check('PY 批跑 exit 0', r2.status === 0, (r2.stderr || '').slice(-200))
   const cases = JSON.parse(readFileSync(CORPUS, 'utf8')).cases
   const ts = new Map(JSON.parse(readFileSync(tsOut, 'utf8')).results.map((x) => [x.id, x]))
@@ -202,7 +207,7 @@ const work = mkdtempSync(join(tmpdir(), 'design-val-'))
     "os.environ['DSH_DESIGN_EXPECT_INDEX_SHA'] = '0' * 64",
     "print(json.dumps(ops.op_design_stage_artifact({'artifact_type': 'genome_ref', 'raw_json': '{}'})))",
   ].join('\n'), 'utf8')
-  const idr = spawnSync(VENV, [idScript], { encoding: 'utf8', timeout: 120000 })
+  const idr = spawnSync(VENV, [idScript], { encoding: 'utf8', timeout: 120000, env: venvEnv })
   check('E7b 期望身份不符 -> PACKET_IDENTITY_MISMATCH（split-packet 防线）',
     String(idr.stdout || '').includes('PACKET_IDENTITY_MISMATCH'), (idr.stdout || idr.stderr || '').slice(0, 220))
   // E8 非 canonical staged bytes（stage② 层直接复核）。

@@ -11,6 +11,7 @@ import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
+import { cleanVenvEnv } from '../test/clean-venv-env.mjs'
 
 function findPython() {
   if (process.env.DSH_BIO_PYTHON) return process.env.DSH_BIO_PYTHON
@@ -31,7 +32,10 @@ const repoRoot = resolve(import.meta.dirname, '..')
 const formalTests = new Set(['test/test_deg_backends.py', 'test/test_genie_r2_contract.py'])
 const python = formalTests.has(script.replaceAll('\\', '/')) && process.env.DSH_BIO_FORMAL_PYTHON
   ? process.env.DSH_BIO_FORMAL_PYTHON : findPython()
-const r = spawnSync(python, ['-B', script], { cwd: repoRoot, stdio: 'inherit', windowsHide: true })
+// venv python 须隔离宿主 PYTHONPATH（Hermes agent shell 会注入其工具 venv 的
+// site-packages 影子化同名包；详见 test/clean-venv-env.mjs 头注）。
+const cleanEnv = cleanVenvEnv()
+const r = spawnSync(python, ['-B', script], { cwd: repoRoot, stdio: 'inherit', windowsHide: true, env: cleanEnv })
 if (r.error) {
   console.error(`failed to spawn python: ${r.error.message}`)
   process.exit(1)

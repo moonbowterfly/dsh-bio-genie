@@ -23,6 +23,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { DESIGN_TOOL_OPS, registerTools } from '../src/tools.js'
 import { DESIGN_OPS } from '../src/design-ops.js'
+import { cleanVenvEnv } from './clean-venv-env.mjs'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
 const home = process.env.USERPROFILE || process.env.HOME
@@ -56,7 +57,7 @@ function sha256File(p) {
   return createHash('sha256').update(readFileSync(p)).digest('hex')
 }
 function pythonEval(code) {
-  const r = spawnSync(VENV, ['-c', code], { encoding: 'utf8', cwd: ROOT, timeout: 120_000 })
+  const r = spawnSync(VENV, ['-c', code], { encoding: 'utf8', cwd: ROOT, timeout: 120_000, env: cleanVenvEnv() })
   if (r.status !== 0) throw new Error('pythonEval failed: ' + (r.stderr || r.stdout))
   return r.stdout.trim()
 }

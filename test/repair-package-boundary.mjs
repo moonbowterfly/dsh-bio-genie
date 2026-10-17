@@ -17,7 +17,10 @@ try {
   const out = process.platform === 'win32'
     ? execFileSync('cmd.exe', ['/d', '/s', '/c', 'npm pack --dry-run --json'], opts)
     : execFileSync('npm', ['pack', '--dry-run', '--json'], opts)
-  pack = JSON.parse(out.trim())[0]
+  // npm 输出两种形态：数组 [{...}]（旧版）或对象 {"<name>": {...}}（新版）——都接受
+  const parsed = JSON.parse(out.trim())
+  pack = Array.isArray(parsed) ? parsed[0] : Object.values(parsed)[0]
+  if (!pack || !Array.isArray(pack.files)) throw new Error('unexpected npm pack JSON shape')
 } catch (err) {
   console.error(`  FAIL npm pack --dry-run 失败: ${err.message}`)
   process.exit(1)

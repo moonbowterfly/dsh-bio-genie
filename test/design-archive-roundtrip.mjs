@@ -12,6 +12,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { commitReportFinalizeTransaction } from '../src/design-casefile.js'
+import { cleanVenvEnv } from './clean-venv-env.mjs'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
 const BUILDER = join(ROOT, 'test', 'design-casefile-builder.mjs')
@@ -75,7 +76,7 @@ const ZIP_CODE = [
   'print(json.dumps(r))',
 ].join('\n')
 function inspectZip(zipPath, outDir) {
-  const env = { ...process.env, PYTHONIOENCODING: 'utf-8' }
+  const env = { ...cleanVenvEnv(), PYTHONIOENCODING: 'utf-8' }
   const r = spawnSync(VENV, ['-c', ZIP_CODE, zipPath, outDir], { encoding: 'utf8', env, timeout: 120_000 })
   if (r.status !== 0) throw new Error('zip inspect failed: ' + (r.stderr || r.stdout))
   return JSON.parse(r.stdout.trim())

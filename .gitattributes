@@ -5,3 +5,6 @@ design/acceptance*.json -text
 design/capability-policy/** -text
 # fixtures 字节级保真（SHA 清单绑定；autocrlf 下防 LF→CRLF 破坏哈希）
 test/fixtures/design/** -text
+# cordis.patch.yml 由 scripts/build-preset-patch.mjs 生成、freshness gate 按 LF 逐字节比对；
+# 固定 eol=lf，防 autocrlf 检出为 CRLF 后 gate 假红（2026-10-17 实测过一次）
+cordis.patch.yml text eol=lf

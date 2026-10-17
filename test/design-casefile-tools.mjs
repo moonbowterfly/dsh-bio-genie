@@ -14,6 +14,7 @@ import { basename, dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { DESIGN_TOOL_OPS, registerTools } from '../src/tools.js'
 import { DESIGN_OPS } from '../src/design-ops.js'
+import { cleanVenvEnv } from './clean-venv-env.mjs'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
 const BUILDER = join(ROOT, 'test', 'design-casefile-builder.mjs')
@@ -38,7 +39,7 @@ function buildCase(mode, outDir) {
   return JSON.parse(r.stdout.trim())
 }
 function pythonEval(code, cwd = ROOT) {
-  const r = spawnSync(VENV, ['-c', code], { encoding: 'utf8', cwd, timeout: 120_000 })
+  const r = spawnSync(VENV, ['-c', code], { encoding: 'utf8', cwd, timeout: 120_000, env: cleanVenvEnv() })
   if (r.status !== 0) throw new Error('pythonEval failed: ' + (r.stderr || r.stdout))
   return r.stdout.trim()
 }
