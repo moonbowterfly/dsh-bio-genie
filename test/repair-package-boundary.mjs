@@ -37,6 +37,8 @@ for (const bad of ['test/', 'tmp/', 'node_modules/', 'repair-account', '.local.m
 }
 assert(!files.some((f) => f.startsWith('scripts/') && f !== 'scripts/install-preset.js'), 'scripts/ 只含 install-preset.js（lab 入口不进包）')
 assert(!files.includes('scripts/repair-lab-verify.mjs'), 'repair-lab-verify.mjs 不进包')
+assert(!files.includes('scripts/repair-gen-package.mjs'), 'repair-gen-package.mjs 不进包')
+assert(!files.some((f) => f.includes('repair-gen')), 'repair-gen 相关 lab 件不进包')
 assert(!files.some((f) => f.includes('fixtures/repair')), '合成 fixtures 不进包')
 
 // ② 公开契约/文档/源码在包内

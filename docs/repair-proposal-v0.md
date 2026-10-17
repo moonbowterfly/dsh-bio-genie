@@ -26,7 +26,7 @@ OBSERVED → TRIAGED → REPRODUCIBLE | NOT_REPRODUCIBLE | OUT_OF_SCOPE
 | `bio_repair_capture` | ✅ 登记脱敏观察（仅接受短命 token） | — |
 | `bio_repair_status` | ✅ 只读摘要 | — |
 | `bio_repair_ledger_verify` | ✅ 离线完整性校验 | — |
-| proposal 生成 / 独立验证 | ❌ **不注册**（无 `propose/verify/apply` 工具） | `scripts/repair-lab-verify.mjs`（显式点火；不进 npm 包） |
+| proposal 生成 / 独立验证 | ❌ **不注册**（无 `propose/verify/apply` 工具） | `scripts/repair-lab-verify.mjs`（验证入口）+ `scripts/repair-gen-package.mjs`（生成器输入包：canary 预扫/载荷记录/拒发；均不进 npm 包） |
 | 插件文件编辑 / shell / Git / npm / 发布 | ❌ 永不提供 | 仅维护者常规流程（本管道不代劳） |
 
 ## 3. 隐私边界（硬约束）
@@ -87,6 +87,7 @@ node test/repair-store.mjs           # 原子写/sidecar/锁/CAS/上限/扫描
 node test/repair-memory-boundary.mjs # L2 边界（proof/legacy/撤销/篡改）
 node test/repair-tools.mjs           # 注册面（三工具、无 propose/verify/apply）+ 运行时
 node test/repair-verify-lab.mjs      # lab 入口对抗场景
+node test/repair-gen-canary.mjs      # 生成器输入包：canary/凭据/路径/二进制拒发、绑定、确定性、无网络面
 node test/repair-package-boundary.mjs# npm pack 内容边界
 ```
 
