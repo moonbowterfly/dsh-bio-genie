@@ -104,6 +104,33 @@ console.log('[lab] 对抗场景')
   const r = run(['--trusted', mkTrusted(), '--base', same, '--candidate', same, '--proposal', UUID(), '--out', mkOut()])
   assert(r.status === 3, `空变更 → exit 3（实际 ${r.status}）`)
 }
+// ⑧ oracle 变异校准：checker 期望值被故意改错（流程合法：MANIFEST 同步）→ 对「正确的」候选也必须判红
+//    （证明验证器忠实执行 oracle、不当橡皮图章——A3 变异校准）
+{
+  const LF = String.fromCharCode(10)
+  const trusted = mkTrusted()
+  writeFileSync(join(trusted, 'checker.mjs'), [
+    "import { readFileSync } from 'node:fs'",
+    "import { join } from 'node:path'",
+    'const tree = process.argv[2]',
+    "const text = readFileSync(join(tree, 'src', 'math.js'), 'utf8')",
+    "process.exit(text.includes('two = 999') ? 0 : 1)",
+    '',
+  ].join(LF))
+  const mPath = join(trusted, 'MANIFEST.json')
+  const m = JSON.parse(readFileSync(mPath, 'utf8'))
+  m.files['checker.mjs'] = sha256Hex(readFileSync(join(trusted, 'checker.mjs')))
+  writeFileSync(mPath, JSON.stringify(m, null, 2))
+  const r = run(['--trusted', trusted, '--base', mkTree(1), '--candidate', mkTree(2), '--proposal', UUID(), '--out', mkOut()])
+  assert(r.status === 1, `oracle 期望值错误 → 正确候选也判红（exit 1，实际 ${r.status}）`)
+}
+// ⑨ 受信目录混入未列文件 → TRUSTED_INTEGRITY（未列一律拒绝）
+{
+  const trusted = mkTrusted()
+  writeFileSync(join(trusted, 'extra-note.txt'), 'unlisted')
+  const r = run(['--trusted', trusted, '--base', mkTree(1), '--candidate', mkTree(2), '--proposal', UUID(), '--out', mkOut()])
+  assert(r.status === 2 && String(r.stderr).includes('TRUSTED_INTEGRITY'), `未列文件 → exit 2（实际 ${r.status}）`)
+}
 // ⑦ receipt 闭集校验（从 ① 重跑一遍取点位）
 {
   const out = mkOut()

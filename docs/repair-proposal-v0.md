@@ -93,3 +93,24 @@ node test/repair-package-boundary.mjs# npm pack 内容边界
 
 配置：`repairMode: 'normal' | 'off'`（插件 config；默认 normal）。用户可在 profile
 的 `cordis.patch.yml` 覆盖 `dsh-bio-genie` 行配置关闭。
+
+## 9. 受控原型扩展（2026-10-17）：生成器输入包 + lab 部署（v0.2 线）
+
+- **生成器输入包构建器**：`scripts/repair-gen-package.mjs`（lab 件，不进 npm 包）。
+  - `prepare`：从 incident + 快照 + MRE + 受信材料生成「点火请求」草案，全部哈希绑定
+    （base tree / MRE / oracle / contract / verifier）。
+  - `build`：复核全部绑定 → 快照/MRE 预扫描（canary 词表 + 凭据形状 + 用户路径 +
+    二进制 + 大小上限）→ 载荷 canonical JSON 字节级终扫 → 写 payload.json +
+    payload-record.json（含工具自我哈希）；任一违规 fail-closed 拒发（refusal.json
+    只报文件/偏移/序号，绝不回声命中值）。
+  - 脚本零网络面（不导入网络模块；由 `test/repair-gen-canary.mjs` 静态锁定）。
+- **lab 部署（本机）**：`C:\Users\g_repair_v0\repair-lab\`（低权限身份私有区）：
+  `verifier-<V>/`（冻结验证器：runner + contract + trusted{policy/checker/MANIFEST}）、
+  `gen-<G>/`（生成器工具副本）、`runs/`、`canary-exp/`、`manifests/`。
+  V/G = 内容哈希前 12 位；部署清单逐文件 `sha256`，运行前复核。
+- **已通过实测（2026-10-17）**：E2E 演练 7/7（正常 / 候选不绿 / base 不红 /
+  策略越界 / 受信篡改）；canary 实验 12/12（清洁通路 0 命中 + 脏输入拒发 +
+  refusal 无回声 + decoy 不入载荷 + 凭据矩阵 DENY）。报告与证据：
+  `D:\Program\dsh-plug-develop\g-series-selfrepair-20261016\`。
+- **纪律**：canary = 证据，非「绝不外泄」证明；无法检查的出口默认关闭（拒发）；
+  生成器与验证器网络面分离；发布仍只经维护者。
