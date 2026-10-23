@@ -532,7 +532,7 @@ def op_design_chassis_profile(args):
     for f in genome_files:
         display_files.append({
             "path": f.get("display_name") or os.path.basename(f.get("path", "")),
-            "sha256": f["sha256"],
+            "sha256": f.get("sha256") or _sha256_file(f["path"]),
             "format": _GB_FORMAT.get(f.get("format", ""), "other"),
         })
     genome_ref_value = {
@@ -567,7 +567,7 @@ def op_design_chassis_profile(args):
     pe_detail = "no parts evidence file"
     if isinstance(parts_evidence_file, dict) and parts_evidence_file.get("path"):
         _verify_input_files([parts_evidence_file], "parts evidence")
-        pe_hash = parts_evidence_file["sha256"]
+        pe_hash = parts_evidence_file.get("sha256") or _sha256_file(parts_evidence_file["path"])
         pe_source = parts_evidence_file.get("display_name") or os.path.basename(parts_evidence_file["path"])
         try:
             with open(parts_evidence_file["path"], encoding="utf-8") as fh:
@@ -751,6 +751,107 @@ def _evidence_ids(doc, key):
     raise ToolError("INVALID_INPUT", "%s 缺基因列表（genes/gene_ids/ids）" % key)
 
 
+def _features_from_detail(ann_obj):
+    """host_profile.annotation.detail → 规则求值特征表（结构损坏 → BLOCKED）。"""
+    if not isinstance(ann_obj.get("features"), list):
+        raise ToolError("BLOCKED", "ANNOTATION_UNVERIFIABLE: host_profile.annotation.detail 不可反解特征表")
+    features = []
+    for row in ann_obj["features"]:
+        if not (isinstance(row, dict) and isinstance(row.get("f"), str) and isinstance(row.get("t"), str)
+                and isinstance(row.get("g"), list) and isinstance(row.get("c"), str)
+                and row.get("s") in ("+", "-", ".")):
+            raise ToolError("BLOCKED", "ANNOTATION_UNVERIFIABLE: 特征行损坏")
+        features.append({"feature_id": row["f"], "type": row["t"], "strand": row["s"],
+                         "segments": row["g"], "contig": row["c"]})
+    return features
+
+
+def _feature_key(feature):
+    """特征身份键（detail 行与解析结果两种形状统一）。"""
+    segs = feature.get("segments") if "segments" in feature else feature.get("g")
+    return (
+        feature.get("feature_id") if "feature_id" in feature else feature.get("f"),
+        feature.get("type") if "type" in feature else feature.get("t"),
+        feature.get("strand") if "strand" in feature else feature.get("s"),
+        tuple((int(a), int(b)) for a, b in (segs or [])),
+        feature.get("contig") if "contig" in feature else feature.get("c"),
+    )
+
+
+def _features_from_annotation_inputs(args, genome_ref_value, ann_obj):
+    """annotation.detail 被 2048 字节上限截断时，从入参注释文件重解析特征表。
+
+    fail-closed 门禁（P1-2；禁止用「缩小注释表」换通过）：
+      1) 必须随 genome_files 提供注释文件（gff3/genbank/segments_tsv），否则保持
+         NOT_RUN ANNOTATION_TRUNCATED（位点类工具不运行）。
+      2) 提供的注释文件 sha256 集合必须与 genome_ref.files 记录的注释文件集合**逐项相等**
+         （同一份注释的逐字节重放）；不一致 → BLOCKED ANNOTATION_UNVERIFIABLE。
+      3) 解析失败 → NOT_RUN ANNOTATION_UNTRUSTED；坐标体系取档案声明（不接受调用方另行覆盖）。
+      4) 重解析特征必须覆盖 detail 中保留的全部特征行（子集一致性），否则 ANNOTATION_UNVERIFIABLE。
+    """
+    supplied = [f for f in (args.get("genome_files") or [])
+                if isinstance(f, dict) and f.get("format") in ("gff3", "genbank", "segments_tsv")]
+    if not supplied:
+        raise ToolError("NOT_RUN", "ANNOTATION_TRUNCATED: 档案注释摘要截断且未提供注释文件"
+                                   "（位点类工具不运行；请以 genome_files 传入档案所用的同一份注释）")
+    recorded = [f for f in (genome_ref_value.get("files") or [])
+                if isinstance(f, dict) and f.get("format") != "fasta"]
+    rec_hashes = {str(f["sha256"]) for f in recorded if f.get("sha256")}
+    sup_hashes = {str(f["sha256"]) for f in supplied if f.get("sha256")}
+    if not rec_hashes or sup_hashes != rec_hashes:
+        raise ToolError("BLOCKED", "ANNOTATION_UNVERIFIABLE: 注释文件与档案记录不一致"
+                                   "（须为 host_profile 解析的同一批文件，禁止换注释绕截断）")
+    coord = genome_ref_value.get("coord_convention")
+    if coord not in ("0-based-half-open", "1-based-inclusive"):
+        raise ToolError("BLOCKED", "ANNOTATION_UNVERIFIABLE: genome_ref.coord_convention 不可用")
+    features = []
+    for f in supplied:
+        try:
+            features.extend(parse_annotation(f["path"], f["format"], coord))
+        except ToolError as exc:
+            if exc.code == "EXECUTION_ERROR":
+                raise ToolError("NOT_RUN", "ANNOTATION_UNTRUSTED: 注释重解析失败（位点类工具不运行）")
+            raise
+    contig_names = [c.get("name") for c in (genome_ref_value.get("contigs") or []) if isinstance(c, dict)]
+    if len(contig_names) == 1:
+        for feat in features:
+            if feat.get("contig") is None:
+                feat["contig"] = contig_names[0]
+    # detail 行结构校验（损坏 → BLOCKED，与未截断路径同标准），并作为子集一致性的基准
+    retained = {_feature_key(r) for r in _features_from_detail(ann_obj)}
+    reparsed = {_feature_key(f) for f in features}
+    if not retained <= reparsed:
+        raise ToolError("BLOCKED", "ANNOTATION_UNVERIFIABLE: 重解析特征表与档案摘要不一致")
+    return features
+
+
+def _canonical_features(ann_obj, args, genome_ref_value):
+    """特征表来源判定：未截断 → detail 反解；截断 → 入参注释文件哈希绑定重解析（P1-2）。"""
+    if ann_obj.get("truncated") is True:
+        return _features_from_annotation_inputs(args, genome_ref_value, ann_obj)
+    return _features_from_detail(ann_obj)
+
+
+# ── 必需性/表达 id 命名空间（P2：裸 locus_tag 与 gene-/cds- 命名空间互认，禁止静默假通过）──
+_FEATURE_ID_NAMESPACES = ("gene-", "cds-", "mrna-", "transcript-", "exon-", "locus-", "rna-")
+
+
+def _gene_id_aliases(feature_id):
+    """feature_id → 同源 id 集合（原名 + 去命名空间形态 + 命名空间形态的裸 token）。"""
+    out = {feature_id}
+    for pref in _FEATURE_ID_NAMESPACES:
+        if feature_id.startswith(pref) and len(feature_id) > len(pref):
+            out.add(feature_id[len(pref):])
+        elif not feature_id.startswith(pref) and feature_id:
+            out.add(pref + feature_id)
+    return out
+
+
+def _evidence_hits(features, evidence_ids):
+    """特征 × 证据 id 命中（命名空间互认；仅放宽 id 对齐，不降级任何门禁）。"""
+    return [f for f in features if _gene_id_aliases(f["feature_id"]) & evidence_ids]
+
+
 def _parse_candidates_input(args, contigs_by_name, topology_by_name):
     """候选窗口输入：candidates[] 或 scan（互斥）；返回 [(contig, segments, ordering_key)]。"""
     explicit = args.get("candidates")
@@ -867,19 +968,8 @@ def op_design_integration_candidates(args):
         raise ToolError("INVALID_INPUT", "GENOME_REF_MISMATCH: FASTA contigs 与 genome_ref 不一致")
     topology_by_name = {c.get("name"): c.get("topology", "linear") for c in gr_contigs}
 
-    # ── 特征表（从 host_profile annotation detail 反解；规则评估用）──
-    if not isinstance(ann_obj.get("features"), list):
-        raise ToolError("BLOCKED", "ANNOTATION_UNVERIFIABLE: host_profile.annotation.detail 不可反解特征表")
-    features = []
-    for row in ann_obj["features"]:
-        if not (isinstance(row, dict) and isinstance(row.get("f"), str) and isinstance(row.get("t"), str)
-                and isinstance(row.get("g"), list) and isinstance(row.get("c"), str)
-                and row.get("s") in ("+", "-", ".")):
-            raise ToolError("BLOCKED", "ANNOTATION_UNVERIFIABLE: 特征行损坏")
-        features.append({"feature_id": row["f"], "type": row["t"], "strand": row["s"],
-                         "segments": row["g"], "contig": row["c"]})
-    if ann_obj.get("truncated"):
-        raise ToolError("NOT_RUN", "ANNOTATION_TRUNCATED: 档案注释摘要截断（位点类工具不运行）")
+    # ── 特征表（未截断 → detail 反解；截断 → 入参注释文件哈希绑定重解析；规则评估用）──
+    features = _canonical_features(ann_obj, args, genome_ref_value)
 
     # ── 规则参数（正式资产驱动；固定求值顺序）──
     exclude_rules = args.get("exclude_rules")
@@ -1017,8 +1107,8 @@ def op_design_integration_candidates(args):
                 if essential_ids is None:
                     verdicts[rid] = ("UNKNOWN", "essentiality 证据缺失（unknown_policy=block）")
                 else:
-                    hit = [f for f in loc_features if f["feature_id"] in essential_ids
-                           and overlap_nt(iv, feature_intervals(f)) > 0]
+                    hit = [f for f in _evidence_hits(loc_features, essential_ids)
+                           if overlap_nt(iv, feature_intervals(f)) > 0]
                     if hit:
                         verdicts[rid] = ("EXCLUDE", "essential gene in proximity: %s" % hit[0]["feature_id"])
                     else:
@@ -1039,8 +1129,8 @@ def op_design_integration_candidates(args):
                     else:
                         prox = 200
                         iv = expand_intervals(window_iv, prox, domain_hi)
-                        hit = [f for f in loc_features if f["feature_id"] in high_exp_ids
-                               and overlap_nt(iv, feature_intervals(f)) > 0]
+                        hit = [f for f in _evidence_hits(loc_features, high_exp_ids)
+                               if overlap_nt(iv, feature_intervals(f)) > 0]
                         if hit:
                             verdicts[rid] = ("EXCLUDE", "高表达基因邻域: %s" % hit[0]["feature_id"])
                         else:

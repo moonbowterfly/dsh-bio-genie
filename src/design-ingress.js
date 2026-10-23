@@ -261,7 +261,10 @@ function consumersFor(role, classification) {
   if (role === 'genome_sequence') return ['bio_chassis_profile']
   if (role === 'genome_annotation') return ['bio_chassis_profile', 'bio_integration_candidates']
   if (role === 'cassette') return ['bio_circuit_contextualize', 'bio_integration_candidates']
-  if (role === 'gem_model' || role === 'gem_card' || role === 'coupling_assumption') return ['bio_design_consequence']
+  // 消费者提示必须是真实注册的工具名（P2：曾误写 bio_design_consequence，agent 无法据此调用）
+  if (role === 'gem_model') return ['design_consequence']
+  if (role === 'gem_card') return ['design_consequence']
+  if (role === 'coupling_assumption') return ['bio_circuit_contextualize']
   if (role === 'condition') return classification.format === 'json' || classification.format === 'text' ? ['bio_chassis_profile'] : []
   if (role === 'parts_evidence') return classification.format === 'json' || classification.format === 'text' ? ['bio_chassis_profile', 'bio_circuit_contextualize'] : []
   return []

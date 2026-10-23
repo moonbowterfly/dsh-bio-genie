@@ -596,7 +596,7 @@ function designInputCopyDir({ cwd, caseHandle, op }) {
 /** A4 外部输入摄入：读 → hash → TS 拥有副本 → input_snapshot 提交（case 模式）。 */
 function ingestHostInputs(op, args, { cwd, caseHandle }) {
   const entries = []
-  const push = (key, role, format, path) => entries.push({ key, role, format, path })
+  const push = (key, role, format, path, expectSha = null) => entries.push({ key, role, format, path, expectSha })
   const gfiles = Array.isArray(args.genome_files) ? args.genome_files : []
   for (const f of gfiles) {
     if (!f || typeof f.path !== 'string' || !f.path) return fail('INGRESS_ENTRY_INVALID', 'genome_files 项需 {path, format}')
@@ -625,6 +625,21 @@ function ingestHostInputs(op, args, { cwd, caseHandle }) {
     && typeof args.circuit.sbol_file === 'object' && typeof args.circuit.sbol_file.path === 'string') {
     push('circuit.sbol_file', 'sbol', 'text', args.circuit.sbol_file.path)
   }
+  // P1-4：kinetic_crn_ref 的登记入口。SBML 由本层摄入（hash + 副本 + input_snapshot），
+  // 再以 artifactRef 交给 worker 封装 —— 与 refs-only 路径同语义，不额外放宽任何门禁。
+  if (args.crn_sbml_file !== undefined && args.crn_sbml_file !== null) {
+    const v = args.crn_sbml_file
+    if (typeof v !== 'object' || typeof v.path !== 'string' || !v.path) {
+      return fail('INGRESS_ENTRY_INVALID', 'crn_sbml_file 需 {path, sha256?}')
+    }
+    if (v.sha256 !== undefined && (typeof v.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(v.sha256))) {
+      return fail('INGRESS_ENTRY_INVALID', 'crn_sbml_file.sha256 需 64 位小写 hex')
+    }
+    if (args.crn_sbml_ref !== undefined && args.crn_sbml_ref !== null) {
+      return fail('CRN_INPUT_CONFLICT', 'crn_sbml_ref 与 crn_sbml_file 互斥（登记入口二选一）')
+    }
+    push('crn_sbml_file', 'gem_model', 'sbml', v.path, v.sha256 || null)
+  }
 
   const inputDir = designInputCopyDir({ cwd, caseHandle, op })
   const inputRefs = []
@@ -637,6 +652,9 @@ function ingestHostInputs(op, args, { cwd, caseHandle }) {
     const ingested = ingestExternalInput(e.path, { role: e.role, caseHandle })
     if (!ingested.ok) return fail(ingested.code || 'INGRESS_FAILED', ingested.detail || e.path)
     if (ingested.byte_size > DESIGN_HOST_INPUT_BYTES) return fail('INGRESS_SIZE_LIMIT', String(ingested.byte_size))
+    if (e.expectSha && ingested.sha256 !== e.expectSha) {
+      return fail('INGRESS_HASH_MISMATCH', `${e.key}: disk=${ingested.sha256.slice(0, 16)} expected=${e.expectSha.slice(0, 16)}`)
+    }
     mkdirSync(inputDir, { recursive: true })
     const copyPath = join(inputDir, ingested.sha256)
     if (!existsSync(copyPath)) writeFileSync(copyPath, ingested.bytes)
@@ -662,6 +680,14 @@ function ingestHostInputs(op, args, { cwd, caseHandle }) {
       fileArgs[e.key] = { path: copyPath, sha256: ingested.sha256, display_name: basename(e.path) }
     } else if (e.key === 'circuit.sbol_file') {
       fileArgs.circuit_sbol = { path: copyPath, sha256: ingested.sha256, display_name: basename(e.path) }
+    } else if (e.key === 'crn_sbml_file') {
+      // 摄入的 SBML → artifactRef（artifact_id = 文件字节 sha256；已随 input_snapshot 提交/落副本）
+      const base = basename(e.path).replace(/[^A-Za-z0-9._-]/g, '_') || 'crn_sbml'
+      fileArgs.crn_sbml_ref = {
+        artifact_id: ingested.sha256,
+        expected_sha256: ingested.sha256,
+        relative_path: /\.sbml$/i.test(base) ? base : base + '.sbml',
+      }
     }
   }
   return { ok: true, args: fileArgs, inputRefs, newArtifacts }
@@ -702,6 +728,20 @@ function resolveRefValue({ caseHandle, cwd, artifactId }) {
   } catch (e) {
     return fail('OBJECT_UNREADABLE', String(e.message).slice(0, 120))
   }
+}
+
+/**
+ * OK 信封必须产出的声明输出名单（MISSING_OUTPUT 判定的唯一决策点）。
+ *
+ * 默认 = 全部声明输出（fail-closed：声明即承诺，缺省不放宽——避免「少产一个也算 OK」）。
+ * 工具以 output.requiredWhen(args) 显式标注条件产物（典型：仅在提供 CRN 时才产
+ * kinetic_crn_ref.json）；未标注的一律按必需处理。dispatch 侧 allowedOutputs 仍一律
+ * required:false（worker 合法终态 BLOCKED/NOT_RUN 不产候选），本函数只收紧不放松。
+ */
+export function requiredOutputNames(allowedOutputs, args) {
+  return (Array.isArray(allowedOutputs) ? allowedOutputs : [])
+    .filter((o) => (typeof o.requiredWhen === 'function' ? o.requiredWhen(args) === true : true))
+    .map((o) => o.logical_name)
 }
 
 function designHostTool(config, opts) {
@@ -812,6 +852,7 @@ function designHostTool(config, opts) {
         if (!ingest.ok) return await fail('INVALID_INPUT', ingest.code, ingest.detail || '输入摄入失败')
         const workerArgs = { ...args, ...ingest.args }
         delete workerArgs.casefile_dir
+        delete workerArgs.crn_sbml_file // 登记入口文件已转 artifactRef，勿把宿主路径透给 worker
         const inputRefs = ingest.inputRefs
         // ── case 绑定：policy / caseContentId / parent ──
         let caseContentId = null
@@ -882,9 +923,14 @@ function designHostTool(config, opts) {
             }
             const objects = (res.committed && Array.isArray(res.committed.objects)) ? res.committed.objects
               : (res.committed && res.committed.object_path ? [res.committed] : [])
-            if (workerEnvelope.status === 'OK') {
+            // 产物元数据不完整（无 logical_name/sha256）→ 不得构造非法 artifactRef（fail-closed）
+            const malformed = objects.filter((o) => !o || typeof o.logical_name !== 'string' || !o.logical_name
+              || typeof o.sha256 !== 'string')
+            if (workerEnvelope.status === 'OK' && malformed.length > 0) {
+              envelope = { status: 'EXECUTION_ERROR', reason_code: 'WORKER_RESULT_INVALID', artifact_refs: [], detail: 'worker 产物元数据缺 logical_name/sha256' }
+            } else if (workerEnvelope.status === 'OK') {
               const got = new Set(objects.map((o) => o.logical_name))
-              const expected = (opts.allowedOutputs || []).map((o) => o.logical_name)
+              const expected = requiredOutputNames(opts.allowedOutputs, workerArgs)
               const missing = expected.filter((n) => !got.has(n))
               if (objects.length === 0 || missing.length > 0) {
                 envelope = { status: 'EXECUTION_ERROR', reason_code: missing.length > 0 ? 'MISSING_OUTPUT' : 'WORKER_EMPTY_RESULT', artifact_refs: [], detail: 'OK 信封但产出缺失: ' + (missing.join(',') || 'empty') }
@@ -3022,7 +3068,7 @@ function semanticTools(config) {
         genome_files: { type: 'array', required: true, description: '基因组输入文件列表 [{path, format}]：path 为工作区内绝对路径；format ∈ fasta|gff3|genbank|segments_tsv（至少一个 fasta）', items: { type: 'object', additionalProperties: true } },
         coord_convention: { type: 'string', enum: ['0-based-half-open', '1-based-inclusive'], required: true, description: '坐标体系（必须显式声明）' },
         contig_topology: { type: 'object', additionalProperties: true, description: '{contig 名: linear|circular}；缺省 linear' },
-        condition: { type: 'object', additionalProperties: true, description: '培养条件（可空字段显式 null）' },
+        condition: { type: 'object', additionalProperties: true, description: '培养条件（可空字段显式 null）。已识别字段：medium / temperature / oxygen / phase（其余字段不参与完整度判定，也不会被评估）；四字段齐 → completeness=full，部分 → partial，全缺 → missing' },
         parts_evidence_file: { type: 'object', additionalProperties: true, description: 'parts 证据文件 {path}' },
         genome_source: { type: 'string', description: '基因组来源标注（默认 user-supplied-genome）' },
         strict: { type: 'boolean', default: true, description: '严格模式（只改变诊断详略，不放松门禁）' },
@@ -3046,8 +3092,11 @@ function semanticTools(config) {
         '基因组整合位点候选（design 通道 B1-part-1）：按正式 integration-ruleset（feature_overlap / ' +
         'repeat / essentiality / neighborhood / motif 强制 + contextual_stability 提示）对候选窗口逐条评估 → ' +
         'integration_candidate@1[]（≤top_n）。cassette 序列/长度二分：只有长度 → sequence_identity=unknown ' +
-        '仅初步空间筛选。环状跨 origin 窗口显式处理；origin/表达证据按参数声明。触发词：整合位点候选、' +
-        'integration candidates、插入位点扫描。',
+        '仅初步空间筛选。环状跨 origin 窗口显式处理；origin/表达证据按参数声明。' +
+        'host_profile.annotation.detail 受 2048 字节上限（超限即 truncated）：此时必须随 genome_files 传入' +
+        '档案解析的同一份注释文件（sha256 逐项绑定）以重解析完整特征表；未提供 → NOT_RUN ' +
+        'ANNOTATION_TRUNCATED，换另一份注释 → BLOCKED ANNOTATION_UNVERIFIABLE（不得缩注释表绕过）。' +
+        '触发词：整合位点候选、integration candidates、插入位点扫描。',
       parameters: {
         host_profile: { type: 'object', additionalProperties: true, description: 'host_profile@1 值（或提供 host_profile_ref 解析）' },
         host_profile_ref: { type: 'object', additionalProperties: true, description: '已登记 host_profile 的 artifactRef {artifact_id,...}（优先于嵌入值）' },
@@ -3067,10 +3116,13 @@ function semanticTools(config) {
         casefile_dir: { type: 'string', description: 'casefile 目录（可选）' },
       },
       op: 'design_integration_candidates',
+      // 16 个候选位是上限而非承诺：top_n 可小于 16，且候选可全部被 ruleset EXCLUDE。
+      // 因此声明为条件产物（requiredWhen=false）；「OK 但 0 产物」仍由 WORKER_EMPTY_RESULT 拦截。
       allowedOutputs: Array.from({ length: 16 }, (_, i) => ({
         logical_name: 'integration_candidate-' + String(i + 1).padStart(2, '0') + '.json',
         artifact_type: 'integration_candidate',
         required: false,
+        requiredWhen: () => false,
       })),
       timeoutMs: 180_000,
     }),
@@ -3083,7 +3135,8 @@ function semanticTools(config) {
       description:
         '回路表达情景化（design 通道 B1-part-1）：circuit components[] + host_profile → expression_scenario@1 ' +
         '（元件证据查表排名，禁绝对表达——无证据元件只给 rank）。coupling_mode 仅生成耦合草案，不构成定量授权；' +
-        '可选 kinetic_crn_ref@1 封装现有 bio_circuit_compile 输出；ostir_proxy 走可选依赖 preflight（不可用 → ' +
+        '可选 kinetic_crn_ref@1 封装 CRN：crn_sbml_ref（已登记 artifactRef）或 crn_sbml_file {path}（本工具登记入口，' +
+        '摄入后自动转 ref，二者互斥）；ostir_proxy 走可选依赖 preflight（不可用 → ' +
         'DEPENDENCY_UNAVAILABLE）。触发词：表达情景、元件排名、circuit contextualize、耦合草案。',
       parameters: {
         circuit: { type: 'object', additionalProperties: true, required: true, description: '{components: [{component_id, kind, sequence?}], template?, sbol_file?}' },
@@ -3093,15 +3146,24 @@ function semanticTools(config) {
         coupling_mode: { type: 'string', enum: ['qualitative_direction', 'user_calibrated_bound', 'evidence_calibrated_bound'], default: 'qualitative_direction', description: '耦合模式（仅产草案）' },
         parts_evidence: { type: 'json', description: '元件证据：数组 [{part_id, evidence_level, source_id?, rank_hint?}] 或 {path}' },
         ostir_request: { type: 'object', additionalProperties: true, description: '可选 ostir proxy 请求 {sequence, label?}（preflight 失败 → DEPENDENCY_UNAVAILABLE）' },
-        crn_sbml_ref: { type: 'object', additionalProperties: true, description: 'bio_circuit_compile 输出 SBML 的 artifactRef {artifact_id,...}（须已登记）' },
+        crn_sbml_ref: { type: 'object', additionalProperties: true, description: 'bio_circuit_compile 输出 SBML 的 artifactRef {artifact_id,expected_sha256,relative_path}（已登记对象；与 crn_sbml_file 互斥）' },
+        crn_sbml_file: { type: 'object', additionalProperties: true, description: 'kinetic_crn_ref 登记入口：{path, sha256?} 指向 SBML 文件；本层摄入（hash+副本+input_snapshot）后自动转为 crn_sbml_ref（与 crn_sbml_ref 互斥）' },
         strict: { type: 'boolean', default: true },
         casefile_dir: { type: 'string' },
       },
       op: 'design_circuit_contextualize',
+      // circuit_design / expression_scenario 是无条件产物（OK 必产）；
+      // kinetic_crn_ref 仅在提供了 CRN（ref 或 file 登记入口）时才产——按条件产物声明，
+      // 避免「未提供 CRN」被误判 MISSING_OUTPUT，同时不放松前两项。
       allowedOutputs: [
         { logical_name: 'circuit_design.json', artifact_type: 'circuit_design', required: false },
         { logical_name: 'expression_scenario.json', artifact_type: 'expression_scenario', required: false },
-        { logical_name: 'kinetic_crn_ref.json', artifact_type: 'kinetic_crn_ref', required: false },
+        {
+          logical_name: 'kinetic_crn_ref.json',
+          artifact_type: 'kinetic_crn_ref',
+          required: false,
+          requiredWhen: (args) => Boolean(args && (args.crn_sbml_ref || args.crn_sbml_file)),
+        },
       ],
       timeoutMs: 180_000,
     }),

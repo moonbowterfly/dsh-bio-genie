@@ -877,9 +877,17 @@ export async function dispatchDesignOp(pythonPath, op, args = {}, {
   } else {
     consumed = consumeDispatchCandidates({ cwd, caseHandle, dispatchId, workerResult: res.result || null, now: Date.now(), caseContentId, policy })
   }
-  const committed = consumed?.ok && consumed.candidates?.length === 1
-    ? { ok: true, object_path: consumed.candidates[0].object_path, sha256: consumed.candidates[0].sha256 }
-    : (consumed?.ok ? { ok: true, objects: consumed.candidates || [] } : null)
+  // 单候选也返回 objects[]：调用方（designHostTool）需要 logical_name 才能构造 artifactRef；
+  // object_path/sha256 保留给既有单候选消费方（向后兼容，语义不变）。
+  const committed = consumed?.ok
+    ? {
+        ok: true,
+        objects: consumed.candidates || [],
+        ...(consumed.candidates?.length === 1
+          ? { object_path: consumed.candidates[0].object_path, sha256: consumed.candidates[0].sha256 }
+          : {}),
+      }
+    : null
   return {
     ...res,
     ok: Boolean(res.ok && consumed?.ok),
