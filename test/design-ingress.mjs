@@ -107,7 +107,7 @@ try {
     const d = root()
     const sbml = write(d, 'model.sbml', '<?xml version="1.0"?><sbml xmlns="http://www.sbml.org/sbml/level3/version1/core"></sbml>')
     const r = ingestExternalInput(sbml, { role: 'gem_model' })
-    check('SBML model ingress succeeds without claiming FBC semantics', r.ok && r.inventory.format === 'sbml' && r.inventory.consumer_compatibility[0] === 'bio_design_consequence', JSON.stringify(r))
+    check('SBML model ingress succeeds without claiming FBC semantics', r.ok && r.inventory.format === 'sbml' && r.inventory.consumer_compatibility[0] === 'design_consequence', JSON.stringify(r))
   }
   {
     const d = root()
@@ -135,10 +135,12 @@ try {
     const cassette = write(d, 'cassette.fa', '>cassette\nACGT\n')
     const c = ingestExternalInput(cassette, { role: 'cassette' })
     check('cassette FASTA has only circuit/integration consumers', c.ok && JSON.stringify(c.inventory.consumer_compatibility) === JSON.stringify(['bio_circuit_contextualize', 'bio_integration_candidates']), JSON.stringify(c))
+    const EXPECT_CONSUMER = { gem_card: 'design_consequence', coupling_assumption: 'bio_circuit_contextualize' }
     for (const role of ['gem_card', 'coupling_assumption']) {
       const p = write(d, role + '.json', '{"kind":"' + role + '"}')
       const r = ingestExternalInput(p, { role })
-      check(role + ' JSON maps only to consequence consumer', r.ok && JSON.stringify(r.inventory.consumer_compatibility) === JSON.stringify(['bio_design_consequence']), JSON.stringify(r))
+      check(role + ' JSON 只映射到真实注册工具名（' + EXPECT_CONSUMER[role] + '）',
+        r.ok && JSON.stringify(r.inventory.consumer_compatibility) === JSON.stringify([EXPECT_CONSUMER[role]]), JSON.stringify(r))
     }
   }
   {
