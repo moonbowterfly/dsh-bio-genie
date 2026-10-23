@@ -7,7 +7,7 @@
   ],
   "config_fingerprint": {
     "dsh_version": {
-      "value": "0.6.51",
+      "value": "0.6.52",
       "source": "package.json#version"
     },
     "preset": {
@@ -27,7 +27,7 @@
     }
   },
   "config_hash": {
-    "value": "8ee07a15b9b0261ba7b34e190b7eff31cc6feda493366d6bf82b4cb98a46cc47",
+    "value": "60d93e49ad6f747a5466a67970f759683a02d805638008e5e379319cacc6bae6",
     "canonical_fields": [
       "fixture_version",
       "dsh_version",
